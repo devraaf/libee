@@ -1,0 +1,27 @@
+name: Tarefa técnica
+description: Documentação, testes, refatoração ou configuração
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Depois de criar a Issue, adicione a label do tipo: `tipo: docs`, `tipo: test`, `tipo: refactor` ou `tipo: chore`.
+  - type: textarea
+    id: objetivo
+    attributes:
+      label: Objetivo
+      description: O que precisa ser feito e por quê.
+    validations:
+      required: true
+  - type: textarea
+    id: criterios
+    attributes:
+      label: Critérios de conclusão
+      description: O que precisa ser verdade para esta tarefa ser considerada concluída.
+      value: "- [ ] "
+    validations:
+      required: true
+  - type: textarea
+    id: observacoes
+    attributes:
+      label: Observações
+      description: "(Opcional) Dependências, referências, links."

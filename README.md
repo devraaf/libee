@@ -1,5 +1,5 @@
 # Libee
-Plataforma de gestão de bibliotecas acadêmicas para a Fatec  Cotia.
+Plataforma de gestão de bibliotecas acadêmicas para a Fatec Cotia.
 
 >Projeto desenvolvido em grupo, no contexto acadêmico.
 
@@ -21,4 +21,3 @@ Plataforma de gestão de bibliotecas acadêmicas para a Fatec  Cotia.
 
 O backend segue arquitetura em camadas (MVC com Service e Repository) e se comunica com o frontend por API REST em JSON.
 A lista de dependências pode ser ajustada ao longo do desenvolvimento.
-

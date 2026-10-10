@@ -1,0 +1,26 @@
+name: Funcionalidade (User Story)
+description: Descreva uma nova funcionalidade como história de usuário
+labels: ["type: feature"]
+body:
+  - type: textarea
+    id: historia
+    attributes:
+      label: História de usuário
+      description: "Use o formato: Como <perfil>, quero <ação> para que <benefício>."
+      placeholder: "Como bibliotecário, quero cadastrar um livro no sistema para que ele possa fazer parte do acervo."
+    validations:
+      required: true
+  - type: textarea
+    id: criterios
+    attributes:
+      label: Critérios de aceite
+      description: O que precisa ser verdade para esta tarefa ser considerada concluída.
+      value: "- [ ] "
+    validations:
+      required: true
+  - type: textarea
+    id: observacoes
+    attributes:
+      label: Observações
+      description: "(Opcional) Dependências de outras Issues, caso de uso relacionado, links de referência."
+      placeholder: "Ex.: depende da Issue #10"
