@@ -1,0 +1,7 @@
+* text=auto
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jar binary
+mvnw text eol=lf
+

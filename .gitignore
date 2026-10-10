@@ -1,0 +1,33 @@
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores / IDEs
+.vscode/
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.sts4-cache/
+*.swp
+
+# Variáveis de ambiente e segredos
+.env
+.env.*
+!.env.example
+
+# Logs e temporários
+*.log
+*.tmp
+
+# Backend (Java / Spring Boot)
+target/
+*.class
+
+# Frontend (Node / Vite)
+node_modules/
+dist/
+coverage/
+npm-debug.log*
