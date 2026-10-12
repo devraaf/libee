@@ -31,3 +31,6 @@ node_modules/
 dist/
 coverage/
 npm-debug.log*
+
+# Perfil local Spring Boot (credenciais)
+application-local.properties
