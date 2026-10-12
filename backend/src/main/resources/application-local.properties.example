@@ -1,0 +1,4 @@
+# Copie este arquivo para application-local.properties e preencha com os seus valores.
+# O application-local.properties é ignorado pelo Git. Nunca envie credenciais para o repositório.
+spring.datasource.username=postgres
+spring.datasource.password=change_me
