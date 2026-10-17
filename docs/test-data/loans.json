@@ -1,0 +1,82 @@
+[
+  {
+    "id": 1,
+    "copyId": 1,
+    "readerId": 4,
+    "librarianId": 2,
+    "loanDate": "2026-08-03",
+    "dueDate": "2026-08-17",
+    "returnDate": "2026-08-14",
+    "renewalCount": 0
+  },
+  {
+    "id": 2,
+    "copyId": 3,
+    "readerId": 5,
+    "librarianId": 3,
+    "loanDate": "2026-08-10",
+    "dueDate": "2026-08-24",
+    "returnDate": "2026-09-02",
+    "renewalCount": 1
+  },
+  {
+    "id": 3,
+    "copyId": 5,
+    "readerId": 7,
+    "librarianId": 2,
+    "loanDate": "2026-09-01",
+    "dueDate": "2026-09-15",
+    "returnDate": "2026-09-10",
+    "renewalCount": 2
+  },
+  {
+    "id": 4,
+    "copyId": 2,
+    "readerId": 6,
+    "librarianId": 2,
+    "loanDate": "2026-10-12",
+    "dueDate": "2026-12-31",
+    "returnDate": null,
+    "renewalCount": 0
+  },
+  {
+    "id": 5,
+    "copyId": 7,
+    "readerId": 8,
+    "librarianId": 3,
+    "loanDate": "2026-10-05",
+    "dueDate": "2027-01-15",
+    "returnDate": null,
+    "renewalCount": 1
+  },
+  {
+    "id": 6,
+    "copyId": 9,
+    "readerId": 4,
+    "librarianId": 3,
+    "loanDate": "2026-09-14",
+    "dueDate": "2026-09-28",
+    "returnDate": null,
+    "renewalCount": 0
+  },
+  {
+    "id": 7,
+    "copyId": 11,
+    "readerId": 5,
+    "librarianId": 2,
+    "loanDate": "2026-09-01",
+    "dueDate": "2026-09-20",
+    "returnDate": null,
+    "renewalCount": 2
+  },
+  {
+    "id": 8,
+    "copyId": 2,
+    "readerId": 7,
+    "librarianId": 3,
+    "loanDate": "2026-07-01",
+    "dueDate": "2026-07-15",
+    "returnDate": "2026-07-14",
+    "renewalCount": 0
+  }
+]
