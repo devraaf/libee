@@ -2,7 +2,7 @@
 
 | Formato | Arquivo | Para quê |
 |---|---|---|
-| SQL | `test-data/V2__insert_test_data.sql` | Popular o banco de dados |
+| SQL | `V2__insert_test_data.sql` | Popular o banco de dados |
 | JSON | arquivos em `test-data`| Mostrar os dados no formato em que a API vai recebê-los e devolvê-los |
 
 Nenhum dado é real: nomes, e-mails, telefones, livros e autores são inventados.
