@@ -44,8 +44,8 @@ A aplicação fica disponível em `http://localhost:5173`.
 | `npm run dev`          | Inicia o servidor de desenvolvimento                      |
 | `npm run build`        | Verifica os tipos e gera o build de produção              |
 | `npm run preview`      | Visualiza localmente o build de produção                  |
-| `npm run lint`         | Executa o ESLint sem corrigir arquivos                    |
-| `npm run lint:fix`     | Corrige automaticamente problemas corrigíveis pelo ESLint |
+| `npm run lint`         | Executa o Oxlint sem corrigir arquivos                    |
+| `npm run lint:fix`     | Corrige automaticamente problemas corrigíveis pelo Oxlint |
 | `npm run format`       | Formata os arquivos-fonte e de configuração com Prettier  |
 | `npm run format:check` | Verifica a formatação sem alterar arquivos                |
 | `npm run typecheck`    | Verifica os tipos TypeScript sem gerar build              |
@@ -98,7 +98,7 @@ features/
 - A URL da API é configurada por `VITE_API_BASE_URL`; use `.env.example` como referência e crie um `.env` local para desenvolvimento.
 - Sem duplicação de código e sem funcionalidades fora do wireframe ou das Issues.
 
-`lint` encontra problemas estáticos; `format` padroniza a apresentação do código; `typecheck` analisa os tipos TypeScript. O comando `build` também verifica os tipos antes de gerar os arquivos de produção.
+`lint` encontra problemas estáticos com Oxlint; `format` padroniza a apresentação do código; `typecheck` analisa os tipos TypeScript. O comando `build` também verifica os tipos antes de gerar os arquivos de produção.
 
 ## Build
 
