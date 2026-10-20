@@ -27,6 +27,7 @@ import { Table, type TableColumn } from '../components/ui/Table'
 import { Tabs } from '../components/ui/Tabs'
 import { useDisclosure } from '../hooks/useDisclosure'
 import type { NavLinkItem } from '../types/navigation'
+import { Loader } from '../components/ui/Loader/Loader';
 
 const links: NavLinkItem[] = [
   { label: 'Item um', to: '/', icon: Library, end: true },
@@ -174,6 +175,7 @@ export function GalleryPage() {
         <Demo label="EmptyState">
           <Card className="w-full"><EmptyState icon={<BookText size={22} />} title="Nenhum resultado encontrado." description="Ajuste a busca e tente novamente." action={<Button variant="outline">Ação</Button>} /></Card>
         </Demo>
+
         <Demo label="Modal">
           <Button variant="secondary" onClick={modal.open}>Abrir modal</Button>
         </Demo>
@@ -194,6 +196,14 @@ export function GalleryPage() {
         </Demo>
         <Demo label="Footer">
           <div className="w-full overflow-hidden rounded-xl border border-line"><Footer /></div>
+        </Demo>
+      </Section>
+
+      <Section id="Feedback" title="Animação de Carregamento">
+        <Demo label="Loader ">
+          <div className="p-6 bg-muted/20 rounded-lg flex items-center justify-center w-full">
+            <Loader />
+          </div>
         </Demo>
       </Section>
 
