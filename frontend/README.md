@@ -16,8 +16,8 @@ Esta etapa cobre apenas o front-end, seguindo o wireframe do projeto. Não há b
 
 ## Pré-requisitos
 
-- [Node.js](https://nodejs.org/) `>=22.22.0` (necessário para o React Router instalado)
-- npm 10.9.2 (versão registrada no `package.json`)
+- [Node.js](https://nodejs.org/) 20.19 ou superior
+- npm (já vem com o Node.js)
 - Git
 
 ## Instalação
@@ -26,7 +26,7 @@ A partir da raiz do repositório:
 
 ```bash
 cd frontend
-npm ci
+npm install
 ```
 
 ## Executar em desenvolvimento
@@ -65,6 +65,7 @@ frontend/
     │   ├── routes/             # Rotas globais quando houver páginas
     │   └── providers/          # Providers globais necessários
     ├── features/               # Funcionalidades, criadas conforme forem desenvolvidas
+    ├── test/                   # Configurações, fixtures e utilitários compartilhados de teste
     ├── shared/
     │   ├── api/                # Cliente HTTP compartilhado
     │   ├── components/         # Componentes realmente reutilizados
@@ -75,6 +76,8 @@ frontend/
     ├── index.css               # Estilos globais e entrada do Tailwind 4
     └── main.tsx                # Ponto de entrada
 ```
+
+Testes específicos de uma feature ou componente devem ficar próximos do código testado; use `src/test/` para recursos compartilhados entre diferentes testes.
 
 As pastas de cada funcionalidade em `src/features/` são criadas conforme as respectivas Issues forem desenvolvidas, seguindo este padrão:
 
