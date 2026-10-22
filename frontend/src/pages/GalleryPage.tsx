@@ -1,6 +1,6 @@
-import { Bell, BookText, Library, Plus, Search, Settings, Users } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
-import { Logo } from '../components/branding/Logo.tsx'
+import { Bell, BookText, Library, Plus, Search, Settings, Users } from 'lucide-react'
+import { Logo } from '../components/branding/Logo'
 import { Footer } from '../components/navigation/Footer'
 import { Navbar } from '../components/navigation/Navbar'
 import { Sidebar } from '../components/navigation/Sidebar'
@@ -15,11 +15,12 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { FilterButton } from '../components/ui/FilterButton'
 import { IconButton } from '../components/ui/IconButton'
 import { Input } from '../components/ui/Input'
+import { Loader } from '../components/ui/Loader/Loader'
 import { Modal } from '../components/ui/Modal'
 import { PageHeader } from '../components/ui/PageHeader'
-import { PasswordInput } from '../components/ui/PasswordInput'
 import { Pagination } from '../components/ui/Pagination'
-import { RadioGroup } from '../components/ui/RadioGroup'
+import { PasswordInput } from '../components/ui/PasswordInput'
+import { RadioGroup } from '.././components/ui/RadioGroup'
 import { SearchInput } from '../components/ui/SearchInput'
 import { Select } from '../components/ui/Select'
 import { StatCard } from '../components/ui/StatCard'
@@ -27,12 +28,11 @@ import { Table, type TableColumn } from '../components/ui/Table'
 import { Tabs } from '../components/ui/Tabs'
 import { useDisclosure } from '../hooks/useDisclosure'
 import type { NavLinkItem } from '../types/navigation'
-import { Loader } from '../components/ui/Loader/Loader';
 
 const links: NavLinkItem[] = [
   { label: 'Item um', to: '/', icon: Library, end: true },
-  { label: 'Item dois', to: '/#dois', icon: BookText },
-  { label: 'Item três', to: '/#tres', icon: Users },
+  { label: 'Item dois', to: '/galeria#dois', icon: BookText },
+  { label: 'Item três', to: '/galeria#tres', icon: Users },
 ]
 
 interface Row {
@@ -40,17 +40,19 @@ interface Row {
   a: string
   b: string
 }
+
 const columns: TableColumn<Row>[] = [
   { key: 'a', header: 'Cabeçalho', render: (r) => r.a },
   { key: 'b', header: 'Cabeçalho', render: (r) => r.b },
   { key: 's', header: 'Status', render: () => <Badge variant="success" dot>Disponível</Badge> },
 ]
+
 const rows: Row[] = [1, 2, 3].map((id) => ({ id, a: 'Célula', b: 'Célula' }))
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
     <section id={id} className="flex flex-col gap-5 border-t border-line py-10">
-      <h2 className="type-h2">{title}</h2>
+      <h2 className="type-h2 text-xl font-bold">{title}</h2>
       {children}
     </section>
   )
@@ -59,14 +61,14 @@ function Section({ id, title, children }: { id: string; title: string; children:
 function Demo({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
-      <p className="type-caption font-semibold text-muted">{label}</p>
+      <p className="type-caption font-semibold text-muted text-sm">{label}</p>
       <div className="flex flex-wrap items-start gap-3">{children}</div>
     </div>
   )
 }
 
 const buttonVariants: ButtonVariant[] = ['primary', 'secondary', 'outline', 'ghost']
-const categories = ['Ações', 'Formulários', 'Exibição de dados', 'Feedback e overlays', 'Navegação', 'Identidade']
+const categories = ['Ações', 'Formulários', 'Exibição de dados', 'Feedback e overlays', 'Navegação', 'Animação', 'Identidade']
 
 export function GalleryPage() {
   const modal = useDisclosure()
@@ -81,18 +83,20 @@ export function GalleryPage() {
       <header className="flex flex-wrap items-center justify-between gap-4 py-8">
         <div className="flex items-center gap-4">
           <Logo heightClassName="h-14" />
-          <h1 className="type-h1">Galeria de componentes Apenas a visao dos componentes reutilizaveis</h1>
+          <h1 className="type-h1 text-2xl font-bold">Galeria de Componentes</h1>
         </div>
         <ThemeToggle />
       </header>
+
       <nav aria-label="Categorias" className="flex flex-wrap gap-2 pb-6">
         {categories.map((c) => (
-          <a key={c} href={`#${c}`} className="type-small rounded-full bg-chip px-3 py-1 text-muted hover:text-fg">
+          <a key={c} href={`#${c}`} className="type-small rounded-full bg-chip px-3 py-1 text-muted hover:text-fg text-sm">
             {c}
           </a>
         ))}
       </nav>
 
+      {/* AÇÕES */}
       <Section id="Ações" title="Ações">
         {buttonVariants.map((v) => (
           <Demo key={v} label={`Button — ${v}`}>
@@ -117,6 +121,7 @@ export function GalleryPage() {
         </Demo>
       </Section>
 
+      {/* FORMULÁRIOS */}
       <Section id="Formulários" title="Formulários">
         <div className="grid gap-5 md:grid-cols-2">
           <Input label="Input" placeholder="Placeholder" />
@@ -132,6 +137,7 @@ export function GalleryPage() {
         </div>
       </Section>
 
+      {/* EXIBIÇÃO DE DADOS */}
       <Section id="Exibição de dados" title="Exibição de dados">
         <Demo label="Badge">
           <Badge variant="success" dot>Disponível</Badge>
@@ -156,7 +162,9 @@ export function GalleryPage() {
           <StatCard label="Sem valor" icon={<Users size={20} />} />
         </Demo>
         <Demo label="PageHeader">
-          <div className="w-full"><PageHeader title="Título" subtitle="Subtítulo da página" action={<Button leftIcon={<Plus size={16} />}>Ação</Button>} /></div>
+          <div className="w-full">
+            <PageHeader title="Título" subtitle="Subtítulo da página" action={<Button leftIcon={<Plus size={16} />}>Ação</Button>} />
+          </div>
         </Demo>
         <Demo label="Tabs">
           <Tabs label="Demo" value={tab} onChange={setTab} items={[{ id: 'a', label: 'Aba A (0)' }, { id: 'b', label: 'Aba B (0)' }]} />
@@ -167,15 +175,19 @@ export function GalleryPage() {
           </div>
         </Demo>
         <Demo label="Table vazia">
-          <div className="w-full"><Table columns={columns} rows={[]} getRowKey={(r) => r.id} emptyState={<EmptyState title="Nenhum registro disponível." />} /></div>
+          <div className="w-full">
+            <Table columns={columns} rows={[]} getRowKey={(r) => r.id} emptyState={<EmptyState title="Nenhum registro disponível." />} />
+          </div>
         </Demo>
       </Section>
 
+      {/* FEEDBACK E OVERLAYS */}
       <Section id="Feedback e overlays" title="Feedback e overlays">
         <Demo label="EmptyState">
-          <Card className="w-full"><EmptyState icon={<BookText size={22} />} title="Nenhum resultado encontrado." description="Ajuste a busca e tente novamente." action={<Button variant="outline">Ação</Button>} /></Card>
+          <Card className="w-full">
+            <EmptyState icon={<BookText size={22} />} title="Nenhum resultado encontrado." description="Ajuste a busca e tente novamente." action={<Button variant="outline">Ação</Button>} />
+          </Card>
         </Demo>
-
         <Demo label="Modal">
           <Button variant="secondary" onClick={modal.open}>Abrir modal</Button>
         </Demo>
@@ -184,29 +196,38 @@ export function GalleryPage() {
         </Modal>
       </Section>
 
+    {/* NAVEGAÇÃO */}
       <Section id="Navegação" title="Navegação">
         <Demo label="Navbar (com sair)">
-          <div className="w-full overflow-hidden rounded-xl border border-line [transform:translateZ(0)]"><Navbar links={links} showLogout /></div>
+          <div className="w-full overflow-hidden rounded-xl border border-line">
+            <Navbar links={links} showLogout />
+          </div>
         </Demo>
         <Demo label="Sidebar + Topbar (recolhível)">
-          <div className="flex h-[26rem] w-full overflow-hidden rounded-xl border border-line [transform:translateZ(0)]">
+          <div className="flex h-[26rem] w-full overflow-hidden rounded-xl border border-line">
             <Sidebar links={links} collapsed={collapsed} onToggleCollapsed={() => setCollapsed((v) => !v)} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
-            <div className="min-w-0 flex-1"><Topbar onOpenMenu={() => setMobileOpen(true)} /></div>
+            <div className="min-w-0 flex-1">
+              <Topbar onOpenMenu={() => setMobileOpen(true)} />
+            </div>
           </div>
         </Demo>
         <Demo label="Footer">
-          <div className="w-full overflow-hidden rounded-xl border border-line"><Footer /></div>
+          <div className="w-full overflow-hidden rounded-xl border border-line">
+            <Footer />
+          </div>
         </Demo>
       </Section>
 
-      <Section id="Feedback" title="Animação de Carregamento">
-        <Demo label="Loader ">
+      {/* ANIMAÇÕES DE CARREGAMENTO */}
+      <Section id="Animação" title="Animação de Carregamento">
+        <Demo label="Loader">
           <div className="p-6 bg-muted/20 rounded-lg flex items-center justify-center w-full">
             <Loader />
           </div>
         </Demo>
       </Section>
 
+      {/* IDENTIDADE */}
       <Section id="Identidade" title="Identidade">
         <Demo label="Logo — full / mark">
           <Logo heightClassName="h-16" />

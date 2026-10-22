@@ -1,13 +1,16 @@
-import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
-import { AppProviders } from './app/providers/AppProviders';
-import './index.css';
-import { GalleryPage } from './app/pages/GalleryPage';
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
+import { AppRoutes } from './app/routes/AppRoutes'
+import { ThemeProvider } from './app/providers/ThemeProvider'
+import './index.css'
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <AppProviders>
-      <GalleryPage />
-    </AppProviders>
-  </StrictMode>,
-);
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
+    </ThemeProvider>
+  </React.StrictMode>,
+)

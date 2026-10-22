@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { NavLinkItem } from '../../types/navigation'
-import { Logo } from '../branding/Logo.tsx'
+import { Logo } from '../branding/Logo'
 import { cn } from '../ui/cn'
 import { SidebarItem } from './SidebarItem'
 
