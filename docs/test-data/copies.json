@@ -1,0 +1,100 @@
+[
+  {
+    "id": 1,
+    "bookId": 1,
+    "accessionNumber": "0001",
+    "physicalLocation": "Estante A-01",
+    "status": "AVAILABLE"
+  },
+  {
+    "id": 2,
+    "bookId": 1,
+    "accessionNumber": "0002",
+    "physicalLocation": "Estante A-02",
+    "status": "ON_LOAN"
+  },
+  {
+    "id": 3,
+    "bookId": 2,
+    "accessionNumber": "0003",
+    "physicalLocation": "Estante B-01",
+    "status": "AVAILABLE"
+  },
+  {
+    "id": 4,
+    "bookId": 2,
+    "accessionNumber": "0004",
+    "physicalLocation": "Estante B-02",
+    "status": "AVAILABLE"
+  },
+  {
+    "id": 5,
+    "bookId": 3,
+    "accessionNumber": "0005",
+    "physicalLocation": "Estante C-01",
+    "status": "AVAILABLE"
+  },
+  {
+    "id": 6,
+    "bookId": 3,
+    "accessionNumber": "0006",
+    "physicalLocation": "Estante C-02",
+    "status": "AVAILABLE"
+  },
+  {
+    "id": 7,
+    "bookId": 4,
+    "accessionNumber": "0007",
+    "physicalLocation": "Estante D-01",
+    "status": "ON_LOAN"
+  },
+  {
+    "id": 8,
+    "bookId": 4,
+    "accessionNumber": "0008",
+    "physicalLocation": "Estante D-02",
+    "status": "AVAILABLE"
+  },
+  {
+    "id": 9,
+    "bookId": 5,
+    "accessionNumber": "0009",
+    "physicalLocation": "Estante E-01",
+    "status": "ON_LOAN"
+  },
+  {
+    "id": 10,
+    "bookId": 5,
+    "accessionNumber": "0010",
+    "physicalLocation": "Estante E-02",
+    "status": "AVAILABLE"
+  },
+  {
+    "id": 11,
+    "bookId": 6,
+    "accessionNumber": "0011",
+    "physicalLocation": "Estante F-01",
+    "status": "ON_LOAN"
+  },
+  {
+    "id": 12,
+    "bookId": 7,
+    "accessionNumber": "0012",
+    "physicalLocation": "Estante G-01",
+    "status": "AVAILABLE"
+  },
+  {
+    "id": 13,
+    "bookId": 7,
+    "accessionNumber": "0013",
+    "physicalLocation": "Estante G-02",
+    "status": "AVAILABLE"
+  },
+  {
+    "id": 14,
+    "bookId": 8,
+    "accessionNumber": "0014",
+    "physicalLocation": "Estante H-01",
+    "status": "AVAILABLE"
+  }
+]
