@@ -7,6 +7,7 @@ Este roteiro permite recriar o banco de dados e conferir os dados preparados par
 - [diagrama-classes.png](../uml/diagrama-classes.png): diagrama de classes do Libee.
 - [V1__create_domains_and_tables.sql](../../backend/src/main/resources/db/migration/V1__create_domains_and_tables.sql): formatação do banco de dados.
 - [V2__insert_test_data.sql](../../backend/src/main/resources/db/migration/V2__insert_test_data.sql): dados de teste inseridos no banco.
+- [V3__create_audit_triggers.sql](../../backend/src/main/resources/db/migration/V3__create_audit_triggers.sql): triggers e tabela de auditoria para UPDATE e DELETE.
 - Arquivos `.json` em [test-data/](../test-data/): representação dos dados no formato previsto para tráfego pela API.
 - [test_queries.sql](./test_queries.sql): consultas para conferir o acervo e os empréstimos.
 
@@ -22,7 +23,8 @@ Este roteiro permite recriar o banco de dados e conferir os dados preparados par
 2. Abra o Query Tool desse banco.
 3. Abra e execute `V1__create_domains_and_tables.sql`.
 4. Sem trocar de banco, abra e execute `V2__insert_test_data.sql`.
-5. Para conferir os resultados, abra e execute `test_queries.sql`.
+5. Em seguida, abra e execute `V3__create_audit_triggers.sql` para ativar a auditoria.
+6. Para conferir os resultados, abra e execute `test_queries.sql`.
 
 Execute os dois primeiros arquivos SQL uma única vez e na ordem indicada, em um banco recém-criado. A estrutura e os dados usam nomes e IDs fixos, então não execute esses scripts novamente sobre o mesmo banco. Para recomeçar, crie outro banco vazio para a avaliação. O arquivo `test_queries.sql` contém apenas consultas de leitura e pode ser executado novamente.
 
@@ -41,6 +43,7 @@ Após a carga, o banco deve conter:
 | `book_author` | 9 |
 | `book_copies` | 14 |
 | `loans` | 8 |
+| `audit_logs` | Variável (0 ou mais, conforme testes de UPDATE/DELETE)
 
 As consultas em `test_queries.sql` demonstram listagens do acervo, exemplares disponíveis, empréstimos ativos, empréstimos atrasados e um resumo das quantidades.
 
