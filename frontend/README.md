@@ -39,16 +39,12 @@ A aplicação fica disponível em `http://localhost:5173`.
 
 ## Scripts disponíveis
 
-| Comando                | Descrição                                                 |
-| ---------------------- | --------------------------------------------------------- |
-| `npm run dev`          | Inicia o servidor de desenvolvimento                      |
-| `npm run build`        | Verifica os tipos e gera o build de produção              |
-| `npm run preview`      | Visualiza localmente o build de produção                  |
-| `npm run lint`         | Executa o Oxlint sem corrigir arquivos                    |
-| `npm run lint:fix`     | Corrige automaticamente problemas corrigíveis pelo Oxlint |
-| `npm run format`       | Formata os arquivos-fonte e de configuração com Prettier  |
-| `npm run format:check` | Verifica a formatação sem alterar arquivos                |
-| `npm run typecheck`    | Verifica os tipos TypeScript sem gerar build              |
+| Comando           | Descrição                                      |
+| ----------------- | ---------------------------------------------- |
+| `npm run dev`     | Inicia o servidor de desenvolvimento           |
+| `npm run build`   | Verifica os tipos e gera o build de produção   |
+| `npm run preview` | Visualiza localmente o build de produção       |
+| `npm run lint`    | Executa o ESLint                               |
 
 ## Estrutura de pastas
 
@@ -57,27 +53,25 @@ O projeto usa arquitetura **feature-based**: o código é organizado por funcion
 ```text
 frontend/
 ├── public/
-│   └── images/                 # Arquivos servidos diretamente
+│   └── images/            # Imagens estáticas (logos)
 │
 └── src/
     ├── app/
-    │   ├── App.tsx             # Composição e provedor de rotas
-    │   ├── routes/             # Rotas globais quando houver páginas
-    │   └── providers/          # Providers globais necessários
-    ├── features/               # Funcionalidades, criadas conforme forem desenvolvidas
-    ├── test/                   # Configurações, fixtures e utilitários compartilhados de teste
-    ├── shared/
-    │   ├── api/                # Cliente HTTP compartilhado
-    │   ├── components/         # Componentes realmente reutilizados
-    │   ├── hooks/              # Hooks compartilhados
-    │   ├── utils/               # Utilitários sem domínio de feature
-    │   └── types/              # Tipos compartilhados
-    ├── assets/                 # Recursos importados no código
-    ├── index.css               # Estilos globais e entrada do Tailwind 4
-    └── main.tsx                # Ponto de entrada
+    │   ├── routes/        # Definição das rotas
+    │   └── providers/     # Providers globais
+    ├── assets/            # Recursos estáticos importados no código
+    ├── components/
+    │   ├── branding/      # Logo e identidade visual
+    │   ├── navigation/    # Navbar e navegação
+    │   └── ui/            # Componentes de interface reutilizáveis
+    ├── hooks/             # Hooks compartilhados
+    ├── layouts/           # Layouts de página
+    ├── pages/             # Páginas da aplicação
+    ├── services/          # Serviços HTTP compartilhados
+    ├── types/             # Tipos compartilhados
+    ├── index.css          # Estilos globais e Tailwind
+    └── main.tsx           # Ponto de entrada
 ```
-
-Testes específicos de uma feature ou componente devem ficar próximos do código testado; use `src/test/` para recursos compartilhados entre diferentes testes.
 
 As pastas de cada funcionalidade em `src/features/` são criadas conforme as respectivas Issues forem desenvolvidas, seguindo este padrão:
 
@@ -86,8 +80,8 @@ features/
 └── nome-da-feature/
     ├── components/
     ├── hooks/
-    ├── services/    # chamadas HTTP específicas da feature
-    ├── schemas/     # validações específicas da feature
+    ├── services/    # quando houver chamadas HTTP
+    ├── schemas/     # quando houver validações com Zod
     └── types/
 ```
 
@@ -96,12 +90,13 @@ features/
 - Componentes em TypeScript, pequenos e com responsabilidade única.
 - Estilização com Tailwind CSS.
 - Rotas com React Router, importando sempre de `react-router`.
-- Pastas de features em `kebab-case`; componentes em `PascalCase`; hooks com prefixo `use`; funções e variáveis em `camelCase`; tipos em `PascalCase`.
-- Tipos, schemas e serviços ficam junto da feature que os utiliza; mova-os para `shared` apenas quando forem reutilizados.
-- A URL da API é configurada por `VITE_API_BASE_URL`; use `.env.example` como referência e crie um `.env` local para desenvolvimento.
 - Sem duplicação de código e sem funcionalidades fora do wireframe ou das Issues.
 
-`lint` encontra problemas estáticos com Oxlint; `format` padroniza a apresentação do código; `typecheck` analisa os tipos TypeScript. O comando `build` também verifica os tipos antes de gerar os arquivos de produção.
+### Branches e commits
+
+- Cada Issue tem sua branch, criada a partir da `develop`, no formato `tipo/numero-da-issue/descricao-curta`. Exemplo: `feature/15/navbar`.
+- Commits no formato `tipo: descrição curta` ou `tipo(escopo): descrição curta`. Exemplo: `feat(frontend): implementar navbar`.
+- Nunca faça push direto na `main` nem na `develop`. Todo código entra por Pull Request, com Squash and merge.
 
 ## Build
 
