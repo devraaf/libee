@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { Logo } from '../../shared/components/branding/Logo.tsx';
-import { Footer } from '../../shared/components/navigation/Footer.tsx';
+import { Footer } from '../layout/Footer.tsx';
 import { Navbar } from '../../shared/components/navigation/Navbar.tsx';
 import { Sidebar } from '../../shared/components/navigation/Sidebar.tsx';
 import { ThemeToggle } from '../../shared/components/navigation/ThemeToggle.tsx';
