@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Plus, BookMarked, CircleCheck, AlarmClock } from "lucide-react";
-import Navbar from "../../shared/components/navigation/LibrarianNavbar";
-import { Footer } from "../layout/Footer";
-import { StatCard } from "../../shared/components/ui/StatCard";
-import SearchFilterBar from "../../shared/components/ui/SearchFilterBar";
-import TableFooter from "../../shared/components/ui/TableFooter";
+import Navbar from "../../../shared/components/navigation/LibrarianNavbar";
+import { Footer } from "../../../app/layout/Footer";
+import { StatCard } from "../../../shared/components/ui/StatCard";
+import SearchFilterBar from "../../../shared/components/ui/SearchFilterBar";
+import TableFooter from "../../../shared/components/ui/TableFooter";
 
 type Situacao = "Em dia" | "Atrasado";
 

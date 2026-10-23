@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Plus, BookOpen, Library, CircleCheck, Clock, Pencil, X } from "lucide-react";
-import LibrarianNavbar from "../../shared/components/navigation/LibrarianNavbar";
-import { Footer } from "../layout/Footer";
-import { StatCard } from "../../shared/components/ui/StatCard";
-import SearchFilterBar from "../../shared/components/ui/SearchFilterBar";
-import TableFooter from "../../shared/components/ui/TableFooter";
+import LibrarianNavbar from "../../../shared/components/navigation/LibrarianNavbar";
+import { Footer } from "../../../app/layout/Footer";
+import { StatCard } from "../../../shared/components/ui/StatCard";
+import SearchFilterBar from "../../../shared/components/ui/SearchFilterBar";
+import TableFooter from "../../../shared/components/ui/TableFooter";
 
 /*    Dado Ficticio para verificação do layout da pagina    */
 const livro = {
