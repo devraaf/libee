@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom';
-import { Button } from '../../shared/components/ui/Button';
 
 export function NotFoundPage() {
   return (
     <main className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-bg text-fg">
       <div className="flex flex-col items-center justify-center text-center max-w-lg w-full">
-        <div className="relative flex items-center justify-center select-none my-6">
+        <div
+          aria-hidden="true"
+          className="relative flex items-center justify-center select-none my-6"
+        >
           {/* Primeiro número 4 */}
           <span className="text-9xl sm:text-[12rem] font-extrabold text-fg leading-none flex items-center">
             4
@@ -14,7 +16,7 @@ export function NotFoundPage() {
           {/* SVG da Colmeia */}
           <img
             src="/images/hive-notFound.svg"
-            alt="Colmeia 404"
+            alt=""
             className="w-36 h-36 sm:w-52 sm:h-52 object-contain -mx-3 sm:-mx-5 z-10"
           />
 
@@ -34,10 +36,11 @@ export function NotFoundPage() {
           página.
         </p>
 
-        <Link to="/" className="w-full sm:w-auto">
-          <Button type="button" size="lg" className="w-full sm:w-auto px-8">
-            Voltar ao início
-          </Button>
+        <Link
+          to="/"
+          className="inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-8 text-sm font-semibold text-on-primary transition-colors hover:bg-primary-hover active:bg-primary-active sm:w-auto"
+        >
+          Voltar ao início
         </Link>
       </div>
     </main>
