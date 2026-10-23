@@ -41,9 +41,9 @@ import type { NavLinkItem } from '../../shared/types/navigation.ts';
 import { Loader } from '../../shared/components/ui/Loader/Loader.tsx';
 
 const links: NavLinkItem[] = [
-  { label: 'Item um', to: '/#um', icon: Library, end: true },
-  { label: 'Item dois', to: '/#dois', icon: BookText },
-  { label: 'Item três', to: '/#tres', icon: Users },
+  { label: 'Item um', to: '/galeria#um', icon: Library, end: true },
+  { label: 'Item dois', to: '/galeria#dois', icon: BookText },
+  { label: 'Item três', to: '/galeria#tres', icon: Users },
 ];
 
 interface Row {
@@ -77,7 +77,7 @@ function Section({
 }) {
   return (
     <section id={id} className="flex flex-col gap-5 border-t border-line py-10">
-      <h2 className="type-h2">{title}</h2>
+      <h2 className="type-h2 text-xl font-bold">{title}</h2>
       {children}
     </section>
   );
@@ -86,7 +86,7 @@ function Section({
 function Demo({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
-      <p className="type-caption font-semibold text-muted">{label}</p>
+      <p className="type-caption font-semibold text-muted text-sm">{label}</p>
       <div className="flex flex-wrap items-start gap-3">{children}</div>
     </div>
   );
@@ -104,6 +104,7 @@ const categories = [
   'Exibição de dados',
   'Feedback e overlays',
   'Navegação',
+  'Animação',
   'Identidade',
 ];
 
@@ -120,24 +121,24 @@ export function GalleryPage() {
       <header className="flex flex-wrap items-center justify-between gap-4 py-8">
         <div className="flex items-center gap-4">
           <Logo heightClassName="h-14" />
-          <h1 className="type-h1">
-            Galeria de componentes Apenas a visao dos componentes reutilizaveis
-          </h1>
+          <h1 className="type-h1 text-2xl font-bold">Galeria de Componentes</h1>
         </div>
         <ThemeToggle />
       </header>
+
       <nav aria-label="Categorias" className="flex flex-wrap gap-2 pb-6">
         {categories.map((c) => (
           <a
             key={c}
             href={`#${c}`}
-            className="type-small rounded-full bg-chip px-3 py-1 text-muted hover:text-fg"
+            className="type-small rounded-full bg-chip px-3 py-1 text-muted hover:text-fg text-sm"
           >
             {c}
           </a>
         ))}
       </nav>
 
+      {/* AÇÕES */}
       <Section id="Ações" title="Ações">
         {buttonVariants.map((v) => (
           <Demo key={v} label={`Button — ${v}`}>
@@ -179,6 +180,7 @@ export function GalleryPage() {
         </Demo>
       </Section>
 
+      {/* FORMULÁRIOS */}
       <Section id="Formulários" title="Formulários">
         <div className="grid gap-5 md:grid-cols-2">
           <Input label="Input" placeholder="Placeholder" />
@@ -225,6 +227,7 @@ export function GalleryPage() {
         </div>
       </Section>
 
+      {/* EXIBIÇÃO DE DADOS */}
       <Section id="Exibição de dados" title="Exibição de dados">
         <Demo label="Badge">
           <Badge variant="success" dot>
@@ -314,6 +317,7 @@ export function GalleryPage() {
         </Demo>
       </Section>
 
+      {/* FEEDBACK E OVERLAYS */}
       <Section id="Feedback e overlays" title="Feedback e overlays">
         <Demo label="EmptyState">
           <Card className="w-full">
@@ -350,14 +354,15 @@ export function GalleryPage() {
         </Modal>
       </Section>
 
+      {/* NAVEGAÇÃO */}
       <Section id="Navegação" title="Navegação">
         <Demo label="Navbar (com sair)">
-          <div className="w-full overflow-hidden rounded-xl border border-line [transform:translateZ(0)]">
+          <div className="w-full overflow-hidden rounded-xl border border-line">
             <Navbar links={links} showLogout />
           </div>
         </Demo>
         <Demo label="Sidebar + Topbar (recolhível)">
-          <div className="flex h-[26rem] w-full overflow-hidden rounded-xl border border-line [transform:translateZ(0)]">
+          <div className="flex h-104 w-full overflow-hidden rounded-xl border border-line">
             <Sidebar
               links={links}
               collapsed={collapsed}
@@ -377,14 +382,16 @@ export function GalleryPage() {
         </Demo>
       </Section>
 
-      <Section id="Feedback" title="Animação de Carregamento">
-        <Demo label="Loader ">
+      {/* ANIMAÇÕES DE CARREGAMENTO */}
+      <Section id="Animação" title="Animação de Carregamento">
+        <Demo label="Loader">
           <div className="p-6 bg-muted/20 rounded-lg flex items-center justify-center w-full">
             <Loader />
           </div>
         </Demo>
       </Section>
 
+      {/* IDENTIDADE */}
       <Section id="Identidade" title="Identidade">
         <Demo label="Logo — full / mark">
           <Logo heightClassName="h-16" />
