@@ -1,16 +1,13 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
-import { AppRoutes } from './app/routes/AppRoutes'
-import { ThemeProvider } from './app/providers/ThemeProvider'
-import './index.css'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { App } from './app/App';
+import { AppProviders } from './app/providers/AppProviders';
+import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </ThemeProvider>
+    <AppProviders>
+      <App />
+    </AppProviders>
   </React.StrictMode>,
-)
+);
