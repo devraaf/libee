@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import beePattern from '../assets/bee-pattern.svg'
+import beePattern from '../../assets/bee-pattern.svg'
 
 export interface AuthLayoutProps {
   children: ReactNode

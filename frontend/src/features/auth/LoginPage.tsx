@@ -1,12 +1,11 @@
 import { useState, type FormEvent, type ChangeEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { Logo } from '../../components/branding/Logo'
-import { Button } from '../../components/ui/Button'
-import { Input } from '../../components/ui/Input'
-import { PasswordInput } from '../../components/ui/PasswordInput'
-import { AuthLayout } from '../../layouts/AuthLayout'
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+import { Logo } from '../../shared/components/branding/Logo'
+import { Button } from '../../shared/components/ui/Button'
+import { Input } from '../../shared/components/ui/Input'
+import { PasswordInput } from '../../shared/components/ui/PasswordInput'
+import { AuthLayout } from '../../shared/layouts/AuthLayout'
+import { loginSchema } from './schemas/auth.schema'
 
 export function LoginPage() {
   const [email, setEmail] = useState('')
@@ -27,35 +26,27 @@ export function LoginPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     
-    const cleanEmail = email.trim().toLowerCase()
-    const cleanPassword = password.trim()
-    const nextErrors: typeof errors = {}
+    // Validação utilizando o Schema isolado do Zod
+    const validationResult = loginSchema.safeParse({ email, password })
 
-    if (!cleanEmail) {
-      nextErrors.email = 'Informe seu e-mail.'
-    } else if (!EMAIL_REGEX.test(cleanEmail)) {
-      nextErrors.email = 'Informe um e-mail válido.'
-    }
-
-    if (!cleanPassword) {
-      nextErrors.password = 'Informe sua senha.'
-    } else if (cleanPassword.length < 8) {
-      nextErrors.password = 'A senha deve ter no mínimo 8 caracteres.'
-    }
-
-    if (Object.keys(nextErrors).length > 0) {
-      setErrors(nextErrors)
+    if (!validationResult.success) {
+      const formattedErrors: { email?: string; password?: string } = {}
+      validationResult.error.issues.forEach((issue) => {
+        const fieldName = issue.path[0] as keyof typeof formattedErrors
+        if (!formattedErrors[fieldName]) {
+          formattedErrors[fieldName] = issue.message
+        }
+      })
+      setErrors(formattedErrors)
       return
     }
 
     setIsLoading(true)
     try {
-      // Lógica de submissão da API/autenticação aqui
+
       setEmail('')
       setPassword('')
       setErrors({})
-    } catch (error) {
-      // Tratamento de erro de login.
     } finally {
       setIsLoading(false)
     }
