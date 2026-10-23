@@ -1,5 +1,5 @@
-import { Logo } from '../branding/Logo.tsx';
-import { GithubIcon } from '../ui/GithubIcon.tsx';
+import { Logo } from '../../shared/components/branding/Logo.tsx';
+import { GithubIcon } from '../../shared/components/ui/GithubIcon.tsx';
 
 export interface FooterProps {
   githubUrl?: string;
