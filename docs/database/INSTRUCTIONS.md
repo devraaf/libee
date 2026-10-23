@@ -1,53 +1,192 @@
-# Instruções para reproduzir o banco de dados do Libee
+# Instruções para configurar e reproduzir o banco de dados do Libee
 
-Este roteiro permite recriar o banco de dados e conferir os dados preparados para a Sprint Zero. Os dados são fictícios e destinados exclusivamente a desenvolvimento e testes.
+Este documento descreve como configurar o ambiente local do banco de dados do Libee, iniciar os serviços necessários e reproduzir a estrutura do banco por meio das migrations do Flyway.
 
-## Entregáveis da atividade
+O ambiente utiliza PostgreSQL executado em container Docker. Os dados são persistidos em um volume nomeado, permitindo que os containers sejam parados e iniciados novamente sem perder o banco.
 
-- [diagrama-classes.png](../uml/diagrama-classes.png): diagrama de classes do Libee.
-- [V1__create_domains_and_tables.sql](../../backend/src/main/resources/db/migration/V1__create_domains_and_tables.sql): formatação do banco de dados.
-- [V2__insert_test_data.sql](../../backend/src/main/resources/db/migration/V2__insert_test_data.sql): dados de teste inseridos no banco.
-- Arquivos `.json` em [test-data/](../test-data/): representação dos dados no formato previsto para tráfego pela API.
-- [test_queries.sql](./test_queries.sql): consultas para conferir o acervo e os empréstimos.
+## 1. Pré-requisitos
 
-## Pré-requisitos
+Antes de começar, instale ou tenha disponível:
 
-- PostgreSQL 18 instalado e em execução.
-- Acesso ao PostgreSQL com permissão para criar bancos de dados.
-- pgAdmin.
+- [Git](https://git-scm.com/);
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/), em execução;
 
-## Reprodução pelo pgAdmin
+O pgAdmin é disponibilizado por meio do Docker Compose, portanto não é necessário instalá-lo separadamente.
 
-1. Conecte-se ao servidor PostgreSQL e crie um banco chamado `libee_sprint0`.
-2. Abra o Query Tool desse banco.
-3. Abra e execute `V1__create_domains_and_tables.sql`.
-4. Sem trocar de banco, abra e execute `V2__insert_test_data.sql`.
-5. Para conferir os resultados, abra e execute `test_queries.sql`.
+## 2. Configuração do ambiente
 
-Execute os dois primeiros arquivos SQL uma única vez e na ordem indicada, em um banco recém-criado. A estrutura e os dados usam nomes e IDs fixos, então não execute esses scripts novamente sobre o mesmo banco. Para recomeçar, crie outro banco vazio para a avaliação. O arquivo `test_queries.sql` contém apenas consultas de leitura e pode ser executado novamente.
+Na raiz do repositório, copie o arquivo `.env.example` para `.env`.
 
-## Conferência dos resultados
+No Git Bash, execute:
 
-Após a carga, o banco deve conter:
+```bash
+cp .env.example .env
+```
 
-| Tabela | Quantidade esperada |
-|---|---:|
-| `courses` | 3 |
-| `users` | 8 |
-| `students` | 3 |
-| `authors` | 6 |
-| `categories` | 4 |
-| `books` | 8 |
-| `book_author` | 9 |
-| `book_copies` | 14 |
-| `loans` | 8 |
+No Windows PowerShell, execute:
 
-As consultas em `test_queries.sql` demonstram listagens do acervo, exemplares disponíveis, empréstimos ativos, empréstimos atrasados e um resumo das quantidades.
+```powershell
+Copy-Item .env.example .env
+```
 
-O status dos empréstimos é calculado pela view `vw_loans` com base na data em que a consulta é executada: `RETURNED` quando há devolução, `OVERDUE` quando a data prevista já passou e `ON_TIME` nos demais empréstimos ativos. Portanto, o resultado dos status pode mudar com o passar do tempo.
+Abra o arquivo `.env` e defina as credenciais locais para o PostgreSQL e o pgAdmin.
 
-## Sobre os arquivos JSON
+O arquivo `.env` contém configurações privadas do ambiente local e não deve ser versionado. Utilize o `.env.example` como referência para compartilhar os nomes das variáveis necessárias, sem incluir senhas reais.
 
-Os JSONs documentam os formatos de dados planejados para a API; não são scripts para importar diretamente no PostgreSQL. A carga reproduzível do banco é feita pelo arquivo SQL de dados. A relação entre livros e autores, por exemplo, aparece como `authorIds` no JSON e é persistida na tabela `book_author`.
+## 3. Inicialização dos serviços
 
-Mais detalhes sobre os arquivos, relacionamentos e cenários dos empréstimos estão em [test-data/README.md](../test-data/README.md).
+Na raiz do repositório, execute:
+
+```bash
+docker compose up -d
+```
+
+O comando inicia os seguintes serviços:
+
+| Serviço | Finalidade |
+|---|---|
+| `db` | Banco de dados PostgreSQL |
+| `pgadmin` | Interface gráfica para administrar o banco |
+
+Para verificar o estado dos containers:
+
+```bash
+docker compose ps
+```
+
+O serviço `db` deve apresentar o estado `healthy` antes de o backend tentar se conectar ao banco.
+
+## 4. Acesso ao banco de dados
+
+### 4.1 PostgreSQL
+
+A configuração local utiliza as seguintes informações:
+
+| Parâmetro | Valor |
+|---|---|
+| Host | `localhost` |
+| Porta | `5433` |
+| Banco de dados | `libee` |
+| Usuário | Definido em `.env` |
+| Senha | Definida em `.env` |
+
+A porta `5433` do computador é direcionada à porta `5432` do container PostgreSQL.
+
+### 4.2 pgAdmin
+
+Acesse o pgAdmin pelo navegador:
+
+<http://localhost:5050>
+
+Entre com as credenciais definidas pelas variáveis `PGADMIN_EMAIL` e `PGADMIN_PASSWORD` no arquivo `.env`.
+
+Caso seja necessário cadastrar uma conexão com o PostgreSQL dentro do pgAdmin, utilize:
+
+| Parâmetro | Valor |
+|---|---|
+| Nome da conexão | `Libee Local` |
+| Host | `db` |
+| Porta | `5432` |
+| Banco de dados | `libee` |
+| Usuário | Definido em `.env` |
+| Senha | Definida em `.env` |
+
+Dentro da rede Docker Compose, o hostname `db` identifica o container PostgreSQL. Por isso, essa conexão utiliza a porta interna `5432`, enquanto aplicações executadas diretamente no computador utilizam `localhost:5433`.
+
+## 5. Execução do backend e migrations
+
+Com o PostgreSQL em execução, inicie o backend conforme as instruções do projeto.
+
+A configuração local do Spring Boot utiliza o banco `libee` por meio da URL:
+
+```properties
+spring.datasource.url=jdbc:postgresql://localhost:5433/libee
+```
+
+Ao iniciar o backend, o Flyway identifica e executa as migrations disponíveis em:
+
+`backend/src/main/resources/db/migration/`
+
+As migrations são aplicadas na ordem de versão e registradas na tabela `flyway_schema_history`.
+
+Não execute manualmente os arquivos de migration que o Flyway já aplicou. Para conferir o histórico, consulte a tabela `flyway_schema_history` no banco de dados.
+
+Se uma migration falhar, verifique os logs do backend e corrija a causa antes de prosseguir. Não altere migrations já aplicadas sem avaliar o impacto no histórico e nos ambientes dos demais integrantes.
+
+## 6. Persistência e encerramento do ambiente
+
+Para parar os containers:
+
+```bash
+docker compose down
+```
+
+Esse comando remove os containers e a rede do projeto, mas preserva os volumes nomeados. Ao executar novamente `docker compose up -d`, os dados existentes devem continuar disponíveis.
+
+**Atenção:** não utilize `docker compose down -v` para encerrar o ambiente normalmente. A opção `-v` remove os volumes nomeados e pode apagar permanentemente os dados locais do banco e do pgAdmin.
+
+O banco é inicializado com a configuração e os dados definidos pelas migrations aplicadas. Se o volume for removido e o banco for recriado, o Flyway executará novamente as migrations sobre o banco vazio.
+
+## 7. Comandos úteis
+
+Validar a configuração do Docker Compose:
+
+```bash
+docker compose config --quiet
+```
+
+Verificar os containers:
+
+```bash
+docker compose ps
+```
+
+Consultar os logs do PostgreSQL:
+
+```bash
+docker compose logs db
+```
+
+Consultar os logs do pgAdmin:
+
+```bash
+docker compose logs pgadmin
+```
+
+Acompanhar os logs do backend e verificar a execução das migrations durante sua inicialização.
+
+## 8. Arquivos da atividade Sprint Zero
+
+Os arquivos da atividade original continuam disponíveis no repositório:
+
+- [Diagrama de classes](../uml/diagrama-classes.png)
+- [Migration de estrutura da Sprint Zero](../../backend/src/main/resources/db/migration/V1__create_domains_and_tables.sql)
+- [Migration de dados de teste da Sprint Zero](../../backend/src/main/resources/db/migration/V2__insert_test_data.sql)
+- [Consultas de conferência](./test_queries.sql)
+- [Dados de teste em JSON](../test-data/)
+- [Documentação dos dados de teste](../test-data/README.md)
+
+Esses arquivos documentam a modelagem e os cenários preparados para a Sprint Zero. Para o desenvolvimento cotidiano, a criação e a atualização do esquema devem seguir o fluxo de migrations do Flyway.
+
+As consultas de `test_queries.sql` podem ser utilizadas para conferir os dados quando o banco contiver os registros esperados por elas. A disponibilidade desses registros depende das migrations presentes e aplicadas no ambiente atual.
+
+## 9. Solução de problemas
+
+### O backend não consegue se conectar ao PostgreSQL
+
+- Verifique se o Docker Desktop está em execução.
+- Execute `docker compose ps` e confirme que o serviço `db` está saudável.
+- Confirme se a URL do backend utiliza `localhost:5433`.
+- Confira se o banco, o usuário e a senha correspondem às variáveis definidas em `.env`.
+
+### O pgAdmin não abre
+
+- Verifique se o container `pgadmin` está em execução.
+- Consulte os logs com `docker compose logs pgadmin`.
+- Confirme se a porta `5050` está disponível no computador.
+
+### As migrations não são executadas
+
+- Verifique os logs do backend.
+- Confira se o backend está conectado ao banco correto.
+- Consulte `flyway_schema_history` para identificar as migrations registradas e seu estado de execução.
