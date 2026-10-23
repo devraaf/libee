@@ -165,6 +165,39 @@ public class BookControllerIT {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna livros com quantidades de exemplares quando o usuário é bibliotecário")
+    void returnsBooksWithCopyCounts_whenUserIsLibrarian() throws Exception {
+        mockMvc.perform(get("/books/management").param("q", "casmurro"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Dom Casmurro"))
+                .andExpect(jsonPath("$.content[0].isbn").value("9788535911664"))
+                .andExpect(jsonPath("$.content[0].totalCopies").value(1))
+                .andExpect(jsonPath("$.content[0].availableCopies").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna zero exemplares disponíveis quando todos estão emprestados")
+    void returnsZeroAvailableCopies_whenAllCopiesAreOnLoan() throws Exception {
+        mockMvc.perform(get("/books/management").param("q", "clean code"))
+                .andExpect(jsonPath("$.content[0].totalCopies").value(1))
+                .andExpect(jsonPath("$.content[0].availableCopies").value(0));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna quantidade 0 quando o livro não tem exemplares")
+    void returnsZeroCopies_whenBookHasNoCopies() throws Exception {
+        saveBook("9780306406157", "Livro Sem Exemplares", romance, saveAuthor("Autora Teste"));
+
+        mockMvc.perform(get("/books/management").param("q", "sem exemplares"))
+                .andExpect(jsonPath("$.content[0].totalCopies").value(0))
+                .andExpect(jsonPath("$.content[0].availableCopies").value(0));
+    }
+
 
     // métodos auxiliares para montar os dados
     private Category saveCategory(String name) {
