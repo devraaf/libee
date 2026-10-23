@@ -1,5 +1,6 @@
 package br.edu.fatec.libee.backend.controller;
 
+import br.edu.fatec.libee.backend.dto.response.BookManagementItemResponse;
 import br.edu.fatec.libee.backend.dto.response.PageResponse;
 import br.edu.fatec.libee.backend.dto.response.BookListItemResponse;
 import br.edu.fatec.libee.backend.service.BookService;
@@ -26,4 +27,13 @@ public class BookController {
         return bookService.list(q, categoryId, page, size);
     }
 
+// TODO: restringir a bibliotecário/administrador quando a autenticação existir
+    @GetMapping("/management")
+    public PageResponse<BookManagementItemResponse> listForManagement(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Integer categoryId,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size){
+        return bookService.listForManagement(q, categoryId, page, size);
+    }
 }
