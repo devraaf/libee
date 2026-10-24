@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -25,9 +26,12 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.time.LocalDate;
+import java.util.List;
+
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @WithMockUser
@@ -48,7 +52,7 @@ public class BookControllerIT {
 
     private Category romance;
     private Category tecnologia;
-
+    private static final int NON_EXISTENT_ID = 999_999;
     @BeforeEach
     void setUp(){
         // Esvazia o catálogo para o teste não depender de dados pré-existentes
@@ -65,8 +69,8 @@ public class BookControllerIT {
         Book domCasmurro = saveBook("9788535911664", "Dom Casmurro", romance, machado);
         Book cleanCode = saveBook("9780132350884", "Clean Code", tecnologia, martin);
 
-        saveCopy(domCasmurro, "001", CopyStatus.AVAILABLE);
-        saveCopy(cleanCode, "002", CopyStatus.ON_LOAN);
+        saveCopy(domCasmurro, "001", "A-01", CopyStatus.AVAILABLE);
+        saveCopy(cleanCode, "002", "A-01", CopyStatus.ON_LOAN);
     }
 
     @Test
@@ -165,6 +169,89 @@ public class BookControllerIT {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    @DisplayName("Retorna todos os campos do livro, com autores e exemplares ordenados")
+    void returnsCompleteDetails_whenBookHasAllFields() throws Exception {
+        Author zelia = saveAuthor("Zélia Furtado");
+        Author ana = saveAuthor("Ana Beatriz Lima");
+        Book book = saveCompleteBook(tecnologia, zelia, ana);
+        saveCopy(book, "0003", "A-03", CopyStatus.ON_LOAN);
+        saveCopy(book, "0001", "A-01", CopyStatus.AVAILABLE);
+        saveCopy(book, "0002", "A-02", CopyStatus.AVAILABLE);
+
+        mockMvc.perform(get("/books/{id}", book.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(book.getId()))
+                .andExpect(jsonPath("$.title").value("Estruturas de Dados em Java"))
+                .andExpect(jsonPath("$.category").value("Tecnologia"))
+                .andExpect(jsonPath("$.isbn").value("9788500000019"))
+                .andExpect(jsonPath("$.coverImageUrl").value("https://example.com/covers/estruturas.jpg"))
+                .andExpect(jsonPath("$.publisher").value("Editora Horizonte"))
+                .andExpect(jsonPath("$.publicationPlace").value("São Paulo"))
+                .andExpect(jsonPath("$.edition").value("2ª edição"))
+                .andExpect(jsonPath("$.publicationYear").value(2021))
+                .andExpect(jsonPath("$.pageCount").value(480))
+                .andExpect(jsonPath("$.summary").value("Introdução a listas, pilhas, filas, árvores e grafos, com exemplos em Java."))
+                // autores em ordem alfabética, mesmo salvos ao contrário
+                .andExpect(jsonPath("$.authors.length()").value(2))
+                .andExpect(jsonPath("$.authors[0].name").value("Ana Beatriz Lima"))
+                .andExpect(jsonPath("$.authors[1].name").value("Zélia Furtado"))
+                // exemplares em ordem de tombo, mesmo salvos fora de ordem
+                .andExpect(jsonPath("$.totalCopies").value(3))
+                .andExpect(jsonPath("$.copies.length()").value(3))
+                .andExpect(jsonPath("$.copies[0].accessionNumber").value("0001"))
+                .andExpect(jsonPath("$.copies[0].physicalLocation").value("A-01"))
+                .andExpect(jsonPath("$.copies[0].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.copies[1].accessionNumber").value("0002"))
+                .andExpect(jsonPath("$.copies[2].accessionNumber").value("0003"))
+                .andExpect(jsonPath("$.copies[2].status").value("ON_LOAN"));
+    }
+
+    @Test
+    @DisplayName("Retorna lista de exemplares vazia e total 0 quando o livro não tem exemplares")
+    void returnsEmptyCopies_whenBookHasNoCopies() throws Exception {
+        Book book = saveBook("9780306406157", "Livro Sem Exemplares", romance, saveAuthor("Autora Teste"));
+
+        mockMvc.perform(get("/books/{id}", book.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.copies.length()").value(0))
+                .andExpect(jsonPath("$.totalCopies").value(0));
+    }
+
+    @Test
+    @DisplayName("Retorna 200 com campos opcionais nulos quando o livro só tem os dados obrigatórios")
+    void returnsNullOptionalFields_whenBookHasOnlyRequiredData() throws Exception {
+        Book book = saveBook("9780306406157", "Livro Mínimo", romance, saveAuthor("Autora Teste"));
+
+        mockMvc.perform(get("/books/{id}", book.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Livro Mínimo"))
+                .andExpect(jsonPath("$.publisher").value(nullValue()))
+                .andExpect(jsonPath("$.publicationPlace").value(nullValue()))
+                .andExpect(jsonPath("$.edition").value(nullValue()))
+                .andExpect(jsonPath("$.coverImageUrl").value(nullValue()))
+                .andExpect(jsonPath("$.publicationYear").value(nullValue()))
+                .andExpect(jsonPath("$.pageCount").value(nullValue()))
+                .andExpect(jsonPath("$.summary").value(nullValue()));
+    }
+
+    @Test
+    @DisplayName("Retorna 404 em formato ProblemDetail quando o id não existe")
+    void returnsNotFound_whenIdDoesNotExist() throws Exception {
+        mockMvc.perform(get("/books/{id}", NON_EXISTENT_ID))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Recurso não encontrado"))
+                .andExpect(jsonPath("$.detail").exists())
+                .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    @Test
+    @DisplayName("Retorna 400 quando o id não é numérico")
+    void returnsBadRequest_whenIdIsNotNumeric() throws Exception {
+        mockMvc.perform(get("/books/abc"))
+                .andExpect(status().isBadRequest());
+    }
 
     // métodos auxiliares para montar os dados
     private Category saveCategory(String name) {
@@ -188,10 +275,27 @@ public class BookControllerIT {
         return bookRepository.save(b);
     }
 
-    private void saveCopy(Book book, String accession, CopyStatus status) {
+    private Book saveCompleteBook(Category category, Author... authors) {
+        Book b = new Book();
+        b.setIsbn("9788500000019");
+        b.setTitle("Estruturas de Dados em Java");
+        b.setPublisher("Editora Horizonte");
+        b.setPublicationPlace("São Paulo");
+        b.setEdition("2ª edição");
+        b.setCoverImageUrl("https://example.com/covers/estruturas.jpg");
+        b.setPublicationDate(LocalDate.of(2021, 3, 15));
+        b.setPageCount(480);
+        b.setSummary("Introdução a listas, pilhas, filas, árvores e grafos, com exemplos em Java.");
+        b.setCategory(category);
+        b.getAuthors().addAll(List.of(authors));
+        return bookRepository.save(b);
+    }
+
+    private void saveCopy(Book book, String accession, String location, CopyStatus status) {
         Copy c = new Copy();
         c.setBook(book);
         c.setAccessionNumber(accession);
+        c.setPhysicalLocation(location);
         c.setStatus(status);
         copyRepository.save(c);
     }
