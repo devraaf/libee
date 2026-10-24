@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 
 public interface CopyRepository extends JpaRepository<Copy, Integer> {
@@ -14,4 +15,6 @@ public interface CopyRepository extends JpaRepository<Copy, Integer> {
     @Query("select distinct c.book.id from Copy c where c.book.id in :bookIds and c.status = :status")
     Set<Integer> findBookIdsWithStatus(@Param("bookIds") Collection<Integer> bookIds,
                                        @Param("status") CopyStatus status);
+
+    List<Copy> findByBookIdOrderByAccessionNumberAsc(Integer bookId );
 }
