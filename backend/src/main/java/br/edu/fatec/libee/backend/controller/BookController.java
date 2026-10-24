@@ -1,7 +1,7 @@
 package br.edu.fatec.libee.backend.controller;
 
-import br.edu.fatec.libee.backend.dto.response.PageResponse;
 import br.edu.fatec.libee.backend.dto.response.BookListItemResponse;
+import br.edu.fatec.libee.backend.dto.response.PageResponse;
 import br.edu.fatec.libee.backend.service.BookService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -25,5 +25,4 @@ public class BookController {
             @RequestParam( defaultValue = "10") @Min(1) @Max(100) int size){
         return bookService.list(q, categoryId, page, size);
     }
-
 }

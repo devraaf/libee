@@ -1,10 +1,13 @@
 package br.edu.fatec.libee.backend.service;
 
 import br.edu.fatec.libee.backend.dto.response.BookListItemResponse;
+import br.edu.fatec.libee.backend.dto.response.CategoryResponse;
 import br.edu.fatec.libee.backend.entity.Author;
 import br.edu.fatec.libee.backend.entity.Book;
+import br.edu.fatec.libee.backend.entity.Category;
 import br.edu.fatec.libee.backend.enums.CopyStatus;
 import br.edu.fatec.libee.backend.repository.BookRepository;
+import br.edu.fatec.libee.backend.repository.CategoryRepository;
 import br.edu.fatec.libee.backend.repository.CopyRepository;
 import br.edu.fatec.libee.backend.specification.BookSpecification;
 import lombok.RequiredArgsConstructor;
@@ -13,9 +16,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import br.edu.fatec.libee.backend.dto.response.PageResponse;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Set;
 
 
@@ -24,6 +29,7 @@ import java.util.Set;
 public class BookService {
     private final BookRepository bookRepository;
     private final CopyRepository copyRepository;
+    private final CategoryRepository categoryRepository;
 
     @Transactional(readOnly = true)
     public PageResponse<BookListItemResponse> list(String q, Integer categoryId, int page, int size){
