@@ -69,6 +69,7 @@ public class BookControllerIT {
         saveCopy(cleanCode, "002", CopyStatus.ON_LOAN);
     }
 
+    // TESTES LISTA, PAGINACAO E BUSCA ACERVO
     @Test
     @DisplayName("Retorna livros paginados quando page e size são informados")
     void returnsPagedBooks_whenPageAndSizeAreProvided() throws Exception{
@@ -165,6 +166,7 @@ public class BookControllerIT {
                 .andExpect(status().isUnauthorized());
     }
 
+//TESTES RESUMO DO ACERVO
     @Test
     @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna os totais do acervo inteiro com cada campo no seu lugar")
@@ -180,19 +182,6 @@ public class BookControllerIT {
                 .andExpect(jsonPath("$.totalCopies").value(4))
                 .andExpect(jsonPath("$.availableCopies").value(3))
                 .andExpect(jsonPath("$.onLoanCopies").value(1));
-    }
-  
-    @Test
-    @WithMockUser(roles = "LIBRARIAN")
-    @DisplayName("Retorna livros com quantidades de exemplares quando o usuário é bibliotecário")
-    void returnsBooksWithCopyCounts_whenUserIsLibrarian() throws Exception {
-        mockMvc.perform(get("/books/management").param("q", "casmurro"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content.length()").value(1))
-                .andExpect(jsonPath("$.content[0].title").value("Dom Casmurro"))
-                .andExpect(jsonPath("$.content[0].isbn").value("9788535911664"))
-                .andExpect(jsonPath("$.content[0].totalCopies").value(1))
-                .andExpect(jsonPath("$.content[0].availableCopies").value(1));
     }
 
     @Test
@@ -210,15 +199,6 @@ public class BookControllerIT {
                 .andExpect(jsonPath("$.availableCopies").value(0))
                 .andExpect(jsonPath("$.onLoanCopies").value(0));
     }
-      
-    @Test
-    @WithMockUser(roles = "LIBRARIAN")
-    @DisplayName("Retorna zero exemplares disponíveis quando todos estão emprestados")
-    void returnsZeroAvailableCopies_whenAllCopiesAreOnLoan() throws Exception {
-        mockMvc.perform(get("/books/management").param("q", "clean code"))
-                .andExpect(jsonPath("$.content[0].totalCopies").value(1))
-                .andExpect(jsonPath("$.content[0].availableCopies").value(0));
-    }
 
     @Test
     @WithMockUser(roles = "LIBRARIAN")
@@ -230,7 +210,30 @@ public class BookControllerIT {
                 .andExpect(jsonPath("$.totalBooks").value(3))
                 .andExpect(jsonPath("$.totalCopies").value(2));
     }
-      
+
+    // TESTES ACERVO BIBLIOTECARIO
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna livros com quantidades de exemplares quando o usuário é bibliotecário")
+    void returnsBooksWithCopyCounts_whenUserIsLibrarian() throws Exception {
+        mockMvc.perform(get("/books/management").param("q", "casmurro"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Dom Casmurro"))
+                .andExpect(jsonPath("$.content[0].isbn").value("9788535911664"))
+                .andExpect(jsonPath("$.content[0].totalCopies").value(1))
+                .andExpect(jsonPath("$.content[0].availableCopies").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna zero exemplares disponíveis quando todos estão emprestados")
+    void returnsZeroAvailableCopies_whenAllCopiesAreOnLoan() throws Exception {
+        mockMvc.perform(get("/books/management").param("q", "clean code"))
+                .andExpect(jsonPath("$.content[0].totalCopies").value(1))
+                .andExpect(jsonPath("$.content[0].availableCopies").value(0));
+    }
+
     @Test
     @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna quantidade 0 quando o livro não tem exemplares")

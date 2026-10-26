@@ -30,8 +30,10 @@ public class BookController {
     }
 
     @GetMapping("/management/summary")
-    public ResponseEntity<BookManagementSummaryResponse> getManagementSummary(){
+    public ResponseEntity<BookManagementSummaryResponse> getManagementSummary() {
         return ResponseEntity.ok(bookService.getManagementSummary());
+    }
+
 // TODO: restringir a bibliotecário/administrador quando a autenticação existir
     @GetMapping("/management")
     public PageResponse<BookManagementItemResponse> listForManagement(
