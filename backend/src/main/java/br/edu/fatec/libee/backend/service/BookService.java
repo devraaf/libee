@@ -1,8 +1,10 @@
 package br.edu.fatec.libee.backend.service;
 
+import br.edu.fatec.libee.backend.dto.response.BookCopyCount;
 import br.edu.fatec.libee.backend.dto.response.BookListItemResponse;
 import br.edu.fatec.libee.backend.dto.response.BookManagementSummaryResponse;
 import br.edu.fatec.libee.backend.dto.response.StatusCount;
+import br.edu.fatec.libee.backend.dto.response.BookManagementItemResponse;
 import br.edu.fatec.libee.backend.entity.Author;
 import br.edu.fatec.libee.backend.entity.Book;
 import br.edu.fatec.libee.backend.enums.CopyStatus;
@@ -20,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 
@@ -29,10 +32,14 @@ public class BookService {
     private final BookRepository bookRepository;
     private final CopyRepository copyRepository;
 
+    private Page<Book> searchBooks(String q, Integer categoryId, int page, int size){
+        Pageable pageable = PageRequest.of(page, size, Sort.by("title").and(Sort.by("id")));
+         return bookRepository.findAll(BookSpecification.search(q, categoryId), pageable);
+    }
+
     @Transactional(readOnly = true)
     public PageResponse<BookListItemResponse> list(String q, Integer categoryId, int page, int size){
-        Pageable pageable = PageRequest.of(page, size, Sort.by("title").and(Sort.by("id")));
-        Page<Book> books = bookRepository.findAll(BookSpecification.search(q, categoryId), pageable);
+        Page<Book> books = searchBooks(q, categoryId, page, size);
 
         Set<Integer> availableIds = books.isEmpty()
                 ? Set.of()
@@ -65,4 +72,27 @@ public class BookService {
                 bookRepository.count(), totalCopies, available, onLoan
         );
     }
+    @Transactional(readOnly = true)
+    public PageResponse<BookManagementItemResponse> listForManagement(String q, Integer categoryId, int page, int size){
+        Page<Book> books = searchBooks(q, categoryId, page, size);
+
+        Map<Integer, BookCopyCount> counts = books.isEmpty() ? Map.of() : copyRepository.countCopiesByBookIds(
+                        books.stream().map(Book::getId).toList(), CopyStatus.AVAILABLE)
+                .stream()
+                .collect(Collectors.toMap(BookCopyCount::bookId, Function.identity()));
+
+        return PageResponse.from(books.map(b -> {
+            BookCopyCount count = counts.getOrDefault(b.getId(), new BookCopyCount(b.getId(), 0L, 0L));
+            return new BookManagementItemResponse(
+                    b.getId(),
+                    b.getTitle(),
+                    b.getAuthors().stream().map(Author::getName).sorted().toList(),
+                    b.getIsbn(),
+                    b.getCategory().getName(),
+                    b.getCoverImageUrl(),
+                    count.total(),
+                    count.available());
+        }));
+    }
+
 }
