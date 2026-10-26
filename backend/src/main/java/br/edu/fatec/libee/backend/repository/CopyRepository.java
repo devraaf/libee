@@ -1,5 +1,6 @@
 package br.edu.fatec.libee.backend.repository;
 
+import br.edu.fatec.libee.backend.dto.response.StatusCount;
 import br.edu.fatec.libee.backend.dto.response.BookCopyCount;
 import br.edu.fatec.libee.backend.entity.Copy;
 import br.edu.fatec.libee.backend.enums.CopyStatus;
@@ -17,6 +18,9 @@ public interface CopyRepository extends JpaRepository<Copy, Integer> {
     Set<Integer> findBookIdsWithStatus(@Param("bookIds") Collection<Integer> bookIds,
                                        @Param("status") CopyStatus status);
 
+    @Query("select new br.edu.fatec.libee.backend.dto.response.StatusCount(c.status, count(c)) " +
+            "from Copy c group by c.status")
+    List<StatusCount> countByStatus();
     @Query("select new br.edu.fatec.libee.backend.dto.response.BookCopyCount(" +
             "c.book.id, count(c), " +
             "sum(case when c.status = :status then 1L else 0L end)) " +

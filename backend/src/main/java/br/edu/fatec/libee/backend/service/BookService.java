@@ -2,6 +2,8 @@ package br.edu.fatec.libee.backend.service;
 
 import br.edu.fatec.libee.backend.dto.response.BookCopyCount;
 import br.edu.fatec.libee.backend.dto.response.BookListItemResponse;
+import br.edu.fatec.libee.backend.dto.response.BookManagementSummaryResponse;
+import br.edu.fatec.libee.backend.dto.response.StatusCount;
 import br.edu.fatec.libee.backend.dto.response.BookManagementItemResponse;
 import br.edu.fatec.libee.backend.entity.Author;
 import br.edu.fatec.libee.backend.entity.Book;
@@ -57,6 +59,19 @@ public class BookService {
                 available);
     }
 
+    @Transactional(readOnly = true)
+    public BookManagementSummaryResponse getManagementSummary(){
+        Map<CopyStatus, Long> byStatus = copyRepository.countByStatus()
+                .stream()
+                .collect(Collectors.toMap(StatusCount::status, StatusCount::total));
+        long available = byStatus.getOrDefault(CopyStatus.AVAILABLE, 0L);
+        long onLoan = byStatus.getOrDefault(CopyStatus.ON_LOAN, 0L);
+        long totalCopies = byStatus.values().stream().mapToLong(Long::longValue).sum();
+
+        return new BookManagementSummaryResponse(
+                bookRepository.count(), totalCopies, available, onLoan
+        );
+    }
     @Transactional(readOnly = true)
     public PageResponse<BookManagementItemResponse> listForManagement(String q, Integer categoryId, int page, int size){
         Page<Book> books = searchBooks(q, categoryId, page, size);

@@ -167,6 +167,23 @@ public class BookControllerIT {
 
     @Test
     @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna os totais do acervo inteiro com cada campo no seu lugar")
+    void returnsCollectionsTotals_whenSummaryIsRequested() throws Exception{
+        Book domCasmurro = bookRepository.findAll().stream()
+                .filter(b->b.getTitle().equals("Dom Casmurro")).findFirst().orElseThrow();
+        saveCopy(domCasmurro, "003", CopyStatus.AVAILABLE);
+        saveCopy(domCasmurro, "004", CopyStatus.AVAILABLE);
+
+        mockMvc.perform(get("/books/management/summary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalBooks").value(2))
+                .andExpect(jsonPath("$.totalCopies").value(4))
+                .andExpect(jsonPath("$.availableCopies").value(3))
+                .andExpect(jsonPath("$.onLoanCopies").value(1));
+    }
+  
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna livros com quantidades de exemplares quando o usuário é bibliotecário")
     void returnsBooksWithCopyCounts_whenUserIsLibrarian() throws Exception {
         mockMvc.perform(get("/books/management").param("q", "casmurro"))
@@ -180,6 +197,22 @@ public class BookControllerIT {
 
     @Test
     @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna todos os valores zerados quando o acervo está vazio")
+    void returnsZeros_whenCollectionIsEmpty() throws Exception{
+        jdbcTemplate.execute(
+                "TRUNCATE TABLE loans, book_copies, book_author, books, authors, categories" + " RESTART IDENTITY CASCADE"
+        );
+
+        mockMvc.perform(get("/books/management/summary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalBooks").value(0))
+                .andExpect(jsonPath("$.totalCopies").value(0))
+                .andExpect(jsonPath("$.availableCopies").value(0))
+                .andExpect(jsonPath("$.onLoanCopies").value(0));
+    }
+      
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna zero exemplares disponíveis quando todos estão emprestados")
     void returnsZeroAvailableCopies_whenAllCopiesAreOnLoan() throws Exception {
         mockMvc.perform(get("/books/management").param("q", "clean code"))
@@ -187,6 +220,17 @@ public class BookControllerIT {
                 .andExpect(jsonPath("$.content[0].availableCopies").value(0));
     }
 
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Conta livros sem exemplares no total de livros, mas não nos exemplares")
+    void countsBookWithoutCopies_inTotalBooksOnly() throws Exception{
+        saveBook("9012345678900", "Livro Sem Exemplares", romance, saveAuthor("Autora Teste"));
+
+        mockMvc.perform(get("/books/management/summary"))
+                .andExpect(jsonPath("$.totalBooks").value(3))
+                .andExpect(jsonPath("$.totalCopies").value(2));
+    }
+      
     @Test
     @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna quantidade 0 quando o livro não tem exemplares")
