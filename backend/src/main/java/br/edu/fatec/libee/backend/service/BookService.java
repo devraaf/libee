@@ -1,11 +1,6 @@
 package br.edu.fatec.libee.backend.service;
 
 import br.edu.fatec.libee.backend.dto.response.*;
-import br.edu.fatec.libee.backend.dto.response.BookCopyCount;
-import br.edu.fatec.libee.backend.dto.response.BookListItemResponse;
-import br.edu.fatec.libee.backend.dto.response.BookManagementSummaryResponse;
-import br.edu.fatec.libee.backend.dto.response.StatusCount;
-import br.edu.fatec.libee.backend.dto.response.BookManagementItemResponse;
 import br.edu.fatec.libee.backend.entity.Author;
 import br.edu.fatec.libee.backend.entity.Book;
 import br.edu.fatec.libee.backend.entity.Copy;
@@ -19,7 +14,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import br.edu.fatec.libee.backend.dto.response.PageResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
