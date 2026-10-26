@@ -3,6 +3,8 @@ package br.edu.fatec.libee.backend.service;
 import br.edu.fatec.libee.backend.dto.response.*;
 import br.edu.fatec.libee.backend.dto.response.BookCopyCount;
 import br.edu.fatec.libee.backend.dto.response.BookListItemResponse;
+import br.edu.fatec.libee.backend.dto.response.BookManagementSummaryResponse;
+import br.edu.fatec.libee.backend.dto.response.StatusCount;
 import br.edu.fatec.libee.backend.dto.response.BookManagementItemResponse;
 import br.edu.fatec.libee.backend.entity.Author;
 import br.edu.fatec.libee.backend.entity.Book;
@@ -17,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import br.edu.fatec.libee.backend.dto.response.PageResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,6 +63,19 @@ public class BookService {
                 available);
     }
 
+    @Transactional(readOnly = true)
+    public BookManagementSummaryResponse getManagementSummary(){
+        Map<CopyStatus, Long> byStatus = copyRepository.countByStatus()
+                .stream()
+                .collect(Collectors.toMap(StatusCount::status, StatusCount::total));
+        long available = byStatus.getOrDefault(CopyStatus.AVAILABLE, 0L);
+        long onLoan = byStatus.getOrDefault(CopyStatus.ON_LOAN, 0L);
+        long totalCopies = byStatus.values().stream().mapToLong(Long::longValue).sum();
+
+        return new BookManagementSummaryResponse(
+                bookRepository.count(), totalCopies, available, onLoan
+        );
+    }
     @Transactional(readOnly = true)
     public BookDetailsResponse getBookById(Integer id) {
         Book b = bookRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Livro não encontrado com o ID informado."));

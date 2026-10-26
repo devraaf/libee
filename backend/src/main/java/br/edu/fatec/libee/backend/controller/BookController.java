@@ -10,6 +10,11 @@ import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/books")
@@ -29,6 +34,11 @@ public class BookController {
     @GetMapping("/{id}")
     public ResponseEntity<BookDetailsResponse> getBookById(@PathVariable("id") Integer id){
         return ResponseEntity.ok(bookService.getBookById(id));
+    }
+
+    @GetMapping("/management/summary")
+    public ResponseEntity<BookManagementSummaryResponse> getManagementSummary() {
+        return ResponseEntity.ok(bookService.getManagementSummary());
     }
 
 // TODO: restringir a bibliotecário/administrador quando a autenticação existir
