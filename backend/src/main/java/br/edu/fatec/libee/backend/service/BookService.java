@@ -64,19 +64,6 @@ public class BookService {
     }
 
     @Transactional(readOnly = true)
-    public BookManagementSummaryResponse getManagementSummary(){
-        Map<CopyStatus, Long> byStatus = copyRepository.countByStatus()
-                .stream()
-                .collect(Collectors.toMap(StatusCount::status, StatusCount::total));
-        long available = byStatus.getOrDefault(CopyStatus.AVAILABLE, 0L);
-        long onLoan = byStatus.getOrDefault(CopyStatus.ON_LOAN, 0L);
-        long totalCopies = byStatus.values().stream().mapToLong(Long::longValue).sum();
-
-        return new BookManagementSummaryResponse(
-                bookRepository.count(), totalCopies, available, onLoan
-        );
-    }
-    @Transactional(readOnly = true)
     public BookDetailsResponse getBookById(Integer id) {
         Book b = bookRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Livro não encontrado com o ID informado."));
         List<Copy> copies = copyRepository.findByBookIdOrderByAccessionNumberAsc(id);
@@ -84,7 +71,7 @@ public class BookService {
                 c.getAccessionNumber(),
                 c.getPhysicalLocation(),
                 c.getStatus()
-                )).toList();
+        )).toList();
 
         return new BookDetailsResponse(
                 b.getId(),
@@ -103,6 +90,8 @@ public class BookService {
                 copyResponses.size()
         );
     }
+
+    @Transactional(readOnly = true)
     public PageResponse<BookManagementItemResponse> listForManagement(String q, Integer categoryId, int page, int size){
         Page<Book> books = searchBooks(q, categoryId, page, size);
 
@@ -125,4 +114,17 @@ public class BookService {
         }));
     }
 
+    @Transactional(readOnly = true)
+    public BookManagementSummaryResponse getManagementSummary(){
+        Map<CopyStatus, Long> byStatus = copyRepository.countByStatus()
+                .stream()
+                .collect(Collectors.toMap(StatusCount::status, StatusCount::total));
+        long available = byStatus.getOrDefault(CopyStatus.AVAILABLE, 0L);
+        long onLoan = byStatus.getOrDefault(CopyStatus.ON_LOAN, 0L);
+        long totalCopies = byStatus.values().stream().mapToLong(Long::longValue).sum();
+
+        return new BookManagementSummaryResponse(
+                bookRepository.count(), totalCopies, available, onLoan
+        );
+    }
 }

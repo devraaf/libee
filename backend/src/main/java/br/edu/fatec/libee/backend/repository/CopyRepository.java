@@ -18,10 +18,12 @@ public interface CopyRepository extends JpaRepository<Copy, Integer> {
     Set<Integer> findBookIdsWithStatus(@Param("bookIds") Collection<Integer> bookIds,
                                        @Param("status") CopyStatus status);
 
+    List<Copy> findByBookIdOrderByAccessionNumberAsc(Integer bookId );
+
     @Query("select new br.edu.fatec.libee.backend.dto.response.StatusCount(c.status, count(c)) " +
             "from Copy c group by c.status")
     List<StatusCount> countByStatus();
-    List<Copy> findByBookIdOrderByAccessionNumberAsc(Integer bookId );
+
     @Query("select new br.edu.fatec.libee.backend.dto.response.BookCopyCount(" +
             "c.book.id, count(c), " +
             "sum(case when c.status = :status then 1L else 0L end)) " +
