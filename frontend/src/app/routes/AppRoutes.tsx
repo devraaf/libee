@@ -7,6 +7,8 @@ import { PlaceholderPage } from '../pages/PlaceholderPage';
 import { MainLayout } from '../layout/MainLayout';
 import { BookDetailsPage } from '@/features/catalog/pages/BooksDetailsPage';
 import { GalleryPage } from '../pages/GalleryPage';
+import LoansPage from '@/features/librarian/loans/LoanPage';
+import BookCollectionPage from '@/features/librarian/book-collection/BookCollectionPage';
 
 export function AppRoutes() {
   return (
@@ -39,24 +41,8 @@ export function AppRoutes() {
         <Route path="/livros/:id" element={<BookDetailsPage />} />
       </Route>
       <Route element={<MainLayout profile="librarian" />}>
-        <Route
-          path="/gerenciamento/acervo"
-          element={
-            <PlaceholderPage
-              title="Gerenciamento do acervo"
-              description="Consulte e gerencie os livros da biblioteca."
-            />
-          }
-        />
-        <Route
-          path="/gerenciamento/emprestimos"
-          element={
-            <PlaceholderPage
-              title="Empréstimos"
-              description="Consulte e gerencie os empréstimos da biblioteca."
-            />
-          }
-        />
+        <Route path="/gerenciamento/acervo" element={<BookCollectionPage />} />
+        <Route path="/gerenciamento/emprestimos" element={<LoansPage />} />
         <Route
           path="/gerenciamento/devolucoes"
           element={

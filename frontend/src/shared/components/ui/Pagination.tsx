@@ -6,7 +6,7 @@ export interface PaginationProps {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
-  /** Texto à esquerda, ex.: "Mostrando 5 de 100 livros". */
+  /** Resumo dos itens exibidos, ex.: "Mostrando 10 de 100 livros". */
   summary?: ReactNode;
   className?: string;
 }
