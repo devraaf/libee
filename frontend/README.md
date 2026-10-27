@@ -79,6 +79,18 @@ frontend/
 
 Testes específicos de uma feature ou componente devem ficar próximos do código testado; use `src/test/` para recursos compartilhados entre diferentes testes.
 
+## Rotas e layouts
+
+As rotas da aplicação ficam em `src/app/routes/AppRoutes.tsx`. O único layout
+definido é o `MainLayout`, que reúne o header, o conteúdo da rota e o footer. O
+perfil informado pela rota (`public`, `reader` ou `librarian`) configura os
+links exibidos no header; isso ainda não representa autenticação nem protege o
+acesso às páginas. A página institucional usa o `MainLayout` com perfil
+`public`; acervo, empréstimos e detalhe do livro usam perfil `reader`; e as
+rotas de gerenciamento usam perfil `librarian`. Login e cadastro usam o layout
+de autenticação próprio, e a página 404 é exibida sem layout. Telas ainda não
+implementadas usam páginas provisórias.
+
 ## Mocks e services
 
 Os dados de demonstração ficam em `src/shared/mocks/`; os contratos TypeScript compartilhados ficam em `src/shared/types/library.ts` e seguem o formato descrito em [`../docs/test-data/README.md`](../docs/test-data/README.md). O estado dos mocks vive em memória no módulo e permanece sincronizado entre services até a página ser recarregada. Os services são organizados por domínio em `src/features/<feature>/services/` e retornam `Promise` com atraso de 300 a 600 ms.
