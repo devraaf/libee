@@ -21,13 +21,15 @@ export function NavItem({ item, onNavigate, className }: NavItemProps) {
       end={item.end}
       onClick={onNavigate}
       className={({ isActive: isRouteActive }) => {
-        const isActive = isNavItemActive({
-          isRouteActive,
-          targetPathname: target.pathname,
-          targetHash: target.hash,
-          locationPathname: location.pathname,
-          locationHash: location.hash,
-        });
+        const isActive =
+          isNavItemActive({
+            isRouteActive,
+            targetPathname: target.pathname,
+            targetHash: target.hash,
+            locationPathname: location.pathname,
+            locationHash: location.hash,
+          }) ||
+          item.activePaths?.some((path) => location.pathname.startsWith(path));
 
         return cn(
           'type-label inline-flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-surface-hover',
