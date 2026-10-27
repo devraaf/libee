@@ -1,5 +1,5 @@
-import { PlaceholderPage } from "@/app/pages/PlaceholderPage";
-import { useParams } from "react-router-dom";
+import { PlaceholderPage } from '@/app/pages/PlaceholderPage';
+import { useParams } from 'react-router-dom';
 
 export function BookDetailsPage() {
   const { id } = useParams();

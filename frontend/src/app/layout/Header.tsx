@@ -8,7 +8,7 @@ import {
   Menu,
   UserPlus,
   Users,
-  X
+  X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Logo } from '../../shared/components/branding/Logo';

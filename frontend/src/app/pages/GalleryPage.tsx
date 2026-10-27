@@ -380,10 +380,10 @@ export function GalleryPage() {
       </Section>
 
       {/* LAYOUT */}
-      <Section id='Layout' title='Layout'>
+      <Section id="Layout" title="Layout">
         <Demo label="Header">
           <div className="w-full overflow-hidden rounded-xl border border-line">
-            <Header profile='public'></Header>
+            <Header profile="public"></Header>
           </div>
         </Demo>
 
