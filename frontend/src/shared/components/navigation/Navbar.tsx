@@ -32,7 +32,7 @@ export function Navbar({
           aria-label="Libee - página inicial"
           className="rounded-lg"
         >
-          <Logo heightClassName="h-12 sm:h-14" />
+        <Logo className="h-15 sm:h-20 w-auto transition-all" />
         </Link>
 
         <div className="hidden items-center gap-1 md:flex">
