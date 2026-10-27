@@ -79,6 +79,102 @@ frontend/
 
 Testes específicos de uma feature ou componente devem ficar próximos do código testado; use `src/test/` para recursos compartilhados entre diferentes testes.
 
+## Mocks e services
+
+Os dados de demonstração ficam em `src/shared/mocks/`; os contratos TypeScript compartilhados ficam em `src/shared/types/library.ts` e seguem o formato descrito em [`../docs/test-data/README.md`](../docs/test-data/README.md). O estado dos mocks vive em memória no módulo e permanece sincronizado entre services até a página ser recarregada. Os services são organizados por domínio em `src/features/<feature>/services/` e retornam `Promise` com atraso de 300 a 600 ms.
+
+As listagens usam os mesmos parâmetros e o mesmo formato paginado previsto para a API. Em livros, `available` é derivado dos exemplares. O status dos empréstimos é recalculado pelas datas em cada consulta. Para capas sem imagem, use o recurso local `public/images/book-cover-placeholder.svg` quando `coverImageUrl` for `null`. Para conferir estados de erro, busque por `simular erro`; na consulta de ISBN, os exemplos de sucesso, não encontrado, serviço indisponível e já cadastrado estão documentados em `isbn-lookup.service.ts`.
+
+### Exemplo: listar leitores em uma tela
+
+Importe e chame a função do service como qualquer operação assíncrona. A tela controla os estados de carregamento, sucesso e erro; o service não depende de React:
+
+```tsx
+import { useEffect, useState } from 'react';
+import { listReaders } from '../services/readers.service';
+import type { Reader } from '../../../shared/types/library';
+
+export function ReadersPage() {
+  const [readers, setReaders] = useState<Reader[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadReaders() {
+      try {
+        const result = await listReaders();
+        if (active) setReaders(result);
+      } catch {
+        if (active) setError('Não foi possível carregar os leitores.');
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    }
+
+    void loadReaders();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (isLoading) return <p>Carregando leitores...</p>;
+  if (error) return <p role="alert">{error}</p>;
+
+  return (
+    <ul>
+      {readers.map((reader) => (
+        <li key={reader.id}>
+          {reader.name} — {reader.email}
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+Para experimentar a busca e o cadastro, `listReaders('Eduardo')` filtra os registros e `createReader` insere um novo leitor no estado em memória. As chamadas abaixo também podem ser feitas em handlers `async` de formulários:
+
+```ts
+import { createReader, listReaders } from './readers.service';
+
+const matchingReaders = await listReaders('Eduardo');
+
+const newReader = await createReader({
+  name: 'Pessoa de Teste',
+  email: 'pessoa.teste@example.com',
+  password: 'Libee@2026',
+  phone: null,
+  affiliationType: 'STUDENT',
+  courseId: 1,
+});
+```
+
+`listReaders('simular erro')` rejeita a Promise para permitir testar a apresentação de erros. Erros de negócio também são entregues como rejeições (`MockServiceError`), por exemplo ao cadastrar um e-mail duplicado ou excluir um leitor vinculado a empréstimos. Trate essas rejeições na tela ou no handler que chama o service. Os dados alterados são compartilhados entre os services durante a sessão da página e voltam ao estado inicial após recarregar.
+
+Há usuários fictícios compatíveis com o contrato de `docs/test-data/README.md`; todos usam a senha `Libee@2026`:
+
+| Perfil para teste                   | E-mail                         |
+| ----------------------------------- | ------------------------------ |
+| Leitor aluno (Eduardo Lima)         | `eduardo.lima@example.com`     |
+| Leitor professor (Henrique Azevedo) | `henrique.azevedo@example.com` |
+| Bibliotecário (Carlos Mendes)       | `carlos.mendes@example.com`    |
+
+Para trocar um service simulado por Axios, mantenha sua assinatura, tipos de entrada e saída, e substitua somente o corpo pela chamada ao `httpClient`. Por exemplo:
+
+```ts
+export async function listBooks(params: ListBooksParams) {
+  const { data } = await httpClient.get<PaginatedResult<BookListItem>>(
+    '/books',
+    { params },
+  );
+  return data;
+}
+```
+
+O cliente Axios compartilhado está em `src/shared/api/http-client.ts`; configure `VITE_API_BASE_URL` no ambiente local. Não adicione chamadas HTTP aos mocks.
+
 As pastas de cada funcionalidade em `src/features/` são criadas conforme as respectivas Issues forem desenvolvidas, seguindo este padrão:
 
 ```text
