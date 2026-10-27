@@ -16,7 +16,6 @@ export interface ModalProps {
 
 const sizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl' };
 
-/** Modal baseado em <dialog>: foco preso, ESC fecha, clique no fundo fecha. */
 export function Modal({
   open,
   onClose,
