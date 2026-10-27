@@ -7,6 +7,7 @@ import {
   Settings,
   Users,
 } from 'lucide-react';
+import { BookCard } from '../../shared/components/ui/BookCard.tsx';
 import { useState, type ReactNode } from 'react';
 import { Logo } from '../../shared/components/branding/Logo.tsx';
 import { Footer } from '../layout/Footer.tsx';
@@ -109,6 +110,8 @@ const categories = [
   'Animação',
   'Identidade',
 ];
+
+
 
 export function GalleryPage() {
   const modal = useDisclosure();
@@ -319,7 +322,33 @@ export function GalleryPage() {
         </Demo>
       </Section>
 
-      {/* FEEDBACK E OVERLAYS */}
+<Section id="Livros" title="Cards de Livros">
+        <Demo label="BookCard — Disponível e Emprestado">
+          <div className="flex flex-wrap gap-6 items-center">
+            {/* Livro Disponível */}
+            <BookCard
+              title="Titulo da Obra"
+              author="Autor"
+              year="ano"
+              pages="Nº Paginas"
+              category="Tecnologia"
+              status="available"
+            />
+
+            {/* Livro Emprestado */}
+            <BookCard
+              title="Titulo da Obra"
+              author="Autor"
+              year="ano"
+              pages="Nº Paginas"
+              category="Tecnologia"
+              status="borrowed"
+            />
+          </div>
+        </Demo>
+      </Section>
+
+
       <Section id="Feedback e overlays" title="Feedback e overlays">
         <Demo label="EmptyState">
           <Card className="w-full">
@@ -354,6 +383,8 @@ export function GalleryPage() {
         >
           <p className="type-body">Conteúdo do modal fornecido pela página.</p>
         </Modal>
+
+  
       </Section>
 
       {/* NAVEGAÇÃO */}
