@@ -10,7 +10,7 @@ export function AppRoutes() {
   return (
     <Routes>
       {/* Redireciona a raiz "/" direto para o login */}
-      <Route path="*" element={<BookDetailsPage />} />
+      <Route path="*" element={<Navigate to="/login" />} />
       {/* Definição das Rotas*/}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/cadastro" element={<RegisterPage />} />
