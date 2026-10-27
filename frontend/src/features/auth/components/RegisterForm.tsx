@@ -8,7 +8,7 @@ import { registerSchema } from '../schemas/auth.schema';
 import {
   affiliationTypes,
   type AffiliationType,
-} from '../types/affiliation-type';
+} from '../../../shared/schemas/enums.schema';
 import type { Course } from '../types/course';
 import type { RegisterFormData } from '../schemas/auth.schema';
 
@@ -34,8 +34,14 @@ interface RegisterFormProps {
 }
 
 export function RegisterForm({ courses = [], onSubmit }: RegisterFormProps) {
-  const { formData, errors, isLoading, handleFieldChange, handleSubmit } =
-    useAuthForm(initialValues, registerSchema, onSubmit);
+  const {
+    formData,
+    errors,
+    formError,
+    isLoading,
+    handleFieldChange,
+    handleSubmit,
+  } = useAuthForm(initialValues, registerSchema, onSubmit);
 
   return (
     <form
@@ -121,6 +127,11 @@ export function RegisterForm({ courses = [], onSubmit }: RegisterFormProps) {
         onChange={(e) => handleFieldChange('confirmPassword', e.target.value)}
         error={errors.confirmPassword}
       />
+      {formError && (
+        <p className="type-small text-danger" role="alert">
+          {formError}
+        </p>
+      )}
       <Button
         type="submit"
         size="lg"

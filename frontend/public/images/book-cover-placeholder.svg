@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="420" viewBox="0 0 320 420" fill="none">
+  <rect width="320" height="420" rx="16" fill="#F3E8D3"/>
+  <path d="M92 104c0-8.8 7.2-16 16-16h104c8.8 0 16 7.2 16 16v202H108c-8.8 0-16-7.2-16-16V104Z" fill="#FFF9EF" stroke="#8A6743" stroke-width="8"/>
+  <path d="M112 88v202c0 8.8-7.2 16-16 16m48-168h54m-54 32h54m-54 32h40" stroke="#8A6743" stroke-width="8" stroke-linecap="round"/>
+  <text x="160" y="350" fill="#654D35" font-family="Arial, sans-serif" font-size="18" text-anchor="middle">Sem capa disponível</text>
+</svg>

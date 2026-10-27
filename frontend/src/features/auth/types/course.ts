@@ -1,4 +1,1 @@
-export interface Course {
-  id: number;
-  name: string;
-}
+export type { Course } from '../../../shared/types/library';

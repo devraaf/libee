@@ -15,8 +15,14 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ onSubmit }: LoginFormProps) {
-  const { formData, errors, isLoading, handleFieldChange, handleSubmit } =
-    useAuthForm(initialValues, loginSchema, onSubmit);
+  const {
+    formData,
+    errors,
+    formError,
+    isLoading,
+    handleFieldChange,
+    handleSubmit,
+  } = useAuthForm(initialValues, loginSchema, onSubmit);
 
   return (
     <form
@@ -45,6 +51,11 @@ export function LoginForm({ onSubmit }: LoginFormProps) {
         onChange={(e) => handleFieldChange('password', e.target.value)}
         error={errors.password}
       />
+      {formError && (
+        <p className="type-small text-danger" role="alert">
+          {formError}
+        </p>
+      )}
       <Button
         type="submit"
         size="lg"
