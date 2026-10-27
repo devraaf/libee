@@ -1,9 +1,12 @@
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Logo } from '../../../shared/components/branding/Logo';
 import { AuthLayout } from '../components/AuthLayout';
 import { RegisterForm } from '../components/RegisterForm';
 import type { RegisterFormData } from '../schemas/auth.schema';
 import type { Course } from '../types/course';
+import { listCourses } from '../../catalog/services/catalog.service';
+import { register } from '../services/auth.service';
 
 interface RegisterPageProps {
   courses?: Course[];
@@ -11,11 +14,49 @@ interface RegisterPageProps {
 }
 
 export function RegisterPage({ courses, onSubmit }: RegisterPageProps) {
+  const navigate = useNavigate();
+  const [loadedCourses, setLoadedCourses] = useState<Course[]>([]);
+  const [coursesError, setCoursesError] = useState<string | null>(null);
+  const availableCourses = courses ?? loadedCourses;
+
+  useEffect(() => {
+    if (courses !== undefined) return;
+
+    let active = true;
+    listCourses()
+      .then((result) => {
+        if (active) setLoadedCourses(result);
+      })
+      .catch(() => {
+        if (active) {
+          setCoursesError('Não foi possível carregar a lista de cursos.');
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [courses]);
+
+  async function handleRegister(data: RegisterFormData) {
+    if (onSubmit) {
+      await onSubmit(data);
+    } else {
+      await register(data);
+    }
+    navigate('/galeria');
+  }
+
   return (
     <AuthLayout>
       <Logo heightClassName="h-36" />
       <p className="type-small text-fg">Crie sua conta para começar</p>
-      <RegisterForm courses={courses} onSubmit={onSubmit} />
+      {coursesError && (
+        <p className="type-small text-danger" role="alert">
+          {coursesError}
+        </p>
+      )}
+      <RegisterForm courses={availableCourses} onSubmit={handleRegister} />
       <p className="type-small text-muted">
         Já possui uma conta?{' '}
         <Link to="/login" className="text-primary hover:underline">
