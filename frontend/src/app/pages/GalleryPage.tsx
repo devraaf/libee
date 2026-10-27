@@ -27,7 +27,7 @@ import { EmptyState } from '../../shared/components/ui/EmptyState.tsx';
 import { FilterButton } from '../../shared/components/ui/FilterButton.tsx';
 import { IconButton } from '../../shared/components/ui/IconButton.tsx';
 import { Input } from '../../shared/components/ui/Input.tsx';
-import { Modal } from '../../shared/components/ui/Modal.tsx';
+import  Modal  from '../../shared/components/ui/Modal.tsx';
 import { PageHeader } from '../../shared/components/ui/PageHeader.tsx';
 import { PasswordInput } from '../../shared/components/ui/PasswordInput.tsx';
 import { Pagination } from '../../shared/components/ui/Pagination.tsx';
@@ -361,23 +361,23 @@ export function GalleryPage() {
             Abrir modal
           </Button>
         </Demo>
-        <Modal
-          open={modal.isOpen}
-          onClose={modal.close}
-          title="Título do modal"
-          footer={
-            <>
-              <Button variant="outline" onClick={modal.close}>
-                Cancelar
-              </Button>
-              <Button variant="secondary" onClick={modal.close}>
-                Confirmar
-              </Button>
-            </>
-          }
-        >
-          <p className="type-body">Conteúdo do modal fornecido pela página.</p>
-        </Modal>
+       <Modal
+        isOpen={modal.isOpen} 
+        onClose={modal.close}
+        title="Título do modal"
+        footer={
+          <>
+            <Button variant="outline" onClick={modal.close}>
+              Cancelar
+            </Button>
+            <Button variant="secondary" onClick={modal.close}>
+              Confirmar
+            </Button>
+          </>
+        }
+      >
+        <p className="type-body">Conteúdo do modal fornecido pela página.</p>
+</Modal>
 
   
       </Section>
