@@ -7,8 +7,17 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
-  footer?: ReactNode; // <--- 1. Adicionado aqui (opcional)
+  footer?: ReactNode;
+  header?: ReactNode;
+  size?: 'md' | 'lg' | 'xl' | 'full';
 }
+
+const sizeClasses = {
+  md: 'max-w-md',
+  lg: 'max-w-2xl',
+  xl: 'max-w-5xl',
+  full: 'm-0 h-dvh max-h-dvh max-w-none rounded-none p-4 sm:m-4 sm:h-[90vh] sm:max-h-[90vh] sm:max-w-5xl sm:rounded-xl sm:p-6',
+} as const;
 
 export default function Modal({
   isOpen,
@@ -16,6 +25,8 @@ export default function Modal({
   title,
   children,
   footer,
+  header,
+  size = 'md',
 }: ModalProps) {
   const titleId = useId();
 
@@ -40,7 +51,7 @@ export default function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-0 sm:p-4"
       onClick={onClose}
     >
       <div
@@ -48,9 +59,9 @@ export default function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         onClick={(event) => event.stopPropagation()}
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-line bg-surface p-6 text-fg shadow-card"
+        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-xl border border-line bg-surface p-6 text-fg shadow-card ${sizeClasses[size]}`}
       >
-        <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="mb-4 flex shrink-0 items-start justify-between gap-4">
           <h2 id={titleId} className="type-h3">
             {title}
           </h2>
@@ -64,10 +75,12 @@ export default function Modal({
           </button>
         </div>
 
-        <div className="mb-6">{children}</div>
+        {header && <div className="shrink-0">{header}</div>}
+
+        <div className="mb-6 min-h-0 flex-1 overflow-y-auto">{children}</div>
 
         {footer && (
-          <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
+          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-line pt-4">
             {footer}
           </div>
         )}
