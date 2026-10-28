@@ -25,7 +25,8 @@ export default function ReaderLoanCard({ loan, onRenew }: ReaderLoanCardProps) {
       <CoverImage
         src={loan.coverUrl}
         alt={`Capa de ${loan.title}`}
-        className="h-[86px] w-14 shrink-0 rounded-md border border-line/40 bg-surface-warm"
+        size='sm'
+        className="h-21.5 w-14 shrink-0 rounded-md border border-line/40 bg-surface-warm"
       />
 
       <div className="flex min-w-0 flex-1 flex-col justify-between gap-2 py-0.5">

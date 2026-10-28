@@ -124,7 +124,7 @@ export default function ReaderLoansPage({ readerId }: ReaderLoansPageProps) {
                 <div className="mb-3 flex items-center gap-3 px-1">
                   <h2
                     id="loan-history-title"
-                    className="whitespace-nowrap text-base font-semibold text-fg"
+                    className="whitespace-nowrap type-h3 font-semibold lg:type-h2"
                   >
                     Histórico
                   </h2>

@@ -23,6 +23,7 @@ export default function ReaderLoanHistoryCard({
       <CoverImage
         src={loan.coverUrl}
         alt={`Capa de ${loan.title}`}
+        size='sm'
         className="h-21.5 w-14 shrink-0 rounded-md border border-line/40 bg-surface-warm"
       />
 
