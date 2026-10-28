@@ -90,6 +90,7 @@ export default function ReadersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -120,6 +121,12 @@ export default function ReadersPage() {
       active = false;
     };
   }, [retry]);
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timeoutId = window.setTimeout(() => setSuccessMessage(null), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [successMessage]);
 
   const filteredReaders = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
@@ -152,7 +159,7 @@ export default function ReadersPage() {
           : 'EMPLOYEE';
     const course = courses.find(({ name }) => name === values.course);
 
-    await createReader({
+    const reader = await createReader({
       name: values.name.trim(),
       email: values.email.trim(),
       phone: values.phone.replace(/\D/g, ''),
@@ -163,11 +170,20 @@ export default function ReadersPage() {
     });
     setSearch('');
     setPage(1);
+    setSuccessMessage(`Leitor cadastrado com sucesso.`);
     setRetry((current) => current + 1);
   }
 
   return (
     <>
+      {successMessage && (
+        <div
+          role="status"
+          className="fixed bottom-5 right-5 z-50 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg"
+        >
+          {successMessage}
+        </div>
+      )}
       <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8">
         <PageHeader
           title="Leitores"
