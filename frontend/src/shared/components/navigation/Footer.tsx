@@ -1,8 +1,8 @@
-import type { SVGProps } from "react";
-import { Logo } from "../branding/Logo";
+import type { SVGProps } from 'react';
+import { Logo } from '../branding/Logo';
 
 const logoSize =
-  "h-9 [&_img]:h-full [&_img]:w-auto [&_svg]:h-full [&_svg]:w-auto";
+  'h-9 [&_img]:h-full [&_img]:w-auto [&_svg]:h-full [&_svg]:w-auto';
 
 function GithubIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -23,7 +23,9 @@ interface FooterProps {
   githubUrl?: string;
 }
 
-export default function Footer({ githubUrl = "https://github.com/" }: FooterProps) {
+export default function Footer({
+  githubUrl = 'https://github.com/',
+}: FooterProps) {
   return (
     <footer className="w-full border-t border-[var(--lib-border)] bg-[var(--lib-bg)] text-[color:var(--lib-text)]">
       <div className="mx-auto flex w-full max-w-6xl flex-col items-start gap-6 px-6 py-8 md:flex-row md:items-center md:justify-between">
@@ -37,7 +39,9 @@ export default function Footer({ githubUrl = "https://github.com/" }: FooterProp
         </div>
 
         <div className="flex flex-col items-start gap-4 text-sm sm:flex-row sm:items-center sm:gap-6 md:justify-end">
-          <p className="text-[color:var(--lib-muted)]">Projeto acadêmico | Fatec Cotia</p>
+          <p className="text-[color:var(--lib-muted)]">
+            Projeto acadêmico | Fatec Cotia
+          </p>
 
           <span
             aria-hidden="true"

@@ -63,7 +63,6 @@ export default function EditBookModal({
     setError,
     clearErrors,
     trigger,
-    watch,
     formState: { errors },
   } = useForm<RegisterBookFormInput, unknown, RegisterBookFormData>({
     resolver: zodResolver(registerBookSchema),
@@ -86,7 +85,7 @@ export default function EditBookModal({
     control,
     name: 'copies',
   });
-  const authorsList = watch('authors') || [];
+  const authorsList = useWatch({ control, name: 'authors' }) ?? [];
   const copyValues = useWatch({ control, name: 'copies' });
 
   useEffect(() => {
