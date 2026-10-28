@@ -5,6 +5,7 @@ import {
   type TableColumn,
 } from '../../../../shared/components/ui/Table';
 import { Pagination } from '../../../../shared/components/ui/Pagination';
+import { CoverImage } from '../../../../shared/components/ui/CoverImage';
 
 export interface BookCollectionItem {
   id: number;
@@ -44,10 +45,10 @@ export function BookCollectionTable({
       key: 'cover',
       header: 'Capa',
       render: (book) => (
-        <img
-          src={book.coverImageUrl ?? '/images/book-cover-placeholder.svg'}
+        <CoverImage
+          src={book.coverImageUrl}
           alt={`Capa de ${book.title}`}
-          className="h-12 w-9 rounded object-cover"
+          className="h-12 w-9 rounded"
         />
       ),
     },
