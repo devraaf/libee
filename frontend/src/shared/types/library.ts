@@ -97,7 +97,10 @@ export interface CreateBookInput extends Omit<
   authorIds: number[];
 }
 
-export interface CreateReaderInput extends Omit<Reader, 'id' | 'profile'> {
+export interface CreateReaderInput extends Omit<
+  Reader,
+  'id' | 'password' | 'profile'
+> {
   profile?: 'READER';
 }
 

@@ -1,4 +1,4 @@
-import { AlarmClock, BookMarked, CircleCheck } from 'lucide-react';
+import { BookMarked, CircleCheck, ClockAlert } from 'lucide-react';
 import { StatCard } from '../../../../shared/components/ui/StatCard';
 
 export interface LoanStatsProps {
@@ -28,7 +28,7 @@ export function LoanStats({
         value={onTimeLoans}
       />
       <StatCard
-        icon={<AlarmClock size={18} />}
+        icon={<ClockAlert size={18} />}
         label="Atrasados"
         value={overdueLoans}
       />

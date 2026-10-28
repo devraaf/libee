@@ -6,7 +6,7 @@ import { Loader } from '../../../shared/components/ui/Loader/Loader';
 import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../shared/components/ui/SearchFilterBar';
 import { getBook, listCopies } from '../../catalog/services/books.service';
-import { listReaders } from '../../readers/services/readers.service';
+import { listReaders } from '../readers/services/readers.service';
 import { listLoans, returnLoan } from '../../loans/services/loans.service';
 import { LoanStats } from './components/LoanStats';
 import { LoanTable, type LoanTableItem } from './components/LoanTable';
