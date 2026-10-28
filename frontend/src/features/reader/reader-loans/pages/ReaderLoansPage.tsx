@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '../../../../shared/components/ui/Button';
 import { EmptyState } from '../../../../shared/components/ui/EmptyState';
 import { PageHeader } from '../../../../shared/components/ui/PageHeader';
@@ -6,12 +6,14 @@ import SearchFilterBar from '../../../../shared/components/ui/SearchFilterBar';
 import ReaderLoanCard from '../components/ReaderLoanCard';
 import ReaderLoanHistoryCard from '../components/ReaderLoanHistoryCard';
 import { useReaderLoans } from '../hooks/useReaderLoans';
+import type { ReaderLoan } from '../utils/readerLoans';
 
 interface ReaderLoansPageProps {
   readerId?: number;
 }
 
 type StatusFilter = 'all' | 'on_time' | 'overdue';
+type Toast = { type: 'success' | 'error'; message: string };
 
 const Skeleton = () => (
   <div className="space-y-3" role="status" aria-label="Carregando empréstimos">
@@ -31,10 +33,43 @@ const Skeleton = () => (
 );
 
 export default function ReaderLoansPage({ readerId }: ReaderLoansPageProps) {
-  const { isLoading, error, active, history, reload } =
+  const { isLoading, error, active, history, reload, renew } =
     useReaderLoans(readerId);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
+  const [renewingIds, setRenewingIds] = useState<Set<number>>(() => new Set());
+  const [toast, setToast] = useState<Toast | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timeout = window.setTimeout(() => setToast(null), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
+
+  const hasOverdueLoan = active.some((loan) => loan.status === 'overdue');
+
+  const handleRenew = async (loan: ReaderLoan) => {
+    setRenewingIds((current) => new Set(current).add(loan.id));
+    setToast(null);
+    try {
+      await renew(loan.id);
+      setToast({ type: 'success', message: 'Empréstimo renovado com sucesso.' });
+    } catch (error) {
+      setToast({
+        type: 'error',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível renovar o empréstimo.',
+      });
+    } finally {
+      setRenewingIds((current) => {
+        const next = new Set(current);
+        next.delete(loan.id);
+        return next;
+      });
+    }
+  };
 
   const filteredActive = useMemo(() => {
     const term = search.trim().toLocaleLowerCase();
@@ -51,6 +86,18 @@ export default function ReaderLoansPage({ readerId }: ReaderLoansPageProps) {
   return (
     <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8">
       <PageHeader title="Empréstimos" subtitle="Confira os seus empréstimos" />
+      {toast && (
+        <div
+          className={`fixed right-4 top-20 z-50 rounded-lg border px-4 py-3 text-sm shadow-lg ${
+            toast.type === 'success'
+              ? 'border-ok-line bg-ok-bg text-ok'
+              : 'border-danger-line bg-danger-bg text-danger'
+          }`}
+          role={toast.type === 'error' ? 'alert' : 'status'}
+        >
+          {toast.message}
+        </div>
+      )}
       {readerId === undefined ? (
         <EmptyState
           title="Não foi possível identificar o leitor"
@@ -112,7 +159,19 @@ export default function ReaderLoansPage({ readerId }: ReaderLoansPageProps) {
                   />
                 ) : (
                   filteredActive.map((loan) => (
-                    <ReaderLoanCard key={loan.id} loan={loan} />
+                    <ReaderLoanCard
+                      key={loan.id}
+                      loan={loan}
+                      onRenew={handleRenew}
+                      isRenewing={renewingIds.has(loan.id)}
+                      renewalDisabledReason={
+                        loan.status === 'overdue'
+                          ? 'Empréstimos atrasados não podem ser renovados.'
+                          : hasOverdueLoan
+                            ? 'Regularize seus empréstimos atrasados para renovar.'
+                            : undefined
+                      }
+                    />
                   ))
                 )}
               </section>

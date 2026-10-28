@@ -97,6 +97,8 @@ Os dados de demonstração ficam em `src/shared/mocks/`; os contratos TypeScript
 
 As listagens usam os mesmos parâmetros e o mesmo formato paginado previsto para a API. Em livros, `available` é derivado dos exemplares. O status dos empréstimos é recalculado pelas datas em cada consulta. Para capas sem imagem, use o recurso local `public/images/book-cover-placeholder.svg` quando `coverImageUrl` for `null`. Para conferir estados de erro, busque por `simular erro`; na consulta de ISBN, os exemplos de sucesso, não encontrado, serviço indisponível e já cadastrado estão documentados em `isbn-lookup.service.ts`.
 
+A renovação de empréstimos ativos é simulada pelo service de empréstimos: cada renovação acrescenta 7 dias à devolução prevista e incrementa o contador, sem limite de renovações. A tela do leitor apresenta o carregamento e trata rejeições sem atualizar os dados exibidos.
+
 ### Exemplo: listar leitores em uma tela
 
 Importe e chame a função do service como qualquer operação assíncrona. A tela controla os estados de carregamento, sucesso e erro; o service não depende de React:
