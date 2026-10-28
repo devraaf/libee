@@ -22,7 +22,7 @@ export function AppRoutes() {
       <Route path="/entrar" element={<LoginPage />} />
       <Route path="/cadastro" element={<RegisterPage />} />
       <Route path="/galeria" element={<GalleryPage />} />
-      <Route path='/emprestimos' element={<ReaderLoansPage readerId={4}/>} />  {/* id do leitor de acordo com mock e service, para teste */}
+      
       <Route element={<MainLayout profile="reader" />}>
         <Route
           path="/acervo"
@@ -36,12 +36,7 @@ export function AppRoutes() {
         <Route
           path="/emprestimos"
           element={
-            <PlaceholderPage
-              title="Empréstimos"
-              description="Acompanhe seus empréstimos e prazos de devolução."
-            />
-          }
-        />
+          <ReaderLoansPage readerId={4}/>} />  {/* id do leitor de acordo com mock e service, para teste */}
         <Route path="/livros/:id" element={<BookDetailsPage />} />
       </Route>
       <Route element={<MainLayout profile="librarian" />}>
