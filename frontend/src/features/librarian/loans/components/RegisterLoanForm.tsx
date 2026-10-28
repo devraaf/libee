@@ -64,6 +64,9 @@ export default function RegisterLoanForm({
   const [isLoadingCourses, setIsLoadingCourses] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseLoadError, setCourseLoadError] = useState<string | null>(null);
+  const [readerCreatedMessage, setReaderCreatedMessage] = useState<
+    string | null
+  >(null);
 
   const {
     register,
@@ -92,6 +95,16 @@ export default function RegisterLoanForm({
       ),
     [copies, copyCode],
   );
+
+  useEffect(() => {
+    if (!readerCreatedMessage) return;
+    const timeoutId = window.setTimeout(
+      () => setReaderCreatedMessage(null),
+      4000,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [readerCreatedMessage]);
+
   useEffect(() => {
     let active = true;
 
@@ -204,6 +217,7 @@ export default function RegisterLoanForm({
 
     handleSelectReader(reader);
     setIsCreateReaderOpen(false);
+    setReaderCreatedMessage(`Leitor ${reader.name} cadastrado com sucesso.`);
   }
 
   function handleCopyCodeChange(value: string) {
@@ -243,6 +257,14 @@ export default function RegisterLoanForm({
 
   return (
     <>
+      {readerCreatedMessage && (
+        <div
+          role="status"
+          className="fixed bottom-5 right-5 z-[60] rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg"
+        >
+          {readerCreatedMessage}
+        </div>
+      )}
       <form
         onSubmit={handleSubmit(handleFormSubmit)}
         className="flex flex-col gap-4"
