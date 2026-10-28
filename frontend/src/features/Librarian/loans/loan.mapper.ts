@@ -1,5 +1,5 @@
 import { getBook, listCopies } from '../../catalog/services/books.service';
-import { listReaders } from '../Readers/services/readers.service';
+import { listReaders } from '../readers/services/readers.service';
 import type { Loan } from '../../../shared/types/library';
 import type { LoanTableItem } from './components/LoanTable';
 

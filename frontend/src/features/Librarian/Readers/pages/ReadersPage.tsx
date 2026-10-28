@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '../../../../shared/components/ui/Button';
 import { EmptyState } from '../../../../shared/components/ui/EmptyState';
@@ -6,6 +6,7 @@ import { Loader } from '../../../../shared/components/ui/Loader/Loader';
 import Modal from '../../../../shared/components/ui/Modal';
 import { PageHeader } from '../../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../../shared/components/ui/SearchFilterBar';
+import { useTableData } from '../../../../shared/hooks/useTableData';
 import { listCourses } from '../../../catalog/services/catalog.service';
 import { listLoans } from '../../../loans/services/loans.service';
 import { createReader, listReaders } from '../services/readers.service';
@@ -15,8 +16,6 @@ import { ReaderStats } from '../components/ReadersStats';
 import CreateReaderForm from '../components/CreateReaderForm';
 import { ReadersTable, type ReadersItem } from '../components/ReadersTable';
 import type { ReaderFormValues } from '../types/reader.model';
-
-const PAGE_SIZE = 10;
 
 interface ReaderStatsData {
   totalReaders: number;
@@ -82,7 +81,8 @@ function getErrorMessage(error: unknown): string {
 
 export default function ReadersPage() {
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const [affiliationFilter, setAffiliationFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [readers, setReaders] = useState<ReadersItem[]>([]);
   const [stats, setStats] = useState<ReaderStatsData>();
@@ -128,27 +128,19 @@ export default function ReadersPage() {
     return () => window.clearTimeout(timeoutId);
   }, [successMessage]);
 
-  const filteredReaders = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    if (!query) return readers;
-    return readers.filter(
-      (reader) =>
-        reader.name.toLocaleLowerCase().includes(query) ||
-        reader.email.toLocaleLowerCase().includes(query) ||
-        reader.course?.name.toLocaleLowerCase().includes(query),
-    );
-  }, [readers, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredReaders.length / PAGE_SIZE));
-  const visibleReaders = filteredReaders.slice(
-    (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE,
-  );
-
-  function handleSearchChange(value: string) {
-    setSearch(value);
-    setPage(1);
-  }
+  const tableData = useTableData({
+    data: readers,
+    search,
+    getSearchText: (reader) => reader.name,
+    filters: {
+      affiliation: affiliationFilter,
+      status: statusFilter,
+    },
+    matchesFilters: (reader, filters) =>
+      (!filters.affiliation ||
+        reader.affiliationType === filters.affiliation) &&
+      (!filters.status || reader.status === filters.status),
+  });
 
   async function handleCreateReader(values: ReaderFormValues) {
     const affiliationType: AffiliationType =
@@ -170,7 +162,8 @@ export default function ReadersPage() {
     });
 
     setSearch('');
-    setPage(1);
+    setAffiliationFilter('');
+    setStatusFilter('');
     setSuccessMessage(`Leitor cadastrado com sucesso.`);
     setRetry((current) => current + 1);
   }
@@ -188,7 +181,7 @@ export default function ReadersPage() {
       <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8">
         <PageHeader
           title="Leitores"
-          subtitle="Consulte os leitores cadastrados e o histórico de empréstimos de cada um"
+          subtitle="Consulte os leitores cadastrados"
           action={
             <Button
               type="button"
@@ -203,9 +196,40 @@ export default function ReadersPage() {
         <ReaderStats {...stats} />
 
         <SearchFilterBar
-          placeholder="Buscar por nome, e-mail ou curso..."
+          placeholder="Buscar por nome..."
           value={search}
-          onChange={handleSearchChange}
+          onChange={setSearch}
+          filterContent={
+            <div className="flex flex-col gap-4">
+              <label className="flex flex-col gap-2 text-sm text-fg">
+                Vínculo
+                <select
+                  value={affiliationFilter}
+                  onChange={(event) =>
+                    setAffiliationFilter(event.target.value)
+                  }
+                  className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+                >
+                  <option value="">Todos os vínculos</option>
+                  <option value="STUDENT">Estudante</option>
+                  <option value="EMPLOYEE">Funcionário</option>
+                  <option value="PROFESSOR">Professor</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-2 text-sm text-fg">
+                Situação
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                  className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+                >
+                  <option value="">Todas as situações</option>
+                  <option value="OK">Em dia</option>
+                  <option value="PENDING">Com pendência</option>
+                </select>
+              </label>
+            </div>
+          }
         />
 
         {isLoading ? (
@@ -232,11 +256,11 @@ export default function ReadersPage() {
           />
         ) : (
           <ReadersTable
-            readers={visibleReaders}
-            page={page}
-            totalItems={filteredReaders.length}
-            totalPages={totalPages}
-            onPageChange={setPage}
+            readers={tableData.items}
+            page={tableData.page}
+            totalItems={tableData.totalItems}
+            totalPages={tableData.totalPages}
+            onPageChange={tableData.setPage}
           />
         )}
       </section>

@@ -99,7 +99,7 @@ export function ReadersTable({
       caption="Leitores cadastrados"
       emptyState={
         <EmptyState
-          title="Nenhum leitor encontrado."
+          title="Nenhum resultado encontrado"
           description="Tente alterar os termos da busca."
         />
       }

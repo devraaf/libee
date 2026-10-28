@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { Button } from '../../../shared/components/ui/Button';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
@@ -6,13 +7,14 @@ import { Loader } from '../../../shared/components/ui/Loader/Loader';
 import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../shared/components/ui/SearchFilterBar';
 import {
-  listBooks,
+  listAllBooks,
   listActiveCopies,
   deleteBook,
   type RegisteredBook,
 } from '../../catalog/services/books.service';
 import { listLoans } from '../../loans/services/loans.service';
 import type { BookListItem, Copy } from '../../../shared/types/library';
+import { useTableData } from '../../../shared/hooks/useTableData';
 import {
   BookCollectionTable,
   type BookCollectionItem,
@@ -21,8 +23,6 @@ import { BookCollectionStats } from './components/BookCollectionStats';
 import RegisterBookModal from './components/RegisterBookModal';
 import EditBookModal from './components/EditBookModal';
 import DeleteBookModal from './components/DeleteBookModal';
-
-const PAGE_SIZE = 10;
 
 interface BookCollectionStatsData {
   totalBooks: number;
@@ -56,17 +56,14 @@ function getErrorMessage(error: unknown): string {
 }
 
 export default function BookCollectionPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [books, setBooks] = useState<BookCollectionItem[]>([]);
-  const [totalBooks, setTotalBooks] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [isLoadingBooks, setIsLoadingBooks] = useState(true);
   const [booksError, setBooksError] = useState<string | null>(null);
   const [booksRetry, setBooksRetry] = useState(0);
   const [stats, setStats] = useState<BookCollectionStatsData>();
-  const [statsError, setStatsError] = useState<string | null>(null);
-  const [statsRetry, setStatsRetry] = useState(0);
 
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [editingBookId, setEditingBookId] = useState<number | null>(null);
@@ -84,8 +81,8 @@ export default function BookCollectionPage() {
       setIsLoadingBooks(true);
       setBooksError(null);
       try {
-        const [result, copies, loans] = await Promise.all([
-          listBooks({ page, size: PAGE_SIZE, search }),
+        const [bookRecords, copies, loans] = await Promise.all([
+          listAllBooks(),
           listActiveCopies(),
           listLoans(),
         ]);
@@ -97,12 +94,18 @@ export default function BookCollectionPage() {
             .map((loan) => loan.copyId),
         );
         setBooks(
-          result.items.map((book) =>
+          bookRecords.map((book) =>
             toBookCollectionItem(book, copies, activeCopyIds),
           ),
         );
-        setTotalBooks(result.totalItems);
-        setTotalPages(Math.max(result.totalPages, 1));
+        setStats({
+          totalBooks: bookRecords.length,
+          totalCopies: copies.length,
+          availableCopies: copies.filter((copy) => copy.status === 'AVAILABLE')
+            .length,
+          borrowedCopies: copies.filter((copy) => copy.status === 'ON_LOAN')
+            .length,
+        });
       } catch (error) {
         if (active) setBooksError(getErrorMessage(error));
       } finally {
@@ -114,50 +117,24 @@ export default function BookCollectionPage() {
     return () => {
       active = false;
     };
-  }, [page, search, booksRetry]);
+  }, [booksRetry]);
 
-  useEffect(() => {
-    let active = true;
+  const tableData = useTableData({
+    data: books,
+    search,
+    getSearchText: (book) => [book.title, book.authors, book.isbn],
+    filters: { category: categoryFilter },
+    matchesFilters: (book, filters) =>
+      !filters.category || book.category === filters.category,
+  });
 
-    async function loadStats() {
-      setStatsError(null);
-      try {
-        const [bookResult, copies] = await Promise.all([
-          listBooks({ page: 1, size: 1 }),
-          listActiveCopies(),
-        ]);
-        if (!active) return;
-
-        setStats({
-          totalBooks: bookResult.totalItems,
-          totalCopies: copies.length,
-          availableCopies: copies.filter((copy) => copy.status === 'AVAILABLE')
-            .length,
-          borrowedCopies: copies.filter((copy) => copy.status === 'ON_LOAN')
-            .length,
-        });
-      } catch (error) {
-        if (active) setStatsError(getErrorMessage(error));
-      }
-    }
-
-    void loadStats();
-    return () => {
-      active = false;
-    };
-  }, [statsRetry]);
-
-  function handleSearchChange(value: string) {
-    setSearch(value);
-    setPage(1);
-  }
+  const categories = [...new Set(books.map((book) => book.category))];
 
   const handleBookRegisteredSuccess = (newBook: RegisteredBook) => {
     setIsRegisterModalOpen(false);
     setSearch('');
-    setPage(1);
+    setCategoryFilter('');
     setBooksRetry((retry) => retry + 1);
-    setStatsRetry((r) => r + 1);
 
     setSuccessToast(`Livro "${newBook.title}" cadastrado com sucesso!`);
     setTimeout(() => setSuccessToast(null), 4000);
@@ -170,9 +147,7 @@ export default function BookCollectionPage() {
     try {
       await deleteBook(bookToDelete.id);
       setBookToDelete(null);
-      if (books.length === 1 && page > 1) setPage((current) => current - 1);
       setBooksRetry((retry) => retry + 1);
-      setStatsRetry((retry) => retry + 1);
       setSuccessToast(`Livro "${bookToDelete.title}" excluído com sucesso.`);
       setTimeout(() => setSuccessToast(null), 4000);
     } catch (error) {
@@ -215,26 +190,27 @@ export default function BookCollectionPage() {
       />
 
       <BookCollectionStats {...stats} />
-      {statsError && (
-        <div
-          className="flex flex-wrap items-center justify-between gap-3"
-          role="alert"
-        >
-          <p className="type-small text-danger">{statsError}</p>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setStatsRetry((retry) => retry + 1)}
-          >
-            Tentar carregar resumo novamente
-          </Button>
-        </div>
-      )}
-
       <SearchFilterBar
         placeholder="Pesquise por título, autor ou ISBN..."
         value={search}
-        onChange={handleSearchChange}
+        onChange={setSearch}
+        filterContent={
+          <label className="flex flex-col gap-2 text-sm text-fg">
+            Categoria
+            <select
+              value={categoryFilter}
+              onChange={(event) => setCategoryFilter(event.target.value)}
+              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+            >
+              <option value="">Todas as categorias</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </label>
+        }
       />
 
       {isLoadingBooks ? (
@@ -261,11 +237,12 @@ export default function BookCollectionPage() {
         />
       ) : (
         <BookCollectionTable
-          books={books}
-          page={page}
-          totalItems={totalBooks}
-          totalPages={totalPages}
-          onPageChange={setPage}
+          books={tableData.items}
+          page={tableData.page}
+          totalItems={tableData.totalItems}
+          totalPages={tableData.totalPages}
+          onPageChange={tableData.setPage}
+          onViewBook={(bookId) => navigate(`/livros/${bookId}`)}
           onEditBook={setEditingBookId}
           onDeleteBook={(book) => {
             setBookToDelete(book);
@@ -288,7 +265,6 @@ export default function BookCollectionPage() {
         onSuccess={(updatedBook) => {
           setEditingBookId(null);
           setBooksRetry((retry) => retry + 1);
-          setStatsRetry((retry) => retry + 1);
           setSuccessToast(
             `Livro "${updatedBook.title}" atualizado com sucesso!`,
           );
