@@ -217,7 +217,7 @@ export default function RegisterLoanForm({
 
     handleSelectReader(reader);
     setIsCreateReaderOpen(false);
-    setReaderCreatedMessage(`Leitor ${reader.name} cadastrado com sucesso.`);
+    setReaderCreatedMessage(`Leitor cadastrado com sucesso.`);
   }
 
   function handleCopyCodeChange(value: string) {
