@@ -11,6 +11,7 @@ import LoansPage from '@/features/librarian/loans/LoanPage';
 import BookCollectionPage from '@/features/librarian/book-collection/BookCollectionPage';
 import ReadersPage from '@/features/librarian/Readers/pages/ReadersPage';
 import ReturnsPage from '@/features/librarian/Returns/pages/ReturnsPage';
+import ReaderLoansPage from '@/features/reader/reader-loans/pages/reader-loans-page'
 
 export function AppRoutes() {
   return (
@@ -21,6 +22,7 @@ export function AppRoutes() {
       <Route path="/entrar" element={<LoginPage />} />
       <Route path="/cadastro" element={<RegisterPage />} />
       <Route path="/galeria" element={<GalleryPage />} />
+      <Route path='/emprestimos' element={<ReaderLoansPage readerId={4}/>} />  {/* id do leitor de acordo com mock e service, para teste */}
       <Route element={<MainLayout profile="reader" />}>
         <Route
           path="/acervo"
