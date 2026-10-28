@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Trash2, AlertCircle, Loader2, Search } from 'lucide-react';
 import Modal from '../../../../shared/components/ui/Modal';
@@ -70,7 +70,6 @@ export default function RegisterBookModal({
     register,
     handleSubmit,
     setValue,
-    watch,
     control,
     reset,
     setError,
@@ -100,8 +99,8 @@ export default function RegisterBookModal({
     name: 'copies',
   });
 
-  const authorsList = watch('authors') || [];
-  const isbnValue = watch('isbn') || '';
+  const authorsList = useWatch({ control, name: 'authors' }) ?? [];
+  const isbnValue = useWatch({ control, name: 'isbn' }) ?? '';
 
   useEffect(() => {
     if (!open) return;
@@ -508,7 +507,7 @@ export default function RegisterBookModal({
             {isbnNotice && (
               <div className="flex flex-col items-start justify-between gap-3 rounded-lg border border-warn-line bg-warn-bg p-3 text-xs text-warn sm:flex-row sm:items-center">
                 <div className="flex items-center gap-2">
-                  <AlertCircle size={16} className="text-warn flex-shrink-0" />
+                  <AlertCircle size={16} className="text-warn shrink-0" />
                   <span>{isbnNotice.message}</span>
                 </div>
                 {isbnNotice.type === 'existing' &&
@@ -534,7 +533,7 @@ export default function RegisterBookModal({
           <div className="flex flex-col gap-4">
             {isbnNotice && isbnNotice.type === 'warning' && (
               <div className="rounded-lg bg-info-bg p-3 border border-info-line text-xs text-info flex items-center gap-2">
-                <AlertCircle size={16} className="text-info flex-shrink-0" />
+                <AlertCircle size={16} className="text-info shrink-0" />
                 <span>{isbnNotice.message}</span>
               </div>
             )}

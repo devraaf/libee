@@ -168,7 +168,7 @@ export default function ReadersPage() {
         ? { courseId: course.id }
         : {}),
     });
-    
+
     setSearch('');
     setPage(1);
     setSuccessMessage(`Leitor cadastrado com sucesso.`);
