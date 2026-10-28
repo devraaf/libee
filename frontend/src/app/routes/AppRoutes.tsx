@@ -10,6 +10,7 @@ import { GalleryPage } from '../pages/GalleryPage';
 import LoansPage from '@/features/librarian/loans/LoanPage';
 import BookCollectionPage from '@/features/librarian/book-collection/BookCollectionPage';
 import Returns from '@/features/librarian/Returns/pages/ReturnsPage';
+import ReadersPage from '@/features/librarian/Readers/pages/ReadersPage';
 
 export function AppRoutes() {
   return (
@@ -54,15 +55,7 @@ export function AppRoutes() {
             />
           }
         />
-        <Route
-          path="/gerenciamento/leitores"
-          element={
-            <PlaceholderPage
-              title="Leitores"
-              description="Consulte e gerencie os leitores cadastrados."
-            />
-          }
-        />
+        <Route path="/gerenciamento/leitores" element={<ReadersPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

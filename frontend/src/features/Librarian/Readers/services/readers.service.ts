@@ -3,13 +3,16 @@ import {
   mockLoans,
   mockReaders,
   mockUsers,
-} from '../../../shared/mocks/data';
+} from '../../../../shared/mocks/data';
 import {
   MockServiceError,
   simulateSearchError,
   simulateServiceDelay,
-} from '../../../shared/mocks/service-utils';
-import type { CreateReaderInput, Reader } from '../../../shared/types/library';
+} from '../../../../shared/mocks/service-utils';
+import type {
+  CreateReaderInput,
+  Reader,
+} from '../../../../shared/types/library';
 
 export async function listReaders(search = ''): Promise<Reader[]> {
   await simulateServiceDelay();
@@ -53,6 +56,7 @@ export async function createReader(input: CreateReaderInput): Promise<Reader> {
     ...input,
     id: Math.max(0, ...mockUsers.map(({ id }) => id)) + 1,
     email,
+    password: '',
     profile: 'READER',
   };
   mockUsers.push(reader);

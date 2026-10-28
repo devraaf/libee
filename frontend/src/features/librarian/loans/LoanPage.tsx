@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import { Button } from '../../../shared/components/ui/Button';
 import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../shared/components/ui/SearchFilterBar';
-import { Modal } from '../../../shared/components/ui/Modal';
+import Modal from '../../../shared/components/ui/Modal';
 import { mockBooks, mockCopies, mockLoans, mockReaders } from '../../../shared/mocks/data';
 import RegisterReturnForm from '../Returns/components/RegisterReturnForm';
 import RegisterLoanForm from './components/RegisterLoanForm';
@@ -236,7 +236,7 @@ export default function LoanPage() {
       />
 
       <Modal
-        open={isReturnModalOpen}
+        isOpen={isReturnModalOpen}
         onClose={() => setIsReturnModalOpen(false)}
         title="Registrar devolução"
       >
@@ -254,7 +254,7 @@ export default function LoanPage() {
       </Modal>
 
       <Modal
-        open={isCreateModalOpen}
+        isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         title="Registrar empréstimo"
       >
