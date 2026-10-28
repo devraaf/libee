@@ -387,6 +387,22 @@ export async function listBooks({
   };
 }
 
+export async function listAllBooks(): Promise<BookListItem[]> {
+  const size = 100;
+  const firstPage = await listBooks({ page: 1, size });
+  if (firstPage.totalPages <= 1) return firstPage.items;
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: firstPage.totalPages - 1 }, (_, index) =>
+      listBooks({ page: index + 2, size }),
+    ),
+  );
+  return [
+    ...firstPage.items,
+    ...remainingPages.flatMap((result) => result.items),
+  ];
+}
+
 export async function getBook(bookId: number): Promise<BookListItem> {
   await simulateServiceDelay();
   const book = mockBooks.find(

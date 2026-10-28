@@ -96,21 +96,18 @@ export function LoanTable({
       key: 'actions',
       header: 'Ações',
       align: 'right',
-      render: (loan) => (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled={loan.status === 'RETURNED' || returningLoanId === loan.id}
-          onClick={() => onReturn(loan.id)}
-        >
-          {returningLoanId === loan.id
-            ? 'Devolvendo...'
-            : loan.status === 'RETURNED'
-              ? 'Devolvido'
-              : 'Devolver'}
-        </Button>
-      ),
+      render: (loan) =>
+        loan.status === 'RETURNED' ? null : (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={returningLoanId === loan.id}
+            onClick={() => onReturn(loan.id)}
+          >
+            {returningLoanId === loan.id ? 'Devolvendo...' : 'Devolver'}
+          </Button>
+        ),
     },
   ];
 
@@ -122,7 +119,7 @@ export function LoanTable({
       caption="Empréstimos da biblioteca"
       emptyState={
         <EmptyState
-          title="Nenhum empréstimo encontrado."
+          title="Nenhum resultado encontrado"
           description="Tente alterar os termos da busca."
         />
       }

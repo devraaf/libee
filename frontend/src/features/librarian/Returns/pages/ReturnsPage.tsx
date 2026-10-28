@@ -10,13 +10,12 @@ import {
   type TableColumn,
 } from '../../../../shared/components/ui/Table';
 import { Pagination } from '../../../../shared/components/ui/Pagination';
+import { useTableData } from '../../../../shared/hooks/useTableData';
 import { listLoans, returnLoan } from '../../../loans/services/loans.service';
 import { mapLoanRecords, type LoanRecordItem } from '../../loans/loan.mapper';
 import RegisterReturnForm, {
   type ReturnLoanDetails,
 } from '../components/RegisterReturnForm';
-
-const PAGE_SIZE = 10;
 
 interface ReturnTableItem {
   id: number;
@@ -46,7 +45,6 @@ export default function ReturnsPage() {
   const [copyCodeInput, setCopyCodeInput] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
   const [loans, setLoans] = useState<LoanRecordItem[]>([]);
   const [selectedLoan, setSelectedLoan] = useState<ReturnLoanDetails | null>(
     null,
@@ -100,27 +98,11 @@ export default function ReturnsPage() {
     [loans],
   );
 
-  const filteredReturns = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    if (!query) return returnedLoans;
-    return returnedLoans.filter(
-      (item) =>
-        item.title.toLocaleLowerCase().includes(query) ||
-        item.reader.toLocaleLowerCase().includes(query) ||
-        item.copyCode.toLocaleLowerCase().includes(query),
-    );
-  }, [returnedLoans, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredReturns.length / PAGE_SIZE));
-  const visibleReturns = filteredReturns.slice(
-    (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE,
-  );
-
-  function handleSearchChange(value: string) {
-    setSearch(value);
-    setPage(1);
-  }
+  const tableData = useTableData({
+    data: returnedLoans,
+    search,
+    getSearchText: (item) => [item.reader, item.title, item.copyCode],
+  });
 
   function handleLookup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -240,7 +222,7 @@ export default function ReturnsPage() {
         <SearchFilterBar
           placeholder="Pesquise por leitor, livro ou tombo..."
           value={search}
-          onChange={handleSearchChange}
+          onChange={setSearch}
         />
 
         {isLoading ? (
@@ -268,22 +250,22 @@ export default function ReturnsPage() {
         ) : (
           <Table
             columns={columns}
-            rows={visibleReturns}
+            rows={tableData.items}
             getRowKey={(item) => item.id}
             caption="Devoluções registradas"
             emptyState={
               <EmptyState
-                title="Nenhuma devolução encontrada."
+                title="Nenhum resultado encontrado"
                 description="Os registros de devolução aparecerão aqui."
               />
             }
             footer={
               <Pagination
-                page={page}
-                totalPages={totalPages}
-                onPageChange={setPage}
-                summary={`Mostrando ${visibleReturns.length} de ${filteredReturns.length} ${
-                  filteredReturns.length === 1 ? 'devolução' : 'devoluções'
+                page={tableData.page}
+                totalPages={tableData.totalPages}
+                onPageChange={tableData.setPage}
+                summary={`Mostrando ${tableData.items.length} de ${tableData.totalItems} ${
+                  tableData.totalItems === 1 ? 'devolução' : 'devoluções'
                 }`}
               />
             }

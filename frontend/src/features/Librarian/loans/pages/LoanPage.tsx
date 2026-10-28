@@ -1,29 +1,28 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { Button } from '../../../shared/components/ui/Button';
-import { EmptyState } from '../../../shared/components/ui/EmptyState';
-import { Loader } from '../../../shared/components/ui/Loader/Loader';
-import { PageHeader } from '../../../shared/components/ui/PageHeader';
-import SearchFilterBar from '../../../shared/components/ui/SearchFilterBar';
-import Modal from '../../../shared/components/ui/Modal';
-import { getCurrentSession } from '../../auth/services/auth.service';
-import { listActiveCopies } from '../../catalog/services/books.service';
+import { Button } from '../../../../shared/components/ui/Button';
+import { EmptyState } from '../../../../shared/components/ui/EmptyState';
+import { Loader } from '../../../../shared/components/ui/Loader/Loader';
+import { PageHeader } from '../../../../shared/components/ui/PageHeader';
+import SearchFilterBar from '../../../../shared/components/ui/SearchFilterBar';
+import Modal from '../../../../shared/components/ui/Modal';
+import { getCurrentSession } from '../../../auth/services/auth.service';
+import { listActiveCopies } from '../../../catalog/services/books.service';
 import {
   createLoan,
   listLoans,
   returnLoan,
-} from '../../loans/services/loans.service';
-import { dateFromToday } from '../../../shared/mocks/dates';
+} from '../../../loans/services/loans.service';
+import { dateFromToday } from '../../../../shared/mocks/dates';
+import { useTableData } from '../../../../shared/hooks/useTableData';
 import RegisterReturnForm, {
   type ReturnLoanDetails,
-} from '../Returns/components/RegisterReturnForm';
-import RegisterLoanForm from './components/RegisterLoanForm';
-import { LoanStats } from './components/LoanStats';
-import { LoanTable } from './components/LoanTable';
-import { mapLoanRecords, type LoanRecordItem } from './loan.mapper';
-import type { RegisterLoanFormData } from './schemas/loan.schema';
-
-const PAGE_SIZE = 10;
+} from '../../returns/components/RegisterReturnForm';
+import RegisterLoanForm from '../components/RegisterLoanForm';
+import { LoanStats } from '../components/LoanStats';
+import { LoanTable } from '../components/LoanTable';
+import { mapLoanRecords, type LoanRecordItem } from '../loan.mapper';
+import type { RegisterLoanFormData } from '../schemas/loan.schema';
 
 interface LoanStatsData {
   activeLoans: number;
@@ -49,7 +48,7 @@ async function getActiveLoanItems(): Promise<LoanRecordItem[]> {
 
 export default function LoanPage() {
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState('');
   const [loans, setLoans] = useState<LoanRecordItem[]>([]);
   const [stats, setStats] = useState<LoanStatsData>({
     activeLoans: 0,
@@ -95,31 +94,22 @@ export default function LoanPage() {
     };
   }, [retry]);
 
-  const filteredLoans = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    if (!query) return loans;
-    return loans.filter(
-      (loan) =>
-        loan.title.toLocaleLowerCase().includes(query) ||
-        loan.readerName.toLocaleLowerCase().includes(query) ||
-        loan.accessionNumber.toLocaleLowerCase().includes(query),
-    );
-  }, [loans, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredLoans.length / PAGE_SIZE));
-  const visibleLoans = filteredLoans.slice(
-    (page - 1) * PAGE_SIZE,
-    page * PAGE_SIZE,
-  );
-
-  function handleSearchChange(value: string) {
-    setSearch(value);
-    setPage(1);
-  }
+  const tableData = useTableData({
+    data: loans,
+    search,
+    getSearchText: (loan) => [
+      loan.readerName,
+      loan.title,
+      loan.accessionNumber,
+    ],
+    filters: { status: statusFilter },
+    matchesFilters: (loan, filters) =>
+      !filters.status || loan.status === filters.status,
+  });
 
   function handleOpenReturnModal(loanId: number) {
     const loan = loans.find((item) => item.id === loanId);
-    if (!loan) return;
+    if (!loan || loan.returnDate !== null || loan.status === 'RETURNED') return;
     setSelectedLoanForReturn({
       loanId: loan.id,
       copyCode: loan.accessionNumber,
@@ -210,7 +200,21 @@ export default function LoanPage() {
       <SearchFilterBar
         placeholder="Pesquise por leitor, livro ou tombo..."
         value={search}
-        onChange={handleSearchChange}
+        onChange={setSearch}
+        filterContent={
+          <label className="flex flex-col gap-2 text-sm text-fg">
+            Situação
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+            >
+              <option value="">Todas as situações</option>
+              <option value="ON_TIME">Em dia</option>
+              <option value="OVERDUE">Atrasado</option>
+            </select>
+          </label>
+        }
       />
 
       {isLoading ? (
@@ -237,12 +241,12 @@ export default function LoanPage() {
         />
       ) : (
         <LoanTable
-          loans={visibleLoans}
-          page={page}
-          totalItems={filteredLoans.length}
-          totalPages={totalPages}
+          loans={tableData.items}
+          page={tableData.page}
+          totalItems={tableData.totalItems}
+          totalPages={tableData.totalPages}
           returningLoanId={null}
-          onPageChange={setPage}
+          onPageChange={tableData.setPage}
           onReturn={(loanId) => handleOpenReturnModal(loanId)}
         />
       )}
