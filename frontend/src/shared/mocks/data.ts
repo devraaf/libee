@@ -223,7 +223,7 @@ export const mockCopies: Copy[] = mockBooks.flatMap((book) =>
     )
     .map((copyIndex) => {
       const id = (book.id - 1) * 2 + copyIndex + 1;
-      const isOnLoan = [2, 7, 9, 11, 19, 29].includes(id);
+      const isOnLoan = [2, 7, 9, 11, 13, 19, 29].includes(id);
 
       return {
         id,
@@ -333,6 +333,16 @@ export const mockLoans: Omit<Loan, 'status'>[] = [
     librarianId: 3,
     loanDate: dateFromToday(-18),
     dueDate: dateFromToday(-4),
+    returnDate: null,
+    renewalCount: 0,
+  },
+  {
+    id: 11,
+    copyId: 13,
+    readerId: 4,
+    librarianId: 2,
+    loanDate: dateFromToday(-1),
+    dueDate: dateFromToday(13),
     returnDate: null,
     renewalCount: 0,
   },

@@ -8,7 +8,7 @@ import {
   toBookInfo,
   type BookInfo,
   type ReaderLoan,
-} from '../utils/reader-loans';
+} from '../utils/readerLoans';
 
 interface State {
   isLoading: boolean;

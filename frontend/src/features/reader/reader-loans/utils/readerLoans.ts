@@ -1,5 +1,5 @@
 import { dateFromToday } from '../../../../shared/mocks/dates';
-import type { Loan } from '../../../../shared/types/library';
+import type { Loan, BookListItem } from '../../../../shared/types/library';
 
 export type LoanStatus = 'on_time' | 'overdue' | 'returned';
 
@@ -25,14 +25,11 @@ export interface ReaderLoan {
 
 export const getBookPath = (bookId: number) => `/livros/${bookId}`;
 
-export function toBookInfo(book: unknown): BookInfo {
-  const raw = book as Record<string, unknown>;
-  const text = (value: unknown) =>
-    typeof value === 'string' && value ? value : null;
+export function toBookInfo(book: BookListItem): BookInfo {
   return {
-    title: text(raw.title) ?? 'Título não informado',
-    author: text(raw.author),
-    coverUrl: text(raw.coverUrl),
+    title: book.title,
+    author: book.authors.map(({ name }) => name).join(', ') || null,
+    coverUrl: book.coverImageUrl,
   };
 }
 
