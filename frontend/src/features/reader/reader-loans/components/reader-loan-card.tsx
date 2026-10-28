@@ -1,5 +1,6 @@
+import { Link } from 'react-router-dom';
 import { Button } from '../../../../shared/components/ui/Button';
-import { formatDate, type ReaderLoan } from '../utils/reader-loans';
+import { formatDate, getBookPath, type ReaderLoan } from '../utils/reader-loans';
 import BookCover from '../components/book-cover';
 
 interface ReaderLoanCardProps {
@@ -46,16 +47,32 @@ export default function ReaderLoanCard({ loan, onRenew, onViewBook }: ReaderLoan
             >
               Renovar
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={loan.bookId === null}
-              onClick={() => loan.bookId !== null && onViewBook(loan.bookId)}
-              aria-label={`Ver livro ${loan.title}`}
-            >
-              Ver livro
-            </Button>
+            
+            {loan.bookId !== null ? (
+              <Link
+                to={getBookPath(loan.bookId)}
+                aria-label={`Ver detalhes de ${loan.title}`}
+              >
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  aria-label={`Ver livro ${loan.title}`}
+                >
+                  Ver livro
+                </Button>
+              </Link>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={true}
+                aria-label={`Ver livro ${loan.title}`}
+              >
+                Ver livro
+              </Button>
+            )}
           </div>
         </div>
       </div>

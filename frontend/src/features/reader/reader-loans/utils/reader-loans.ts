@@ -23,7 +23,7 @@ export interface ReaderLoan {
   status: LoanStatus;
 }
 
-export const getBookPath = (bookId: number) => `/acervo/${bookId}`;
+export const getBookPath = (bookId: number) => `/livros/${bookId}`;
 
 export function toBookInfo(book: unknown): BookInfo {
   const raw = book as Record<string, unknown>;
