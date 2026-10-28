@@ -1,72 +1,78 @@
+import { useEffect, useId, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import { useEffect, useId, useRef, type ReactNode } from 'react';
-import { cn } from './cn';
-import { IconButton } from './IconButton';
 
-export interface ModalProps {
-  open: boolean;
+interface ModalProps {
+  isOpen: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
-  /** Linha de ações (botões) exibida no rodapé. */
-  footer?: ReactNode;
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
+  footer?: ReactNode; // <--- 1. Adicionado aqui (opcional)
 }
 
-const sizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl' };
-
-/** Modal baseado em <dialog>: foco preso, ESC fecha, clique no fundo fecha. */
-export function Modal({
-  open,
+export default function Modal({
+  isOpen,
   onClose,
   title,
   children,
   footer,
-  size = 'md',
-  className,
 }: ModalProps) {
-  const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
   useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
+    if (!isOpen) return;
 
-  return (
-    <dialog
-      ref={ref}
-      aria-labelledby={titleId}
-      onClose={onClose}
-      onClick={(event) => {
-        if (event.target === ref.current) onClose();
-      }}
-      className={cn(
-        'm-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-y-auto rounded-2xl border border-line bg-surface p-0 text-fg shadow-card backdrop:bg-black/50',
-        sizes[size],
-        className,
-      )}
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    const previousOverflow = document.body.style.overflow;
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
     >
-      <div className="flex flex-col gap-5 p-6">
-        <div className="flex items-start justify-between gap-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(event) => event.stopPropagation()}
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-line bg-surface p-6 text-fg shadow-card"
+      >
+        <div className="mb-4 flex items-start justify-between gap-4">
           <h2 id={titleId} className="type-h3">
             {title}
           </h2>
-          <IconButton
-            label="Fechar"
-            icon={<X size={18} />}
+          <button
+            type="button"
             onClick={onClose}
-            className="-mr-2 -mt-1"
-          />
+            aria-label="Fechar"
+            className="flex size-7 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-fg"
+          >
+            <X size={16} />
+          </button>
         </div>
-        {children}
+
+        <div className="mb-6">{children}</div>
+
         {footer && (
-          <div className="flex flex-wrap justify-end gap-3">{footer}</div>
+          <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
+            {footer}
+          </div>
         )}
       </div>
-    </dialog>
+    </div>,
+    document.body,
   );
 }
