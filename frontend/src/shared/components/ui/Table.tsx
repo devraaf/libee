@@ -47,7 +47,7 @@ export function Table<T>({
       <div className="overflow-x-auto">
         <table
           className={cn(
-            'type-small w-full min-w-160 border-collapse text-fg',
+            'type-small w-full border-collapse text-fg',
             tableClassName,
           )}
         >
