@@ -1,36 +1,37 @@
-import { useId, useState, type FormEvent } from "react";
-import { ChevronDown } from "lucide-react";
+import { useId, useState, type FormEvent } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { Button } from '../../../../shared/components/ui/Button';
 import {
   bondLabels,
   createReaderSchema,
   maskPhone,
   type ReaderBond,
   type ReaderFormValues,
-} from "../reader.model";
+} from '../types/reader.model';
 
 interface CreateReaderFormProps {
   onCancel: () => void;
-  onSubmit?: (values: ReaderFormValues) => void;
+  onSubmit?: (values: ReaderFormValues) => void | Promise<void>;
   courseOptions?: string[];
 }
 
-type FormState = Omit<ReaderFormValues, "bond"> & { bond: ReaderBond | "" };
+type FormState = Omit<ReaderFormValues, 'bond'> & { bond: ReaderBond | '' };
 type FormErrors = Partial<Record<keyof ReaderFormValues, string>>;
 
 const initialValues: FormState = {
-  name: "",
-  email: "",
-  phone: "",
-  bond: "",
-  course: "",
+  name: '',
+  email: '',
+  phone: '',
+  bond: '',
+  course: '',
 };
 
 const bondOptions = Object.keys(bondLabels) as ReaderBond[];
 
 const inputClass =
-  "w-full rounded-lg border border-[#E7DCC4] bg-white px-3 py-2 text-sm text-[#3B2A1A] placeholder:text-[#9A8B76] focus:border-[#9A5B00] focus:outline-none";
-const labelClass = "mb-1 block text-xs font-semibold";
-const errorClass = "mt-1 text-xs text-red-700";
+  'w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-subtle focus:border-primary focus:outline-none';
+const labelClass = 'mb-1 block type-label text-fg';
+const errorClass = 'mt-1 type-caption text-danger';
 
 export default function CreateReaderForm({
   onCancel,
@@ -40,8 +41,10 @@ export default function CreateReaderForm({
   const id = useId();
   const [values, setValues] = useState<FormState>(initialValues);
   const [errors, setErrors] = useState<FormErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isStudent = values.bond === "student";
+  const isStudent = values.bond === 'student';
 
   const setField = <K extends keyof FormState>(field: K, value: FormState[K]) =>
     setValues((current) => ({ ...current, [field]: value }));
@@ -50,11 +53,12 @@ export default function CreateReaderForm({
     setValues((current) => ({
       ...current,
       bond,
-      course: bond === "student" ? current.course : "",
+      course: bond === 'student' ? current.course : '',
     }));
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setFormError(null);
 
     const result = createReaderSchema.safeParse(values);
 
@@ -64,15 +68,26 @@ export default function CreateReaderForm({
         const fieldName = issue.path[0] as keyof ReaderFormValues | undefined;
         if (!fieldName || formattedErrors[fieldName]) return;
         formattedErrors[fieldName] =
-          fieldName === "bond" ? "Selecione o tipo de vínculo." : issue.message;
+          fieldName === 'bond' ? 'Selecione o tipo de vínculo.' : issue.message;
       });
       setErrors(formattedErrors);
       return;
     }
 
     setErrors({});
-    onSubmit?.(result.data);
-    onCancel();
+    setIsSubmitting(true);
+    try {
+      await onSubmit?.(result.data);
+      onCancel();
+    } catch (error) {
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível cadastrar o leitor.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -86,7 +101,7 @@ export default function CreateReaderForm({
           type="text"
           autoFocus
           value={values.name}
-          onChange={(e) => setField("name", e.target.value)}
+          onChange={(e) => setField('name', e.target.value)}
           className={inputClass}
         />
         {errors.name && <p className={errorClass}>{errors.name}</p>}
@@ -100,7 +115,7 @@ export default function CreateReaderForm({
           id={`${id}-email`}
           type="email"
           value={values.email}
-          onChange={(e) => setField("email", e.target.value)}
+          onChange={(e) => setField('email', e.target.value)}
           className={inputClass}
         />
         {errors.email && <p className={errorClass}>{errors.email}</p>}
@@ -115,7 +130,7 @@ export default function CreateReaderForm({
           type="tel"
           placeholder="(11) 99999-9999"
           value={values.phone}
-          onChange={(e) => setField("phone", maskPhone(e.target.value))}
+          onChange={(e) => setField('phone', maskPhone(e.target.value))}
           className={inputClass}
         />
         {errors.phone && <p className={errorClass}>{errors.phone}</p>}
@@ -123,16 +138,19 @@ export default function CreateReaderForm({
 
       <fieldset>
         <legend className={labelClass}>Tipo vínculo</legend>
-        <div className="flex flex-wrap items-center gap-4 text-xs text-[#6B5A45]">
+        <div className="flex flex-wrap items-center gap-4 type-small text-muted">
           {bondOptions.map((bond) => (
-            <label key={bond} className="flex cursor-pointer items-center gap-1.5">
+            <label
+              key={bond}
+              className="flex cursor-pointer items-center gap-1.5"
+            >
               <input
                 type="radio"
                 name={`${id}-bond`}
                 value={bond}
                 checked={values.bond === bond}
                 onChange={() => handleBondChange(bond)}
-                className="accent-[#9A5B00]"
+                className="accent-primary"
               />
               {bondLabels[bond]}
             </label>
@@ -150,9 +168,9 @@ export default function CreateReaderForm({
             <select
               id={`${id}-course`}
               value={values.course}
-              onChange={(e) => setField("course", e.target.value)}
+              onChange={(e) => setField('course', e.target.value)}
               className={`${inputClass} appearance-none pr-9 ${
-                values.course ? "" : "text-[#9A8B76]"
+                values.course ? '' : 'text-subtle'
               }`}
             >
               <option value="">Selecione</option>
@@ -164,27 +182,31 @@ export default function CreateReaderForm({
             </select>
             <ChevronDown
               size={16}
-              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#6B5A45]"
+              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
             />
           </div>
           {errors.course && <p className={errorClass}>{errors.course}</p>}
         </div>
       )}
 
+      {formError && (
+        <p className={errorClass} role="alert">
+          {formError}
+        </p>
+      )}
+
       <div className="flex justify-end gap-3 pt-2">
-        <button
+        <Button
           type="button"
+          variant="outline"
           onClick={onCancel}
-          className="rounded-lg border border-[#9A5B00] bg-white px-4 py-2 text-sm font-medium text-[#3B2A1A] hover:bg-[#F9F0DC]"
+          disabled={isSubmitting}
         >
           Cancelar
-        </button>
-        <button
-          type="submit"
-          className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600"
-        >
-          Confirmar
-        </button>
+        </Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Cadastrando...' : 'Confirmar'}
+        </Button>
       </div>
     </form>
   );

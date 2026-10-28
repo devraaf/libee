@@ -1,131 +1,240 @@
-import { useState } from "react";
-import { Plus, Users, CircleCheck, AlarmClock } from "lucide-react";
-import Navbar from "../../../../shared/components/navigation/LibrarianNavbar";
-import { Footer } from "../../../../app/layout/Footer";
-import { StatCard } from "../../../../shared/components/ui/StatCard";
-import SearchFilterBar from "../../../../shared/components/ui/SearchFilterBar";
-import TableFooter from "../../../../shared/components/ui/TableFooter";
-import Modal from "../../../../shared/components/ui/Modal";
-import CreateReaderForm from "../components/CreateReaderForm";
-import {
-  bondLabels,
-  statusLabels,
-  type Reader,
-  type ReaderStatus,
-} from "../reader.model";
+import { useEffect, useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
+import { Button } from '../../../../shared/components/ui/Button';
+import { EmptyState } from '../../../../shared/components/ui/EmptyState';
+import { Loader } from '../../../../shared/components/ui/Loader/Loader';
+import Modal from '../../../../shared/components/ui/Modal';
+import { PageHeader } from '../../../../shared/components/ui/PageHeader';
+import SearchFilterBar from '../../../../shared/components/ui/SearchFilterBar';
+import { listCourses } from '../../../catalog/services/catalog.service';
+import { listLoans } from '../../../loans/services/loans.service';
+import { createReader, listReaders } from '../services/readers.service';
+import type { AffiliationType } from '../../../../shared/schemas/enums.schema';
+import type { Course, Loan, Reader } from '../../../../shared/types/library';
+import { ReaderStats } from '../components/ReadersStats';
+import CreateReaderForm from '../components/CreateReaderForm';
+import { ReadersTable, type ReadersItem } from '../components/ReadersTable';
+import type { ReaderFormValues } from '../types/reader.model';
 
-const course = "Desenvolvimento de Software Multiplataforma";
+const PAGE_SIZE = 10;
 
-const readers: Reader[] = [
-  { id: 1, name: "Mario Cunha", bond: "student", course, activeLoans: 0, status: "ok" },
-  { id: 2, name: "Mario Cunha", bond: "teacher", course: null, activeLoans: 1, status: "ok" },
-  { id: 3, name: "Mario Cunha", bond: "student", course: "Ciência de Dados", activeLoans: 1, status: "pending" },
-  { id: 4, name: "Mario Cunha", bond: "student", course, activeLoans: 2, status: "ok" },
-  { id: 5, name: "Mario Cunha", bond: "staff", course: null, activeLoans: 0, status: "ok" },
-];
+interface ReaderStatsData {
+  totalReaders: number;
+  onLoan: number;
+  pending: number;
+}
 
-const statusStyles: Record<ReaderStatus, string> = {
-  ok: "bg-green-100 text-green-800",
-  pending: "bg-red-100 text-red-800",
-};
+interface ReaderData {
+  readers: ReadersItem[];
+  stats: ReaderStatsData;
+  courses: Course[];
+}
 
-export default function Readers() {
-  const [search, setSearch] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+function mapReaderData(
+  readers: Reader[],
+  loans: Loan[],
+  courses: Course[],
+): ReaderData {
+  const coursesById = new Map(courses.map((course) => [course.id, course]));
+  const loansByReaderId = new Map<number, Loan[]>();
+  loans.forEach((loan) => {
+    const readerLoans = loansByReaderId.get(loan.readerId) ?? [];
+    readerLoans.push(loan);
+    loansByReaderId.set(loan.readerId, readerLoans);
+  });
+
+  const items = readers.map((reader): ReadersItem => {
+    const readerLoans = loansByReaderId.get(reader.id) ?? [];
+    const activeLoans = readerLoans.filter(
+      (loan) => loan.status !== 'RETURNED',
+    );
+    return {
+      id: reader.id,
+      name: reader.name,
+      email: reader.email,
+      affiliationType: reader.affiliationType,
+      course: reader.courseId
+        ? (coursesById.get(reader.courseId) ?? null)
+        : null,
+      activeLoans: activeLoans.length,
+      status: activeLoans.some((loan) => loan.status === 'OVERDUE')
+        ? 'PENDING'
+        : 'OK',
+    };
+  });
+
+  return {
+    readers: items,
+    stats: {
+      totalReaders: items.length,
+      onLoan: items.filter((reader) => reader.activeLoans > 0).length,
+      pending: items.filter((reader) => reader.status === 'PENDING').length,
+    },
+    courses,
+  };
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : 'Não foi possível carregar os leitores.';
+}
+
+export default function ReadersPage() {
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [readers, setReaders] = useState<ReadersItem[]>([]);
+  const [stats, setStats] = useState<ReaderStatsData>();
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadReaderData() {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const [readerRecords, loans, courseRecords] = await Promise.all([
+          listReaders(),
+          listLoans(),
+          listCourses(),
+        ]);
+        if (!active) return;
+        const data = mapReaderData(readerRecords, loans, courseRecords);
+        setReaders(data.readers);
+        setStats(data.stats);
+        setCourses(data.courses);
+      } catch (error) {
+        if (active) setLoadError(getErrorMessage(error));
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    }
+
+    void loadReaderData();
+    return () => {
+      active = false;
+    };
+  }, [retry]);
+
+  const filteredReaders = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    if (!query) return readers;
+    return readers.filter(
+      (reader) =>
+        reader.name.toLocaleLowerCase().includes(query) ||
+        reader.email.toLocaleLowerCase().includes(query) ||
+        reader.course?.name.toLocaleLowerCase().includes(query),
+    );
+  }, [readers, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredReaders.length / PAGE_SIZE));
+  const visibleReaders = filteredReaders.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    setPage(1);
+  }
+
+  async function handleCreateReader(values: ReaderFormValues) {
+    const affiliationType: AffiliationType =
+      values.bond === 'student'
+        ? 'STUDENT'
+        : values.bond === 'teacher'
+          ? 'PROFESSOR'
+          : 'EMPLOYEE';
+    const course = courses.find(({ name }) => name === values.course);
+
+    await createReader({
+      name: values.name.trim(),
+      email: values.email.trim(),
+      phone: values.phone.replace(/\D/g, ''),
+      affiliationType,
+      ...(affiliationType === 'STUDENT' && course
+        ? { courseId: course.id }
+        : {}),
+    });
+    setSearch('');
+    setPage(1);
+    setRetry((current) => current + 1);
+  }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#FFFDF5] text-[#3B2A1A]">
-      <Navbar />
+    <>
+      <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8">
+        <PageHeader
+          title="Leitores"
+          subtitle="Consulte os leitores cadastrados e o histórico de empréstimos de cada um"
+          action={
+            <Button
+              type="button"
+              leftIcon={<Plus size={16} />}
+              onClick={() => setIsFormOpen(true)}
+            >
+              Cadastrar leitor
+            </Button>
+          }
+        />
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
-        <header className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Leitores</h1>
-            <p className="text-sm text-[#6B5A45]">
-              Consulte os leitores cadastrados e o histórico de empréstimos de cada um
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsFormOpen(true)}
-            className="flex items-center gap-2 self-start rounded-lg bg-[#9A5B00] px-4 py-2 text-sm font-medium text-[#FFFDF5] hover:bg-[#7F4A00]"
+        <ReaderStats {...stats} />
+
+        <SearchFilterBar
+          placeholder="Buscar por nome, e-mail ou curso..."
+          value={search}
+          onChange={handleSearchChange}
+        />
+
+        {isLoading ? (
+          <div
+            className="flex min-h-48 items-center justify-center"
+            role="status"
+            aria-label="Carregando leitores"
           >
-            <Plus size={16} />
-            Cadastrar leitor
-          </button>
-        </header>
-
-        <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <StatCard icon={<Users size={18} />} label="Leitores" value={20} />
-          <StatCard icon={<CircleCheck size={18} />} label="Com empréstimo ativo" value={10} />
-          <StatCard icon={<AlarmClock size={18} />} label="Com pendência" value={4} />
-        </section>
-
-        <div className="mb-4">
-          <SearchFilterBar
-            placeholder="Buscar leitor"
-            value={search}
-            onChange={setSearch}
-          />
-        </div>
-
-        <section className="overflow-hidden rounded-lg border border-[#E7DCC4] bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-[#F9F0DC] text-xs font-semibold">
-                <tr>
-                  <th className="px-4 py-3">Leitor</th>
-                  <th className="px-4 py-3">Vínculo</th>
-                  <th className="px-4 py-3">Curso</th>
-                  <th className="px-4 py-3 text-center">Empréstimos ativos</th>
-                  <th className="px-4 py-3">Situação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {readers.map((reader) => (
-                  <tr key={reader.id} className="border-t border-[#E7DCC4]">
-                    <td className="px-4 py-4">{reader.name}</td>
-                    <td className="px-4 py-4">
-                      <span className="rounded-full bg-[#F6EBD2] px-3 py-1 text-xs text-[#6B4A1E]">
-                        {bondLabels[reader.bond]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">{reader.course ?? "---"}</td>
-                    <td className="px-4 py-4 text-center">{reader.activeLoans}</td>
-                    <td className="px-4 py-4">
-                      <span
-                        className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${statusStyles[reader.status]}`}
-                      >
-                        {statusLabels[reader.status]}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <Loader />
           </div>
-
-          <TableFooter
-            text="Mostrando 5 de 20 leitores"
-            pages={[1, 2]}
-            activePage={currentPage}
-            onPageChange={(page) => setCurrentPage(page)}
-            onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            onNext={() => setCurrentPage((prev) => Math.min(prev + 1, 2))}
+        ) : loadError ? (
+          <EmptyState
+            title="Não foi possível carregar os leitores."
+            description={loadError}
+            action={
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRetry((current) => current + 1)}
+              >
+                Tentar novamente
+              </Button>
+            }
           />
-        </section>
-      </main>
-
-      <Footer />
+        ) : (
+          <ReadersTable
+            readers={visibleReaders}
+            page={page}
+            totalItems={filteredReaders.length}
+            totalPages={totalPages}
+            onPageChange={setPage}
+          />
+        )}
+      </section>
 
       <Modal
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         title="Cadastrar leitor"
       >
-        <CreateReaderForm onCancel={() => setIsFormOpen(false)} />
+        <CreateReaderForm
+          onCancel={() => setIsFormOpen(false)}
+          courseOptions={courses.map((course) => course.name)}
+          onSubmit={handleCreateReader}
+        />
       </Modal>
-    </div>
+    </>
   );
 }
