@@ -1,5 +1,6 @@
 import {
   mockCopies,
+  mockDeletedBookIds,
   mockLoans,
   mockReaders,
   mockUsers,
@@ -51,6 +52,12 @@ export async function createLoan(input: CreateLoanInput): Promise<Loan> {
   const copy = mockCopies.find(({ id }) => id === input.copyId);
   if (!copy)
     throw new MockServiceError('Exemplar não encontrado.', 'NOT_FOUND');
+  if (mockDeletedBookIds.has(copy.bookId)) {
+    throw new MockServiceError(
+      'Não é possível emprestar um exemplar de um livro excluído do acervo.',
+      'CONFLICT',
+    );
+  }
   if (copy.status !== 'AVAILABLE') {
     throw new MockServiceError(
       'Este exemplar não está disponível.',

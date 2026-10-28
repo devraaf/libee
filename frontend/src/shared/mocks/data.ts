@@ -214,6 +214,8 @@ export const mockBooks: Book[] = bookRows.map(
   },
 );
 
+export const mockDeletedBookIds = new Set<number>();
+
 export const mockCopies: Copy[] = mockBooks.flatMap((book) =>
   [0, 1]
     .filter(

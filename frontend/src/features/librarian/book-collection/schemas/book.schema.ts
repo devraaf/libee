@@ -17,9 +17,25 @@ function isValidBRDate(dateStr: string): boolean {
 }
 
 export const copyItemSchema = z.object({
-  accessionNumber: z.string().min(1, 'Informe o número do tombo.'),
-  physicalLocation: z.string().min(1, 'Informe a localização física.'),
+  copyId: z.number().optional(),
+  accessionNumber: z
+    .string()
+    .trim()
+    .min(1, 'Informe o número do tombo.')
+    .max(30, 'O número do tombo deve ter até 30 caracteres.'),
+  physicalLocation: z
+    .string()
+    .trim()
+    .max(100, 'A localização deve ter até 100 caracteres.')
+    .transform((value) => value || null),
 });
+
+const optionalText = (maxLength: number) =>
+  z
+    .string()
+    .trim()
+    .max(maxLength, `Este campo deve ter até ${maxLength} caracteres.`)
+    .transform((value) => value || null);
 
 export const registerBookSchema = z
   .object({
@@ -29,38 +45,46 @@ export const registerBookSchema = z
       .refine((val) => isValidISBN(val), {
         message: 'Digite um ISBN-10 ou ISBN-13 válido.',
       }),
-    title: z.string().min(1, 'O título da obra é obrigatório.'),
-    authors: z
-      .array(z.string())
-      .min(1, 'Adicione pelo menos um autor.'),
-    categoryId: z.number().min(1, 'Selecione uma categoria.'),
-    publisher: z.string().min(1, 'A editora é obrigatória.'),
-    publicationPlace: z.string().min(1, 'O local de publicação é obrigatório.'),
-    edition: z.string().min(1, 'A edição é obrigatória.'),
-    publicationDate: z
+    title: z
       .string()
-      .min(1, 'A data de publicação é obrigatória.')
-      .refine((val) => isValidBRDate(val), {
-        message: 'Informe uma data válida no formato DD/MM/AAAA.',
-      }),
-    pageCount: z.coerce
-      .number('Digite apenas números para as páginas.')
-      .min(1, 'O número de páginas é obrigatório.'),
-    coverImageUrl: z.string().optional(),
-    summary: z.string().optional(), 
-    copies: z
-      .array(copyItemSchema)
-      .min(1, 'Adicione ao menos 1 exemplar.'),
+      .trim()
+      .min(1, 'O título da obra é obrigatório.')
+      .max(255, 'O título deve ter até 255 caracteres.'),
+    authors: z.array(z.string().trim().min(1).max(255)),
+    categoryId: z.number().min(1, 'Selecione uma categoria.'),
+    publisher: optionalText(150),
+    publicationPlace: optionalText(100),
+    edition: optionalText(50),
+    publicationDate: z.preprocess(
+      (value) => (typeof value === 'string' && !value.trim() ? null : value),
+      z
+        .string()
+        .refine(isValidBRDate, {
+          message: 'Informe uma data válida no formato DD/MM/AAAA.',
+        })
+        .nullable(),
+    ),
+    pageCount: z.preprocess(
+      (value) => (value === '' || value === undefined ? null : Number(value)),
+      z.number().int().nullable(),
+    ),
+    coverImageUrl: optionalText(500),
+    summary: optionalText(Number.MAX_SAFE_INTEGER),
+    copies: z.array(copyItemSchema),
   })
   .superRefine((data, ctx) => {
-    const accessionNumbers = data.copies.map((c) => c.accessionNumber.trim());
+    const accessionNumbers = data.copies.map((c) =>
+      c.accessionNumber.trim().toLocaleLowerCase(),
+    );
     const duplicates = accessionNumbers.filter(
-      (num, index) => num !== '' && accessionNumbers.indexOf(num) !== index
+      (num, index) => num !== '' && accessionNumbers.indexOf(num) !== index,
     );
 
     if (duplicates.length > 0) {
       data.copies.forEach((copy, index) => {
-        if (duplicates.includes(copy.accessionNumber.trim())) {
+        if (
+          duplicates.includes(copy.accessionNumber.trim().toLocaleLowerCase())
+        ) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: 'Tombo duplicado nesta lista.',
@@ -71,4 +95,5 @@ export const registerBookSchema = z
     }
   });
 
-export type RegisterBookFormData = z.infer<typeof registerBookSchema>;
+export type RegisterBookFormInput = z.input<typeof registerBookSchema>;
+export type RegisterBookFormData = z.output<typeof registerBookSchema>;

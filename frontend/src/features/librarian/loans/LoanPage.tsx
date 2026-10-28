@@ -7,7 +7,7 @@ import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../shared/components/ui/SearchFilterBar';
 import Modal from '../../../shared/components/ui/Modal';
 import { getCurrentSession } from '../../auth/services/auth.service';
-import { listCopies } from '../../catalog/services/books.service';
+import { listActiveCopies } from '../../catalog/services/books.service';
 import {
   createLoan,
   listLoans,
@@ -154,7 +154,7 @@ export default function LoanPage() {
     }
 
     const copyCode = data.copyCode.trim();
-    const copies = await listCopies();
+    const copies = await listActiveCopies();
     const copy = copies.find(
       ({ id, accessionNumber }) =>
         accessionNumber === copyCode || String(id) === copyCode,

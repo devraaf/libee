@@ -1,4 +1,9 @@
-import { mockBooks, mockCopies, mockLoans } from '../../../shared/mocks/data';
+import {
+  mockBooks,
+  mockCopies,
+  mockDeletedBookIds,
+  mockLoans,
+} from '../../../shared/mocks/data';
 import {
   MockServiceError,
   simulateServiceDelay,
@@ -8,12 +13,15 @@ import type { Copy, CopyStatus } from '../../../shared/types/library';
 export interface CreateCopyInput {
   bookId: number;
   accessionNumber: string;
-  physicalLocation: string;
+  physicalLocation?: string | null;
 }
 
 export async function createCopy(input: CreateCopyInput): Promise<Copy> {
   await simulateServiceDelay();
-  if (!mockBooks.some(({ id }) => id === input.bookId)) {
+  if (
+    !mockBooks.some(({ id }) => id === input.bookId) ||
+    mockDeletedBookIds.has(input.bookId)
+  ) {
     throw new MockServiceError('Livro não encontrado.', 'NOT_FOUND');
   }
   const accessionNumber = input.accessionNumber.trim();
@@ -26,13 +34,7 @@ export async function createCopy(input: CreateCopyInput): Promise<Copy> {
       'VALIDATION_ERROR',
     );
   }
-  const physicalLocation = input.physicalLocation.trim();
-  if (!physicalLocation) {
-    throw new MockServiceError(
-      'Informe a localização física do exemplar.',
-      'VALIDATION_ERROR',
-    );
-  }
+  const physicalLocation = input.physicalLocation?.trim() || null;
 
   const copy: Copy = {
     id: Math.max(0, ...mockCopies.map(({ id }) => id)) + 1,

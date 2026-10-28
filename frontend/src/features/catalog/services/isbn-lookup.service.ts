@@ -12,6 +12,10 @@ export const isbnLookupExamples = {
   alreadyRegistered: mockBooks[0].isbn,
 } as const;
 
+function normalizeIsbn(isbn: string): string {
+  return isbn.replace(/[\s-]/g, '').toUpperCase();
+}
+
 const lookupBooks: Record<string, Book> = {
   [isbnLookupExamples.found[0]]: {
     ...mockBooks[8],
@@ -35,7 +39,7 @@ const lookupBooks: Record<string, Book> = {
 
 export async function lookupBookByIsbn(isbn: string): Promise<Book | null> {
   await simulateServiceDelay();
-  const normalizedIsbn = isbn.trim();
+  const normalizedIsbn = normalizeIsbn(isbn);
   if (normalizedIsbn === isbnLookupExamples.unavailable) {
     throw new MockServiceError(
       'O serviço de consulta de ISBN está temporariamente indisponível.',
@@ -43,8 +47,8 @@ export async function lookupBookByIsbn(isbn: string): Promise<Book | null> {
     );
   }
   if (
-    mockBooks.some((book) => book.isbn === normalizedIsbn) ||
-    normalizedIsbn === isbnLookupExamples.alreadyRegistered
+    mockBooks.some((book) => normalizeIsbn(book.isbn) === normalizedIsbn) ||
+    normalizedIsbn === normalizeIsbn(isbnLookupExamples.alreadyRegistered)
   ) {
     throw new MockServiceError(
       'Este ISBN já está cadastrado.',

@@ -65,7 +65,7 @@ export interface Copy {
   id: number;
   bookId: number;
   accessionNumber: string;
-  physicalLocation: string;
+  physicalLocation: string | null;
   status: CopyStatus;
 }
 

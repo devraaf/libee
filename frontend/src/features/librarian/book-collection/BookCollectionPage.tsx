@@ -5,7 +5,13 @@ import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Loader } from '../../../shared/components/ui/Loader/Loader';
 import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../shared/components/ui/SearchFilterBar';
-import { listBooks, listCopies } from '../../catalog/services/books.service';
+import {
+  listBooks,
+  listActiveCopies,
+  deleteBook,
+  type RegisteredBook,
+} from '../../catalog/services/books.service';
+import { listLoans } from '../../loans/services/loans.service';
 import type { BookListItem, Copy } from '../../../shared/types/library';
 import {
   BookCollectionTable,
@@ -13,6 +19,8 @@ import {
 } from './components/BookCollectionTable';
 import { BookCollectionStats } from './components/BookCollectionStats';
 import RegisterBookModal from './components/RegisterBookModal';
+import EditBookModal from './components/EditBookModal';
+import DeleteBookModal from './components/DeleteBookModal';
 
 const PAGE_SIZE = 10;
 
@@ -26,14 +34,17 @@ interface BookCollectionStatsData {
 function toBookCollectionItem(
   book: BookListItem,
   copies: Copy[],
+  activeCopyIds: Set<number>,
 ): BookCollectionItem {
+  const bookCopies = copies.filter((copy) => copy.bookId === book.id);
   return {
     id: book.id,
     title: book.title,
     authors: book.authors.map(({ name }) => name).join(', '),
     isbn: book.isbn,
     category: book.category.name,
-    copies: copies.filter((copy) => copy.bookId === book.id).length,
+    copies: bookCopies.length,
+    hasActiveLoan: bookCopies.some((copy) => activeCopyIds.has(copy.id)),
     coverImageUrl: book.coverImageUrl,
   };
 }
@@ -58,6 +69,12 @@ export default function BookCollectionPage() {
   const [statsRetry, setStatsRetry] = useState(0);
 
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [editingBookId, setEditingBookId] = useState<number | null>(null);
+  const [bookToDelete, setBookToDelete] = useState<BookCollectionItem | null>(
+    null,
+  );
+  const [isDeletingBook, setIsDeletingBook] = useState(false);
+  const [deleteBookError, setDeleteBookError] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,33 +84,24 @@ export default function BookCollectionPage() {
       setIsLoadingBooks(true);
       setBooksError(null);
       try {
-        const [result, copies] = await Promise.all([
+        const [result, copies, loans] = await Promise.all([
           listBooks({ page, size: PAGE_SIZE, search }),
-          listCopies(),
+          listActiveCopies(),
+          listLoans(),
         ]);
         if (!active) return;
 
-        // Combina com livros recém-criados do localStorage
-        const savedBooks = localStorage.getItem('booksList');
-        const localBooks = savedBooks ? JSON.parse(savedBooks) : [];
-
-        const savedCopies = localStorage.getItem('copiesList');
-        const localCopies = savedCopies ? JSON.parse(savedCopies) : copies;
-
-        const formattedLocalBooks: BookCollectionItem[] = localBooks.map((b: any) => ({
-          id: b.id,
-          title: b.title,
-          authors: Array.isArray(b.authors) ? b.authors.map((a: any) => a.name).join(', ') : b.authors,
-          isbn: b.isbn,
-          category: b.category?.name || 'Geral',
-          copies: localCopies.filter((c: any) => c.bookId === b.id).length,
-          coverImageUrl: b.coverImageUrl,
-        }));
-
-        const combinedItems = [...formattedLocalBooks, ...result.items.map((book) => toBookCollectionItem(book, localCopies))];
-
-        setBooks(combinedItems);
-        setTotalBooks(result.totalItems + formattedLocalBooks.length);
+        const activeCopyIds = new Set(
+          loans
+            .filter((loan) => loan.returnDate === null)
+            .map((loan) => loan.copyId),
+        );
+        setBooks(
+          result.items.map((book) =>
+            toBookCollectionItem(book, copies, activeCopyIds),
+          ),
+        );
+        setTotalBooks(result.totalItems);
         setTotalPages(Math.max(result.totalPages, 1));
       } catch (error) {
         if (active) setBooksError(getErrorMessage(error));
@@ -116,21 +124,17 @@ export default function BookCollectionPage() {
       try {
         const [bookResult, copies] = await Promise.all([
           listBooks({ page: 1, size: 1 }),
-          listCopies(),
+          listActiveCopies(),
         ]);
         if (!active) return;
 
-        const savedCopies = localStorage.getItem('copiesList');
-        const currentCopies = savedCopies ? JSON.parse(savedCopies) : copies;
-
-        const savedBooks = localStorage.getItem('booksList');
-        const localBooksCount = savedBooks ? JSON.parse(savedBooks).length : 0;
-
         setStats({
-          totalBooks: bookResult.totalItems + localBooksCount,
-          totalCopies: currentCopies.length,
-          availableCopies: currentCopies.filter((copy: any) => copy.status === 'AVAILABLE').length,
-          borrowedCopies: currentCopies.filter((copy: any) => copy.status === 'ON_LOAN').length,
+          totalBooks: bookResult.totalItems,
+          totalCopies: copies.length,
+          availableCopies: copies.filter((copy) => copy.status === 'AVAILABLE')
+            .length,
+          borrowedCopies: copies.filter((copy) => copy.status === 'ON_LOAN')
+            .length,
         });
       } catch (error) {
         if (active) setStatsError(getErrorMessage(error));
@@ -148,25 +152,44 @@ export default function BookCollectionPage() {
     setPage(1);
   }
 
-  // Recebe o novo livro cadastrado e coloca-o imediatamente no topo da tabela
-  const handleBookRegisteredSuccess = (newBook: any) => {
+  const handleBookRegisteredSuccess = (newBook: RegisteredBook) => {
     setIsRegisterModalOpen(false);
-
-    const newCollectionItem: BookCollectionItem = {
-      id: newBook.id,
-      title: newBook.title,
-      authors: newBook.authors.map((a: any) => a.name).join(', '),
-      isbn: newBook.isbn,
-      category: newBook.category.name,
-      copies: newBook.copiesCount, // Exibe o número exato de exemplares cadastrados
-      coverImageUrl: newBook.coverImageUrl,
-    };
-
-    setBooks((prevBooks) => [newCollectionItem, ...prevBooks]);
+    setSearch('');
+    setPage(1);
+    setBooksRetry((retry) => retry + 1);
     setStatsRetry((r) => r + 1);
 
     setSuccessToast(`Livro "${newBook.title}" cadastrado com sucesso!`);
     setTimeout(() => setSuccessToast(null), 4000);
+  };
+
+  const handleDeleteBook = async () => {
+    if (!bookToDelete) return;
+    setIsDeletingBook(true);
+    setDeleteBookError(null);
+    try {
+      await deleteBook(bookToDelete.id);
+      setBookToDelete(null);
+      if (books.length === 1 && page > 1) setPage((current) => current - 1);
+      setBooksRetry((retry) => retry + 1);
+      setStatsRetry((retry) => retry + 1);
+      setSuccessToast(`Livro "${bookToDelete.title}" excluído com sucesso.`);
+      setTimeout(() => setSuccessToast(null), 4000);
+    } catch (error) {
+      setDeleteBookError(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível excluir o livro.',
+      );
+    } finally {
+      setIsDeletingBook(false);
+    }
+  };
+
+  const handleCloseDeleteModal = () => {
+    if (isDeletingBook) return;
+    setBookToDelete(null);
+    setDeleteBookError(null);
   };
 
   return (
@@ -243,6 +266,11 @@ export default function BookCollectionPage() {
           totalItems={totalBooks}
           totalPages={totalPages}
           onPageChange={setPage}
+          onEditBook={setEditingBookId}
+          onDeleteBook={(book) => {
+            setBookToDelete(book);
+            setDeleteBookError(null);
+          }}
         />
       )}
 
@@ -250,6 +278,31 @@ export default function BookCollectionPage() {
         open={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
         onSuccess={handleBookRegisteredSuccess}
+        onOpenEditModal={setEditingBookId}
+      />
+
+      <EditBookModal
+        open={editingBookId !== null}
+        bookId={editingBookId}
+        onClose={() => setEditingBookId(null)}
+        onSuccess={(updatedBook) => {
+          setEditingBookId(null);
+          setBooksRetry((retry) => retry + 1);
+          setStatsRetry((retry) => retry + 1);
+          setSuccessToast(
+            `Livro "${updatedBook.title}" atualizado com sucesso!`,
+          );
+          setTimeout(() => setSuccessToast(null), 4000);
+        }}
+      />
+
+      <DeleteBookModal
+        open={bookToDelete !== null}
+        bookTitle={bookToDelete?.title ?? null}
+        isDeleting={isDeletingBook}
+        error={deleteBookError}
+        onClose={handleCloseDeleteModal}
+        onConfirm={handleDeleteBook}
       />
     </section>
   );

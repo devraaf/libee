@@ -159,7 +159,7 @@ export default function ReadersPage() {
           : 'EMPLOYEE';
     const course = courses.find(({ name }) => name === values.course);
 
-    const reader = await createReader({
+    await createReader({
       name: values.name.trim(),
       email: values.email.trim(),
       phone: values.phone.replace(/\D/g, ''),
@@ -168,6 +168,7 @@ export default function ReadersPage() {
         ? { courseId: course.id }
         : {}),
     });
+    
     setSearch('');
     setPage(1);
     setSuccessMessage(`Leitor cadastrado com sucesso.`);

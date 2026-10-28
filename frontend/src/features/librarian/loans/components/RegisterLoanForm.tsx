@@ -5,7 +5,10 @@ import { Loader2, Search } from 'lucide-react';
 import { Badge } from '../../../../shared/components/ui/Badge';
 import { Button } from '../../../../shared/components/ui/Button';
 import Modal from '../../../../shared/components/ui/Modal';
-import { getBook, listCopies } from '../../../catalog/services/books.service';
+import {
+  getBook,
+  listActiveCopies,
+} from '../../../catalog/services/books.service';
 import { listCourses } from '../../../catalog/services/catalog.service';
 import {
   createReader,
@@ -112,7 +115,7 @@ export default function RegisterLoanForm({
       setIsLoadingOptions(true);
       setOptionsError(null);
       try {
-        const copyRecords = await listCopies();
+        const copyRecords = await listActiveCopies();
         const books = await Promise.all(
           [...new Set(copyRecords.map(({ bookId }) => bookId))].map(getBook),
         );
@@ -260,7 +263,7 @@ export default function RegisterLoanForm({
       {readerCreatedMessage && (
         <div
           role="status"
-          className="fixed bottom-5 right-5 z-[60] rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg"
+          className="fixed bottom-5 right-5 z-60 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg"
         >
           {readerCreatedMessage}
         </div>
