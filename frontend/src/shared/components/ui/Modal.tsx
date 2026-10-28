@@ -1,72 +1,91 @@
+import { useEffect, useId, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import { useEffect, useId, useRef, type ReactNode } from 'react';
-import { cn } from './cn';
-import { IconButton } from './IconButton';
 
-export interface ModalProps {
-  open: boolean;
+interface ModalProps {
+  isOpen: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
-  /** Linha de ações (botões) exibida no rodapé. */
   footer?: ReactNode;
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
+  header?: ReactNode;
+  size?: 'md' | 'lg' | 'xl' | 'full';
 }
 
-const sizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl' };
+const sizeClasses = {
+  md: 'max-w-md',
+  lg: 'max-w-2xl',
+  xl: 'max-w-5xl',
+  full: 'm-0 h-dvh max-h-dvh max-w-none rounded-none p-4 sm:m-4 sm:h-[90vh] sm:max-h-[90vh] sm:max-w-5xl sm:rounded-xl sm:p-6',
+} as const;
 
-/** Modal baseado em <dialog>: foco preso, ESC fecha, clique no fundo fecha. */
-export function Modal({
-  open,
+export default function Modal({
+  isOpen,
   onClose,
   title,
   children,
   footer,
+  header,
   size = 'md',
-  className,
 }: ModalProps) {
-  const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
   useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
+    if (!isOpen) return;
 
-  return (
-    <dialog
-      ref={ref}
-      aria-labelledby={titleId}
-      onClose={onClose}
-      onClick={(event) => {
-        if (event.target === ref.current) onClose();
-      }}
-      className={cn(
-        'm-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-y-auto rounded-2xl border border-line bg-surface p-0 text-fg shadow-card backdrop:bg-black/50',
-        sizes[size],
-        className,
-      )}
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    const previousOverflow = document.body.style.overflow;
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-0 sm:p-4"
+      onClick={onClose}
     >
-      <div className="flex flex-col gap-5 p-6">
-        <div className="flex items-start justify-between gap-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onClick={(event) => event.stopPropagation()}
+        className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-xl border border-line bg-surface p-6 text-fg shadow-card ${sizeClasses[size]}`}
+      >
+        <div className="mb-4 flex shrink-0 items-start justify-between gap-4">
           <h2 id={titleId} className="type-h3">
             {title}
           </h2>
-          <IconButton
-            label="Fechar"
-            icon={<X size={18} />}
+          <button
+            type="button"
             onClick={onClose}
-            className="-mr-2 -mt-1"
-          />
+            aria-label="Fechar"
+            className="flex size-7 items-center justify-center rounded-lg text-muted hover:bg-surface-hover hover:text-fg"
+          >
+            <X size={16} />
+          </button>
         </div>
-        {children}
+
+        {header && <div className="shrink-0">{header}</div>}
+
+        <div className="mb-6 min-h-0 flex-1 overflow-y-auto">{children}</div>
+
         {footer && (
-          <div className="flex flex-wrap justify-end gap-3">{footer}</div>
+          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-line pt-4">
+            {footer}
+          </div>
         )}
       </div>
-    </dialog>
+    </div>,
+    document.body,
   );
 }

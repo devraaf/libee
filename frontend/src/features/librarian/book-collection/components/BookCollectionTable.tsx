@@ -5,6 +5,7 @@ import {
   type TableColumn,
 } from '../../../../shared/components/ui/Table';
 import { Pagination } from '../../../../shared/components/ui/Pagination';
+import { CoverImage } from '../../../../shared/components/ui/CoverImage';
 
 export interface BookCollectionItem {
   id: number;
@@ -13,6 +14,7 @@ export interface BookCollectionItem {
   isbn: string;
   category: string;
   copies: number;
+  hasActiveLoan: boolean;
   coverImageUrl: string | null;
 }
 
@@ -22,6 +24,8 @@ export interface BookCollectionTableProps {
   totalItems: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  onEditBook?: (bookId: number) => void;
+  onDeleteBook?: (book: BookCollectionItem) => void;
 }
 
 export function BookCollectionTable({
@@ -30,6 +34,8 @@ export function BookCollectionTable({
   totalItems,
   totalPages,
   onPageChange,
+  onEditBook,
+  onDeleteBook,
 }: BookCollectionTableProps) {
   const summary = `Mostrando ${books.length} de ${totalItems} ${
     totalItems === 1 ? 'livro' : 'livros'
@@ -39,10 +45,10 @@ export function BookCollectionTable({
       key: 'cover',
       header: 'Capa',
       render: (book) => (
-        <img
-          src={book.coverImageUrl ?? '/images/book-cover-placeholder.svg'}
+        <CoverImage
+          src={book.coverImageUrl}
           alt={`Capa de ${book.title}`}
-          className="h-12 w-9 rounded object-cover"
+          className="h-12 w-9 rounded"
         />
       ),
     },
@@ -86,6 +92,7 @@ export function BookCollectionTable({
         <div className="flex justify-end gap-2">
           <button
             type="button"
+            onClick={() => onEditBook?.(book.id)}
             aria-label={`Editar ${book.title}`}
             className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface text-fg hover:bg-surface-hover"
           >
@@ -93,8 +100,15 @@ export function BookCollectionTable({
           </button>
           <button
             type="button"
+            onClick={() => onDeleteBook?.(book)}
             aria-label={`Excluir ${book.title}`}
-            className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface text-fg hover:bg-surface-hover"
+            title={
+              book.hasActiveLoan
+                ? 'Não é possível excluir um livro com empréstimo ativo.'
+                : `Excluir ${book.title}`
+            }
+            disabled={book.hasActiveLoan}
+            className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface text-fg hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
           >
             <X size={14} aria-hidden="true" />
           </button>

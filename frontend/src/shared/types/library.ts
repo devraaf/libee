@@ -65,7 +65,7 @@ export interface Copy {
   id: number;
   bookId: number;
   accessionNumber: string;
-  physicalLocation: string;
+  physicalLocation: string | null;
   status: CopyStatus;
 }
 
@@ -97,7 +97,10 @@ export interface CreateBookInput extends Omit<
   authorIds: number[];
 }
 
-export interface CreateReaderInput extends Omit<Reader, 'id' | 'profile'> {
+export interface CreateReaderInput extends Omit<
+  Reader,
+  'id' | 'password' | 'profile'
+> {
   profile?: 'READER';
 }
 

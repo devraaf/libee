@@ -5,11 +5,23 @@ import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Loader } from '../../../shared/components/ui/Loader/Loader';
 import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../shared/components/ui/SearchFilterBar';
-import { getBook, listCopies } from '../../catalog/services/books.service';
-import { listReaders } from '../../readers/services/readers.service';
-import { listLoans, returnLoan } from '../../loans/services/loans.service';
+import Modal from '../../../shared/components/ui/Modal';
+import { getCurrentSession } from '../../auth/services/auth.service';
+import { listActiveCopies } from '../../catalog/services/books.service';
+import {
+  createLoan,
+  listLoans,
+  returnLoan,
+} from '../../loans/services/loans.service';
+import { dateFromToday } from '../../../shared/mocks/dates';
+import RegisterReturnForm, {
+  type ReturnLoanDetails,
+} from '../Returns/components/RegisterReturnForm';
+import RegisterLoanForm from './components/RegisterLoanForm';
 import { LoanStats } from './components/LoanStats';
-import { LoanTable, type LoanTableItem } from './components/LoanTable';
+import { LoanTable } from './components/LoanTable';
+import { mapLoanRecords, type LoanRecordItem } from './loan.mapper';
+import type { RegisterLoanFormData } from './schemas/loan.schema';
 
 const PAGE_SIZE = 10;
 
@@ -19,63 +31,7 @@ interface LoanStatsData {
   overdueLoans: number;
 }
 
-function formatDate(value: string): string {
-  return new Date(`${value}T00:00:00`).toLocaleDateString('pt-BR');
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : 'Não foi possível carregar os empréstimos.';
-}
-
-async function loadLoanItems(): Promise<LoanTableItem[]> {
-  const [loans, copies, readers] = await Promise.all([
-    listLoans(),
-    listCopies(),
-    listReaders(),
-  ]);
-  const bookIds = [
-    ...new Set(
-      loans.map((loan) => {
-        const copy = copies.find(({ id }) => id === loan.copyId);
-        if (!copy) {
-          throw new Error(
-            `O exemplar do empréstimo ${loan.id} não foi encontrado.`,
-          );
-        }
-        return copy.bookId;
-      }),
-    ),
-  ];
-  const books = await Promise.all(bookIds.map((bookId) => getBook(bookId)));
-  const booksById = new Map(books.map((book) => [book.id, book]));
-  const copiesById = new Map(copies.map((copy) => [copy.id, copy]));
-  const readersById = new Map(readers.map((reader) => [reader.id, reader]));
-
-  return loans.map((loan) => {
-    const copy = copiesById.get(loan.copyId);
-    const book = copy && booksById.get(copy.bookId);
-    const reader = readersById.get(loan.readerId);
-    if (!copy || !book || !reader) {
-      throw new Error(
-        `Não foi possível encontrar os dados relacionados ao empréstimo ${loan.id}.`,
-      );
-    }
-
-    return {
-      id: loan.id,
-      title: book.title,
-      accessionNumber: copy.accessionNumber,
-      readerName: reader.name,
-      loanDate: formatDate(loan.loanDate),
-      dueDate: formatDate(loan.dueDate),
-      status: loan.status,
-    };
-  });
-}
-
-function getStats(loans: LoanTableItem[]): LoanStatsData {
+function getStats(loans: LoanRecordItem[]): LoanStatsData {
   const activeLoans = loans.filter((loan) => loan.status !== 'RETURNED');
   return {
     activeLoans: activeLoans.length,
@@ -85,16 +41,29 @@ function getStats(loans: LoanTableItem[]): LoanStatsData {
   };
 }
 
+async function getActiveLoanItems(): Promise<LoanRecordItem[]> {
+  const records = await listLoans();
+  const mappedRecords = await mapLoanRecords(records);
+  return mappedRecords.filter((loan) => !loan.returnDate);
+}
+
 export default function LoanPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [loans, setLoans] = useState<LoanTableItem[]>([]);
-  const [stats, setStats] = useState<LoanStatsData>();
-  const [isLoading, setIsLoading] = useState(true);
+  const [loans, setLoans] = useState<LoanRecordItem[]>([]);
+  const [stats, setStats] = useState<LoanStatsData>({
+    activeLoans: 0,
+    onTimeLoans: 0,
+    overdueLoans: 0,
+  });
+  const [selectedLoanForReturn, setSelectedLoanForReturn] =
+    useState<ReturnLoanDetails | null>(null);
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
-  const [returningLoanId, setReturningLoanId] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -103,12 +72,18 @@ export default function LoanPage() {
       setIsLoading(true);
       setLoadError(null);
       try {
-        const items = await loadLoanItems();
+        const activeLoans = await getActiveLoanItems();
         if (!active) return;
-        setLoans(items);
-        setStats(getStats(items));
+        setLoans(activeLoans);
+        setStats(getStats(activeLoans));
       } catch (error) {
-        if (active) setLoadError(getErrorMessage(error));
+        if (active) {
+          setLoadError(
+            error instanceof Error
+              ? error.message
+              : 'Não foi possível carregar os empréstimos.',
+          );
+        }
       } finally {
         if (active) setIsLoading(false);
       }
@@ -142,26 +117,89 @@ export default function LoanPage() {
     setPage(1);
   }
 
-  async function handleReturn(loanId: number) {
-    setReturningLoanId(loanId);
-    setActionError(null);
-    try {
-      await returnLoan(loanId);
-      setRetry((current) => current + 1);
-    } catch (error) {
-      setActionError(getErrorMessage(error));
-    } finally {
-      setReturningLoanId(null);
+  function handleOpenReturnModal(loanId: number) {
+    const loan = loans.find((item) => item.id === loanId);
+    if (!loan) return;
+    setSelectedLoanForReturn({
+      loanId: loan.id,
+      copyCode: loan.accessionNumber,
+      title: loan.title,
+      reader: loan.readerName,
+    });
+    setIsReturnModalOpen(true);
+  }
+
+  async function handleConfirmReturn() {
+    if (!selectedLoanForReturn) return;
+    await returnLoan(selectedLoanForReturn.loanId);
+    const updatedLoans = loans.filter(
+      (loan) => loan.id !== selectedLoanForReturn.loanId,
+    );
+    setLoans(updatedLoans);
+    setStats(getStats(updatedLoans));
+    setIsReturnModalOpen(false);
+    setSelectedLoanForReturn(null);
+    setSuccessToast(
+      `Devolução do tombo ${selectedLoanForReturn.copyCode} registrada com sucesso!`,
+    );
+    setTimeout(() => setSuccessToast(null), 4000);
+  }
+
+  async function handleCreateLoanSubmit(data: RegisterLoanFormData) {
+    const session = await getCurrentSession();
+    if (session?.user.profile !== 'LIBRARIAN') {
+      throw new Error(
+        'É necessário estar autenticado como bibliotecário para registrar um empréstimo.',
+      );
     }
+
+    const copyCode = data.copyCode.trim();
+    const copies = await listActiveCopies();
+    const copy = copies.find(
+      ({ id, accessionNumber }) =>
+        accessionNumber === copyCode || String(id) === copyCode,
+    );
+    if (!copy) {
+      throw new Error('O exemplar selecionado não foi encontrado.');
+    }
+
+    await createLoan({
+      readerId: Number(data.readerId),
+      copyId: copy.id,
+      librarianId: session.user.id,
+      loanDate: dateFromToday(0),
+      dueDate: data.dueDate,
+    });
+    const updatedLoans = await getActiveLoanItems();
+    setLoans(updatedLoans);
+    setStats(getStats(updatedLoans));
+    setIsCreateModalOpen(false);
+    setSuccessToast(
+      `Empréstimo do tombo ${copy.accessionNumber} registrado com sucesso!`,
+    );
+    setTimeout(() => setSuccessToast(null), 4000);
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8">
+    <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8 relative">
+      {successToast && (
+        <div
+          role="status"
+          className="fixed bottom-5 right-5 z-50 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg transition-all"
+        >
+          {successToast}
+        </div>
+      )}
+
       <PageHeader
         title="Empréstimos"
         subtitle="Consulte os empréstimos e prazos de devolução"
         action={
-          <Button type="button" leftIcon={<Plus size={16} />}>
+          <Button
+            type="button"
+            leftIcon={<Plus size={16} />}
+            onClick={() => setIsCreateModalOpen(true)}
+          >
             Registrar empréstimo
           </Button>
         }
@@ -174,12 +212,6 @@ export default function LoanPage() {
         value={search}
         onChange={handleSearchChange}
       />
-
-      {actionError && (
-        <p className="type-small text-danger" role="alert">
-          {actionError}
-        </p>
-      )}
 
       {isLoading ? (
         <div
@@ -209,11 +241,42 @@ export default function LoanPage() {
           page={page}
           totalItems={filteredLoans.length}
           totalPages={totalPages}
-          returningLoanId={returningLoanId}
+          returningLoanId={null}
           onPageChange={setPage}
-          onReturn={handleReturn}
+          onReturn={(loanId) => handleOpenReturnModal(loanId)}
         />
       )}
+
+      <Modal
+        isOpen={isReturnModalOpen}
+        onClose={() => {
+          setIsReturnModalOpen(false);
+          setSelectedLoanForReturn(null);
+        }}
+        title="Registrar devolução"
+      >
+        {selectedLoanForReturn && (
+          <RegisterReturnForm
+            loan={selectedLoanForReturn}
+            onCancel={() => {
+              setIsReturnModalOpen(false);
+              setSelectedLoanForReturn(null);
+            }}
+            onConfirm={handleConfirmReturn}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        title="Registrar empréstimo"
+      >
+        <RegisterLoanForm
+          onCancel={() => setIsCreateModalOpen(false)}
+          onConfirm={handleCreateLoanSubmit}
+        />
+      </Modal>
     </section>
   );
 }

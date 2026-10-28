@@ -7,7 +7,6 @@ import {
   Settings,
   Users,
 } from 'lucide-react';
-import { BookCard } from '../../shared/components/ui/BookCard.tsx';
 import { useState, type ReactNode } from 'react';
 import { Logo } from '../../shared/components/branding/Logo.tsx';
 import { Footer } from '../layout/Footer.tsx';
@@ -28,7 +27,7 @@ import { EmptyState } from '../../shared/components/ui/EmptyState.tsx';
 import { FilterButton } from '../../shared/components/ui/FilterButton.tsx';
 import { IconButton } from '../../shared/components/ui/IconButton.tsx';
 import { Input } from '../../shared/components/ui/Input.tsx';
-import { Modal } from '../../shared/components/ui/Modal.tsx';
+import Modal from '../../shared/components/ui/Modal.tsx';
 import { PageHeader } from '../../shared/components/ui/PageHeader.tsx';
 import { PasswordInput } from '../../shared/components/ui/PasswordInput.tsx';
 import { Pagination } from '../../shared/components/ui/Pagination.tsx';
@@ -110,8 +109,6 @@ const categories = [
   'Animação',
   'Identidade',
 ];
-
-
 
 export function GalleryPage() {
   const modal = useDisclosure();
@@ -321,34 +318,6 @@ export function GalleryPage() {
           </div>
         </Demo>
       </Section>
-
-<Section id="Livros" title="Cards de Livros">
-        <Demo label="BookCard — Disponível e Emprestado">
-          <div className="flex flex-wrap gap-6 items-center">
-            {/* Livro Disponível */}
-            <BookCard
-              title="Titulo da Obra"
-              author="Autor"
-              year="ano"
-              pages="Nº Paginas"
-              category="Tecnologia"
-              status="available"
-            />
-
-            {/* Livro Emprestado */}
-            <BookCard
-              title="Titulo da Obra"
-              author="Autor"
-              year="ano"
-              pages="Nº Paginas"
-              category="Tecnologia"
-              status="borrowed"
-            />
-          </div>
-        </Demo>
-      </Section>
-
-
       <Section id="Feedback e overlays" title="Feedback e overlays">
         <Demo label="EmptyState">
           <Card className="w-full">
@@ -367,7 +336,7 @@ export function GalleryPage() {
           </Button>
         </Demo>
         <Modal
-          open={modal.isOpen}
+          isOpen={modal.isOpen}
           onClose={modal.close}
           title="Título do modal"
           footer={
@@ -383,8 +352,6 @@ export function GalleryPage() {
         >
           <p className="type-body">Conteúdo do modal fornecido pela página.</p>
         </Modal>
-
-  
       </Section>
 
       {/* NAVEGAÇÃO */}

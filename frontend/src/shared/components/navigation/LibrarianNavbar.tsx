@@ -1,13 +1,13 @@
-import { NavLink } from "react-router-dom";
-import { Library, BookText, Inbox, Users, Moon, LogOut } from "lucide-react";
-import { Logo } from "../branding/Logo";
+import { NavLink } from 'react-router-dom';
+import { Library, BookText, Inbox, Users, Moon, LogOut } from 'lucide-react';
+import { Logo } from '../branding/Logo';
 
 /* Ajustar rotas- links do navbar para paginas*/
 const navItems = [
-  { label: "Acervo", to: "/BookCollection", icon: Library },
-  { label: "Empréstimos", to: "/", icon: BookText },
-  { label: "Devoluções", to: "/", icon: Inbox },
-  { label: "Leitores", to: "/", icon: Users },
+  { label: 'Acervo', to: '/BookCollection', icon: Library },
+  { label: 'Empréstimos', to: '/', icon: BookText },
+  { label: 'Devoluções', to: '/', icon: Inbox },
+  { label: 'Leitores', to: '/', icon: Users },
 ];
 
 interface LibrarianNavbarProps {
@@ -22,7 +22,7 @@ export default function LibrarianNavbar({
   return (
     <header className="w-full border-b border-[#E7DCC4] bg-[#FFFDF5] text-[#3B2A1A]">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-       <Logo className="h-15 sm:h-20 w-auto transition-all" />
+        <Logo className="h-15 sm:h-20 w-auto transition-all" />
 
         <div className="flex items-center gap-4 sm:gap-6">
           <nav
@@ -36,7 +36,7 @@ export default function LibrarianNavbar({
                 title={label}
                 className={({ isActive }) =>
                   `flex items-center gap-2 text-xs font-semibold transition-colors hover:text-[#9A5B00] ${
-                    isActive ? "text-[#9A5B00]" : "text-[#3B2A1A]"
+                    isActive ? 'text-[#9A5B00]' : 'text-[#3B2A1A]'
                   }`
                 }
               >
