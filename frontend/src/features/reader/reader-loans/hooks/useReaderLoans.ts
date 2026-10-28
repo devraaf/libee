@@ -18,24 +18,27 @@ interface State {
   error: string | null;
   active: ReaderLoan[];
   history: ReaderLoan[];
+  loadedReaderId: number | null;
 }
 
-const initialState: State = { isLoading: true, error: null, active: [], history: [] };
+const initialState: State = {
+  isLoading: true,
+  error: null,
+  active: [],
+  history: [],
+  loadedReaderId: null,
+};
 
 export function useReaderLoans(readerId?: number) {
   const [state, setState] = useState<State>(initialState);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (readerId === undefined) {
-      setState({ isLoading: false, error: null, active: [], history: [] });
-      return;
-    }
+    if (readerId === undefined) return;
 
     let current = true;
 
     async function load() {
-      setState((prev) => ({ ...prev, isLoading: true, error: null }));
       try {
         const [loans, copies] = await Promise.all([listLoans(), listActiveCopies()]);
         const mine = loans.filter((loan) => loan.readerId === readerId);
@@ -80,6 +83,7 @@ export function useReaderLoans(readerId?: number) {
           error: null,
           active: items.filter((item) => item.status !== 'returned').sort(sortActive),
           history: items.filter((item) => item.status === 'returned').sort(sortHistory),
+          loadedReaderId: readerId ?? null,
         });
       } catch (error) {
         if (!current) return;
@@ -91,6 +95,7 @@ export function useReaderLoans(readerId?: number) {
               : 'Não foi possível carregar os empréstimos.',
           active: [],
           history: [],
+          loadedReaderId: readerId ?? null,
         });
       }
     }
@@ -101,7 +106,10 @@ export function useReaderLoans(readerId?: number) {
     };
   }, [readerId, attempt]);
 
-  const reload = useCallback(() => setAttempt((value) => value + 1), []);
+  const reload = useCallback(() => {
+    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+    setAttempt((value) => value + 1);
+  }, []);
 
   const renew = useCallback(async (loanId: number) => {
     const loan = await renewLoanService(loanId);
@@ -120,5 +128,16 @@ export function useReaderLoans(readerId?: number) {
     }));
   }, []);
 
-  return { ...state, reload, renew };
+  const isLoadedForReader =
+    readerId !== undefined && state.loadedReaderId === readerId;
+
+  return {
+    isLoading:
+      readerId !== undefined && (state.isLoading || !isLoadedForReader),
+    error: isLoadedForReader ? state.error : null,
+    active: isLoadedForReader ? state.active : [],
+    history: isLoadedForReader ? state.history : [],
+    reload,
+    renew,
+  };
 }
