@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { Button } from '../../../../shared/components/ui/Button';
 import { CoverImage } from '../../../../shared/components/ui/CoverImage';
 import { formatDate, getBookPath, type ReaderLoan } from '../utils/readerLoans';
@@ -7,6 +8,8 @@ import { Badge, type BadgeVariant } from '@/shared/components/ui/Badge';
 interface ReaderLoanCardProps {
   loan: ReaderLoan;
   onRenew?: (loan: ReaderLoan) => void;
+  isRenewing?: boolean;
+  renewalDisabledReason?: string;
 }
 
 const Field = ({ label, value }: { label: string; value: string }) => (
@@ -16,9 +19,33 @@ const Field = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
-export default function ReaderLoanCard({ loan, onRenew }: ReaderLoanCardProps) {
+export default function ReaderLoanCard({
+  loan,
+  onRenew,
+  isRenewing = false,
+  renewalDisabledReason,
+}: ReaderLoanCardProps) {
+  const [showDisabledReason, setShowDisabledReason] = useState(false);
   const overdue = loan.status === 'overdue';
+  const disabledReason =
+    renewalDisabledReason ??
+    (overdue ? 'Empréstimos atrasados não podem ser renovados.' : undefined);
   const statusVariant: BadgeVariant = overdue ? 'danger' : 'success';
+
+  useEffect(() => {
+    if (!showDisabledReason) return;
+    const timeout = window.setTimeout(() => setShowDisabledReason(false), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [showDisabledReason]);
+
+  const handleRenewClick = () => {
+    if (disabledReason) {
+      setShowDisabledReason(true);
+      return;
+    }
+
+    onRenew?.(loan);
+  };
 
   return (
     <article className="flex gap-3 rounded-lg border border-line bg-surface p-2.5 sm:gap-3">
@@ -58,12 +85,24 @@ export default function ReaderLoanCard({ loan, onRenew }: ReaderLoanCardProps) {
           <Button
             type="button"
             size="sm"
-            disabled={overdue}
-            onClick={() => onRenew?.(loan)}
+            disabled={isRenewing}
+            aria-disabled={Boolean(disabledReason) || isRenewing}
+            className={
+              disabledReason
+                ? 'aria-disabled:cursor-not-allowed aria-disabled:bg-disabled aria-disabled:text-on-disabled'
+                : undefined
+            }
+            onClick={handleRenewClick}
             aria-label={`Renovar empréstimo de ${loan.title}`}
+            aria-busy={isRenewing}
           >
-            Renovar
+            {isRenewing ? 'Renovando...' : 'Renovar'}
           </Button>
+          {disabledReason && showDisabledReason && (
+            <span className="text-[11px] text-muted" role="note">
+              {disabledReason}
+            </span>
+          )}
 
           {loan.bookId !== null ? (
             <Link to={getBookPath(loan.bookId)}>

@@ -125,14 +125,7 @@ export async function renewLoan(loanId: number): Promise<Loan> {
       'CONFLICT',
     );
   }
-  if (loan.renewalCount >= 2) {
-    throw new MockServiceError(
-      'O limite de renovações foi atingido.',
-      'CONFLICT',
-    );
-  }
-
-  loan.dueDate = addDays(loan.dueDate, 14);
+  loan.dueDate = addDays(loan.dueDate, 7);
   loan.renewalCount += 1;
   return withCurrentStatus(loan);
 }

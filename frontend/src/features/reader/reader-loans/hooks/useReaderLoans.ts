@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getBook, listActiveCopies } from '../../../catalog/services/books.service';
-import { listLoans } from '../../../loans/services/loans.service';
+import {
+  listLoans,
+  renewLoan as renewLoanService,
+} from '../../../loans/services/loans.service';
 import {
   getLoanStatus,
   sortActive,
@@ -100,5 +103,22 @@ export function useReaderLoans(readerId?: number) {
 
   const reload = useCallback(() => setAttempt((value) => value + 1), []);
 
-  return { ...state, reload };
+  const renew = useCallback(async (loanId: number) => {
+    const loan = await renewLoanService(loanId);
+    setState((current) => ({
+      ...current,
+      active: current.active.map((item) =>
+        item.id === loan.id
+          ? {
+              ...item,
+              dueDate: loan.dueDate,
+              renewalCount: loan.renewalCount,
+              status: getLoanStatus(loan),
+            }
+          : item,
+      ),
+    }));
+  }, []);
+
+  return { ...state, reload, renew };
 }
