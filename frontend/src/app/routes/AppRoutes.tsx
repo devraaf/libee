@@ -11,6 +11,7 @@ import LoansPage from '@/features/librarian/loans/LoanPage';
 import BookCollectionPage from '@/features/librarian/book-collection/BookCollectionPage';
 import ReadersPage from '@/features/librarian/Readers/pages/ReadersPage';
 import ReturnsPage from '@/features/librarian/Returns/pages/ReturnsPage';
+import { CatalogPage } from '@/features/catalog/pages/CatalogPage';
 
 export function AppRoutes() {
   return (
@@ -22,15 +23,7 @@ export function AppRoutes() {
       <Route path="/cadastro" element={<RegisterPage />} />
       <Route path="/galeria" element={<GalleryPage />} />
       <Route element={<MainLayout profile="reader" />}>
-        <Route
-          path="/acervo"
-          element={
-            <PlaceholderPage
-              title="Acervo"
-              description="Consulte os livros disponíveis na biblioteca."
-            />
-          }
-        />
+        <Route path="/acervo" element={<CatalogPage />} />
         <Route
           path="/emprestimos"
           element={
