@@ -6,4 +6,6 @@ export interface NavLinkItem {
   icon: LucideIcon;
   /** Quando verdadeiro, só fica ativo na rota exata (ex.: "/"). */
   end?: boolean;
+  /** Rotas adicionais que também devem destacar este item no menu. */
+  activePaths?: string[];
 }

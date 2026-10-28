@@ -18,6 +18,7 @@ export interface TableProps<T> {
   caption?: string;
   footer?: ReactNode;
   className?: string;
+  tableClassName?: string;
 }
 
 const alignClass = {
@@ -34,6 +35,7 @@ export function Table<T>({
   caption,
   footer,
   className,
+  tableClassName,
 }: TableProps<T>) {
   return (
     <div
@@ -43,7 +45,12 @@ export function Table<T>({
       )}
     >
       <div className="overflow-x-auto">
-        <table className="type-small w-full min-w-[640px] border-collapse text-fg">
+        <table
+          className={cn(
+            'type-small w-full min-w-160 border-collapse text-fg',
+            tableClassName,
+          )}
+        >
           {caption && <caption className="sr-only">{caption}</caption>}
           <thead>
             <tr className="border-b border-line-strong bg-surface-warm">

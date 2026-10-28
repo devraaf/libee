@@ -44,7 +44,7 @@ export function RegisterPage({ courses, onSubmit }: RegisterPageProps) {
     } else {
       await register(data);
     }
-    navigate('/galeria');
+    navigate('/entrar', { state: { registrationSuccess: true } });
   }
 
   return (
@@ -59,7 +59,7 @@ export function RegisterPage({ courses, onSubmit }: RegisterPageProps) {
       <RegisterForm courses={availableCourses} onSubmit={handleRegister} />
       <p className="type-small text-muted">
         Já possui uma conta?{' '}
-        <Link to="/login" className="text-primary hover:underline">
+        <Link to="/entrar" className="text-primary hover:underline">
           Entrar
         </Link>
       </p>
