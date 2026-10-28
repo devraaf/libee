@@ -9,7 +9,8 @@ import { BookDetailsPage } from '@/features/catalog/pages/BooksDetailsPage';
 import { GalleryPage } from '../pages/GalleryPage';
 import LoansPage from '@/features/librarian/loans/LoanPage';
 import BookCollectionPage from '@/features/librarian/book-collection/BookCollectionPage';
-import ReadersPage from '@/features/librarian/readers/pages/ReadersPage';
+import ReadersPage from '@/features/librarian/Readers/pages/ReadersPage';
+import ReturnsPage from '@/features/librarian/Returns/pages/ReturnsPage';
 
 export function AppRoutes() {
   return (
@@ -44,15 +45,7 @@ export function AppRoutes() {
       <Route element={<MainLayout profile="librarian" />}>
         <Route path="/gerenciamento/acervo" element={<BookCollectionPage />} />
         <Route path="/gerenciamento/emprestimos" element={<LoansPage />} />
-        <Route
-          path="/gerenciamento/devolucoes"
-          element={
-            <PlaceholderPage
-              title="Devoluções"
-              description="Consulte as devoluções de livros."
-            />
-          }
-        />
+        <Route path="/gerenciamento/devolucoes" element={<ReturnsPage />} />
         <Route path="/gerenciamento/leitores" element={<ReadersPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />
