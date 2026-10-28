@@ -2,9 +2,6 @@ import { Route, Routes } from 'react-router-dom';
 import { LoginPage } from '../../features/auth/pages/LoginPage';
 import { RegisterPage } from '../../features/auth/pages/RegisterPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
-<<<<<<< HEAD
-import { BookDetailsPage } from '../../features/book-details/pages/BookDetailsPage';
-=======
 import { InstitutionalPage } from '../pages/InstitutionalPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
 import { MainLayout } from '../layout/MainLayout';
@@ -12,22 +9,13 @@ import { BookDetailsPage } from '@/features/catalog/pages/BooksDetailsPage';
 import { GalleryPage } from '../pages/GalleryPage';
 import LoansPage from '@/features/librarian/loans/LoanPage';
 import BookCollectionPage from '@/features/librarian/book-collection/BookCollectionPage';
->>>>>>> e84d0b53f8a382ef8a7717ec75f39495e4050fd0
+
 
 export function AppRoutes() {
   return (
     <Routes>
-<<<<<<< HEAD
-      {/* Redireciona a raiz "/" direto para o login */}
-      <Route path="*" element={<Navigate to="/login" />} />
-      {/* Definição das Rotas*/}
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/cadastro" element={<RegisterPage />} />
-      <Route path="/galeria" element={<GalleryPage />} />
 
-       <Route path="/livro/:id" element={<BookDetailsPage />} />
 
-=======
       <Route element={<MainLayout profile="public" />}>
         <Route path="/" element={<InstitutionalPage />} />
       </Route>
@@ -77,7 +65,7 @@ export function AppRoutes() {
           }
         />
       </Route>
->>>>>>> e84d0b53f8a382ef8a7717ec75f39495e4050fd0
+
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
