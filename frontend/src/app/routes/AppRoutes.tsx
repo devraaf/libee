@@ -6,7 +6,7 @@ import { InstitutionalPage } from '../pages/InstitutionalPage';
 import { MainLayout } from '../layout/MainLayout';
 import { BookDetailsPage } from '@/features/book-details/pages/BooksDetailsPage';
 import { GalleryPage } from '../pages/GalleryPage';
-import LoansPage from '@/features/librarian/loans/LoanPage';
+import LoansPage from '@/features/librarian/loans/pages/LoanPage';
 import BookCollectionPage from '@/features/librarian/book-collection/BookCollectionPage';
 import ReadersPage from '@/features/librarian/readers/pages/ReadersPage';
 import ReturnsPage from '@/features/librarian/returns/pages/ReturnsPage';

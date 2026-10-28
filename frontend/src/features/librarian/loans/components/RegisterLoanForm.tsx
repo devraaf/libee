@@ -13,9 +13,9 @@ import { listCourses } from '../../../catalog/services/catalog.service';
 import {
   createReader,
   listReaders,
-} from '../../Readers/services/readers.service';
-import CreateReaderForm from '../../Readers/components/CreateReaderForm';
-import type { ReaderFormValues } from '../../Readers/types/reader.model';
+} from '../../readers/services/readers.service';
+import CreateReaderForm from '../../readers/components/CreateReaderForm';
+import type { ReaderFormValues } from '../../readers/types/reader.model';
 import type { AffiliationType } from '../../../../shared/schemas/enums.schema';
 import type { Copy, Course, Reader } from '../../../../shared/types/library';
 import { dateFromToday } from '../../../../shared/mocks/dates';

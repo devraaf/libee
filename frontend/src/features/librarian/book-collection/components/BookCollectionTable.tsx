@@ -1,4 +1,5 @@
 import { Pencil, X } from 'lucide-react';
+import { IconButton } from '../../../../shared/components/ui/IconButton';
 import { EmptyState } from '../../../../shared/components/ui/EmptyState';
 import {
   Table,
@@ -24,6 +25,7 @@ export interface BookCollectionTableProps {
   totalItems: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  onViewBook?: (bookId: number) => void;
   onEditBook?: (bookId: number) => void;
   onDeleteBook?: (book: BookCollectionItem) => void;
 }
@@ -34,6 +36,7 @@ export function BookCollectionTable({
   totalItems,
   totalPages,
   onPageChange,
+  onViewBook,
   onEditBook,
   onDeleteBook,
 }: BookCollectionTableProps) {
@@ -90,28 +93,26 @@ export function BookCollectionTable({
       align: 'right',
       render: (book) => (
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
+          <IconButton
+            label={`Editar ${book.title}`}
+            icon={<Pencil size={14} aria-hidden="true" />}
+            variant="table"
+            size="table"
             onClick={() => onEditBook?.(book.id)}
-            aria-label={`Editar ${book.title}`}
-            className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface text-fg hover:bg-surface-hover"
-          >
-            <Pencil size={14} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
+          />
+          <IconButton
+            label={`Excluir ${book.title}`}
+            icon={<X size={14} aria-hidden="true" />}
+            variant="table"
+            size="table"
             onClick={() => onDeleteBook?.(book)}
-            aria-label={`Excluir ${book.title}`}
             title={
               book.hasActiveLoan
                 ? 'Não é possível excluir um livro com empréstimo ativo.'
                 : `Excluir ${book.title}`
             }
             disabled={book.hasActiveLoan}
-            className="flex size-8 items-center justify-center rounded-lg border border-line bg-surface text-fg hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <X size={14} aria-hidden="true" />
-          </button>
+          />
         </div>
       ),
     },
@@ -122,10 +123,12 @@ export function BookCollectionTable({
       columns={columns}
       rows={books}
       getRowKey={(book) => book.id}
+      getRowLabel={(book) => `Ver detalhes de ${book.title}`}
+      onRowClick={(book) => onViewBook?.(book.id)}
       caption="Livros do acervo"
       emptyState={
         <EmptyState
-          title="Nenhum livro encontrado."
+          title="Nenhum resultado encontrado"
           description="Tente alterar os termos da busca."
         />
       }
