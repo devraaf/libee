@@ -15,12 +15,14 @@ export function useAuthForm<
   const [errors, setErrors] = useState<Partial<Record<keyof TValues, string>>>(
     {},
   );
+  const [formError, setFormError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const isSubmitting = useRef(false);
 
   function handleFieldChange(field: keyof TValues, value: string) {
     setFormData((previous) => ({ ...previous, [field]: value }));
     setErrors((previous) => ({ ...previous, [field]: undefined }));
+    setFormError(null);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -49,14 +51,30 @@ export function useAuthForm<
       }
 
       setIsLoading(true);
-      await onValidSubmit?.(result.data);
-      setFormData(initialValues);
-      setErrors({});
+      try {
+        await onValidSubmit?.(result.data);
+        setFormData(initialValues);
+        setErrors({});
+        setFormError(null);
+      } catch (error) {
+        setFormError(
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível concluir a operação. Tente novamente.',
+        );
+      }
     } finally {
       isSubmitting.current = false;
       setIsLoading(false);
     }
   }
 
-  return { formData, errors, isLoading, handleFieldChange, handleSubmit };
+  return {
+    formData,
+    errors,
+    formError,
+    isLoading,
+    handleFieldChange,
+    handleSubmit,
+  };
 }

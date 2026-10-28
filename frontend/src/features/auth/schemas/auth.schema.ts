@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { affiliationTypes } from '../types/affiliation-type';
+import { affiliationTypeSchema } from '../../../shared/schemas/enums.schema';
 
 export const loginSchema = z.object({
   email: z
@@ -32,9 +32,7 @@ export const registerSchema = z
           value === '' || /^(?:\(\d{2}\)\s?|\d{2})\d{4,5}-?\d{4}$/.test(value),
         'Informe um telefone válido com DDD.',
       ),
-    affiliationType: z.enum(affiliationTypes, {
-      error: 'Selecione seu tipo de vínculo.',
-    }),
+    affiliationType: affiliationTypeSchema,
     courseId: z.string(),
     email: z
       .string()
