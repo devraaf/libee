@@ -1,259 +1,479 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useEffect, useId, useMemo, useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, Search, UserPlus } from 'lucide-react';
-import { mockBooks, mockCopies, mockReaders } from '../../../../shared/mocks/data';
-import { registerLoanSchema, type RegisterLoanFormData } from '../schemas/loan.schema';
+import { Loader2, Search } from 'lucide-react';
+import { Badge } from '../../../../shared/components/ui/Badge';
+import { Button } from '../../../../shared/components/ui/Button';
+import Modal from '../../../../shared/components/ui/Modal';
+import { getBook, listCopies } from '../../../catalog/services/books.service';
+import { listCourses } from '../../../catalog/services/catalog.service';
+import {
+  createReader,
+  listReaders,
+} from '../../Readers/services/readers.service';
+import CreateReaderForm from '../../Readers/components/CreateReaderForm';
+import type { ReaderFormValues } from '../../Readers/types/reader.model';
+import type { AffiliationType } from '../../../../shared/schemas/enums.schema';
+import type { Copy, Course, Reader } from '../../../../shared/types/library';
+import { dateFromToday } from '../../../../shared/mocks/dates';
+import {
+  registerLoanSchema,
+  type RegisterLoanFormData,
+} from '../schemas/loan.schema';
 
 interface RegisterLoanFormProps {
   onCancel: () => void;
   onConfirm: (data: RegisterLoanFormData) => Promise<void>;
 }
 
-export default function RegisterLoanForm({ onCancel, onConfirm }: RegisterLoanFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
+interface AvailableCopy extends Copy {
+  title: string;
+}
 
-  // Data de devolução prevista padrão: Hoje + 7 dias
-  const getDefaultDueDate = () => {
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    return d.toISOString().split('T')[0];
-  };
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : 'Não foi possível carregar os dados para o empréstimo.';
+}
 
-  const todayStr = new Date().toISOString().split('T')[0];
+const fieldClass =
+  'w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-subtle focus:border-primary focus:outline-none';
+const labelClass = 'type-label mb-1 block text-fg';
+const errorClass = 'type-caption mt-1 block text-danger';
+
+export default function RegisterLoanForm({
+  onCancel,
+  onConfirm,
+}: RegisterLoanFormProps) {
+  const formId = useId();
+  const [copies, setCopies] = useState<AvailableCopy[]>([]);
+  const [selectedReader, setSelectedReader] = useState<Reader | null>(null);
+  const [readerSuggestions, setReaderSuggestions] = useState<Reader[]>([]);
+  const [isLoadingOptions, setIsLoadingOptions] = useState(true);
+  const [isSearchingReader, setIsSearchingReader] = useState(false);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [readerSearchError, setReaderSearchError] = useState<string | null>(
+    null,
+  );
+  const [readerNotFound, setReaderNotFound] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [optionsRetry, setOptionsRetry] = useState(0);
+  const [isCreateReaderOpen, setIsCreateReaderOpen] = useState(false);
+  const [isLoadingCourses, setIsLoadingCourses] = useState(false);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [courseLoadError, setCourseLoadError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm<RegisterLoanFormData>({
-    resolver: zodResolver(registerLoanSchema) as any,
+    resolver: zodResolver(registerLoanSchema),
     defaultValues: {
       readerId: '',
       readerName: '',
       copyCode: '',
-      dueDate: getDefaultDueDate(),
+      dueDate: dateFromToday(7),
     },
   });
 
-  const readerInput = watch('readerName') || '';
-  
-  const [selectedReader, setSelectedReader] = useState<{ id: string; name: string; email: string } | null>(null);
-  const [isSearchingReader, setIsSearchingReader] = useState(false);
-  const [readerNotFound, setReaderNotFound] = useState(false);
+  const readerInput = useWatch({ control, name: 'readerName' }) ?? '';
+  const copyCode = useWatch({ control, name: 'copyCode' }) ?? '';
+  const selectedCopy = useMemo(
+    () =>
+      copies.find(
+        (copy) =>
+          copy.accessionNumber === copyCode.trim() ||
+          String(copy.id) === copyCode.trim(),
+      ),
+    [copies, copyCode],
+  );
+  useEffect(() => {
+    let active = true;
 
-  const [bookDetails, setBookDetails] = useState<{ title: string; available: boolean } | null>(null);
-  const [copyError, setCopyError] = useState<string | null>(null);
+    async function loadOptions() {
+      setIsLoadingOptions(true);
+      setOptionsError(null);
+      try {
+        const copyRecords = await listCopies();
+        const books = await Promise.all(
+          [...new Set(copyRecords.map(({ bookId }) => bookId))].map(getBook),
+        );
+        if (!active) return;
 
-
-  const handleSearchReader = () => {
-    if (!readerInput.trim()) return;
-    setIsSearchingReader(true);
-    setReaderNotFound(false);
-
-    setTimeout(() => {
-      const savedReaders = localStorage.getItem('readersList');
-      const allReaders = savedReaders ? JSON.parse(savedReaders) : mockReaders;
-
-      const found = allReaders.find(
-        (r: any) =>
-          r.name.toLowerCase().includes(readerInput.toLowerCase()) ||
-          r.email.toLowerCase().includes(readerInput.toLowerCase())
-      );
-
-      if (found) {
-        setSelectedReader({ id: String(found.id), name: found.name, email: found.email });
-        setValue('readerId', String(found.id));
-        setValue('readerName', found.name);
-        setReaderNotFound(false);
-      } else {
-        setSelectedReader(null);
-        setValue('readerId', '');
-        setReaderNotFound(true);
+        const booksById = new Map(books.map((book) => [book.id, book]));
+        setCopies(
+          copyRecords.map((copy) => {
+            const book = booksById.get(copy.bookId);
+            if (!book) {
+              throw new Error(
+                `O livro do exemplar ${copy.accessionNumber} não foi encontrado.`,
+              );
+            }
+            return { ...copy, title: book.title };
+          }),
+        );
+      } catch (error) {
+        if (active) setOptionsError(getErrorMessage(error));
+      } finally {
+        if (active) setIsLoadingOptions(false);
       }
-      setIsSearchingReader(false);
-    }, 300);
-  };
+    }
 
-  // Validação do Tombo consumindo mockCopies + mockBooks
-  const handleValidateCopy = (code: string) => {
-    if (!code.trim()) {
-      setBookDetails(null);
+    void loadOptions();
+    return () => {
+      active = false;
+    };
+  }, [optionsRetry]);
+
+  async function handleSearchReader() {
+    const query = readerInput.trim();
+    if (!query) {
+      setReaderSuggestions([]);
+      setReaderNotFound(false);
+      return;
+    }
+
+    setIsSearchingReader(true);
+    setReaderSearchError(null);
+    try {
+      const matches = await listReaders(query);
+      setReaderSuggestions(matches);
+      setReaderNotFound(matches.length === 0);
+    } catch (error) {
+      setReaderSuggestions([]);
+      setReaderNotFound(false);
+      setReaderSearchError(getErrorMessage(error));
+    } finally {
+      setIsSearchingReader(false);
+    }
+  }
+
+  function handleSelectReader(reader: Reader) {
+    setSelectedReader(reader);
+    setValue('readerId', String(reader.id), { shouldValidate: true });
+    setValue('readerName', reader.name, { shouldValidate: true });
+    setReaderSuggestions([]);
+    setReaderNotFound(false);
+    setReaderSearchError(null);
+  }
+
+  function handleReaderInputChange(value: string) {
+    setValue('readerName', value, { shouldValidate: true });
+    setValue('readerId', '', { shouldValidate: true });
+    setSelectedReader(null);
+    setReaderSuggestions([]);
+    setReaderNotFound(false);
+    setReaderSearchError(null);
+  }
+
+  async function handleOpenCreateReader() {
+    setIsCreateReaderOpen(true);
+    setCourseLoadError(null);
+    setIsLoadingCourses(true);
+    try {
+      setCourses(await listCourses());
+    } catch (error) {
+      setCourseLoadError(getErrorMessage(error));
+    } finally {
+      setIsLoadingCourses(false);
+    }
+  }
+
+  async function handleCreateReader(values: ReaderFormValues) {
+    const affiliationType: AffiliationType =
+      values.bond === 'student'
+        ? 'STUDENT'
+        : values.bond === 'teacher'
+          ? 'PROFESSOR'
+          : 'EMPLOYEE';
+    const course = courses.find(({ name }) => name === values.course);
+    const reader = await createReader({
+      name: values.name.trim(),
+      email: values.email.trim(),
+      phone: values.phone.replace(/\D/g, ''),
+      affiliationType,
+      ...(affiliationType === 'STUDENT' && course
+        ? { courseId: course.id }
+        : {}),
+    });
+
+    handleSelectReader(reader);
+    setIsCreateReaderOpen(false);
+  }
+
+  function handleCopyCodeChange(value: string) {
+    setValue('copyCode', value, { shouldValidate: true });
+    const trimmedCode = value.trim();
+    if (!trimmedCode) {
       setCopyError(null);
       return;
     }
-
-    const savedCopies = localStorage.getItem('copiesList');
-    const copies = savedCopies ? JSON.parse(savedCopies) : mockCopies;
-
-    const copy = copies.find((c: any) => c.accessionNumber === code.trim() || String(c.id) === code.trim());
-
+    const copy = copies.find(
+      (item) =>
+        item.accessionNumber === trimmedCode || String(item.id) === trimmedCode,
+    );
     if (!copy) {
-      setBookDetails(null);
       setCopyError('Exemplar inexistente no catálogo.');
-      return;
-    }
-
-    if (copy.status === 'ON_LOAN') {
-      setBookDetails(null);
+    } else if (copy.status !== 'AVAILABLE') {
       setCopyError('Exemplar já se encontra emprestado.');
+    } else {
+      setCopyError(null);
+    }
+  }
+
+  async function handleFormSubmit(data: RegisterLoanFormData) {
+    if (copyError || !selectedCopy || selectedCopy.status !== 'AVAILABLE') {
       return;
     }
-
-    const savedBooks = localStorage.getItem('booksList');
-    const books = savedBooks ? JSON.parse(savedBooks) : mockBooks;
-    const book = books.find((b: any) => b.id === copy.bookId);
-
-    setCopyError(null);
-    setBookDetails({
-      title: book ? book.title : `Exemplar nº ${copy.accessionNumber}`,
-      available: true,
-    });
-  };
-
-  const handleFormSubmit = async (data: RegisterLoanFormData) => {
-    if (copyError || !bookDetails?.available) return;
-    setIsLoading(true);
+    setSubmitError(null);
+    setIsSubmitting(true);
     try {
       await onConfirm(data);
+    } catch (error) {
+      setSubmitError(getErrorMessage(error));
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
-  };
+  }
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="flex flex-col gap-4">
-      {/* Campo Leitor */}
-      <div>
-        <label className="mb-1 block text-xs font-semibold text-[#3B2A1A]">
-          Leitor (nome ou e-mail)
-        </label>
-        <div className="flex gap-2">
-          <input
-            {...register('readerName')}
-            type="text"
-            placeholder="Digite o nome ou e-mail do leitor"
-            className="w-full rounded-lg border border-[#E7DCC4] bg-white px-3 py-2 text-sm text-[#3B2A1A] focus:outline-none focus:border-[#9A5B00]"
-          />
-          <button
-            type="button"
-            onClick={handleSearchReader}
-            disabled={isSearchingReader}
-            className="rounded-lg border border-[#9A5B00] px-4 py-2 text-sm font-medium text-[#9A5B00] hover:bg-[#F9F0DC] flex items-center gap-1"
-          >
-            {isSearchingReader ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-            Buscar
-          </button>
-        </div>
-        {errors.readerName && (
-          <span className="mt-1 block text-xs text-red-600">{errors.readerName.message}</span>
-        )}
-      </div>
-
-      {selectedReader && (
-        <div className="rounded-lg bg-[#FDF9ED] p-3 border border-[#E7DCC4] text-xs text-[#3B2A1A] flex justify-between items-center">
-          <div>
-            <p className="font-semibold">{selectedReader.name}</p>
-            <p className="text-[#6B5A45]">{selectedReader.email}</p>
+    <>
+      <form
+        onSubmit={handleSubmit(handleFormSubmit)}
+        className="flex flex-col gap-4"
+      >
+        {optionsError && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="type-small text-danger" role="alert">
+              {optionsError}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOptionsRetry((current) => current + 1)}
+            >
+              Tentar novamente
+            </Button>
           </div>
-          <span className="text-emerald-700 font-medium bg-emerald-50 px-2 py-1 rounded text-[10px]">
-            Leitor Selecionado
-          </span>
+        )}
+
+        {isLoadingOptions && (
+          <p className="type-small text-muted" role="status">
+            Carregando exemplares...
+          </p>
+        )}
+
+        <input type="hidden" {...register('readerId')} />
+
+        <div>
+          <label htmlFor={`${formId}-reader-name`} className={labelClass}>
+            Leitor (nome ou e-mail)
+          </label>
+          <div className="flex gap-2">
+            <input
+              id={`${formId}-reader-name`}
+              {...register('readerName')}
+              value={readerInput}
+              onChange={(event) => handleReaderInputChange(event.target.value)}
+              type="text"
+              placeholder="Digite o nome ou e-mail do leitor"
+              autoComplete="off"
+              disabled={isSearchingReader}
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={readerSuggestions.length > 0}
+              aria-controls={`${formId}-reader-suggestions`}
+              className={fieldClass}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleSearchReader()}
+              disabled={isSearchingReader}
+              leftIcon={
+                isSearchingReader ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Search size={14} />
+                )
+              }
+            >
+              Buscar
+            </Button>
+          </div>
+          {(errors.readerName || errors.readerId) && (
+            <span className={errorClass}>
+              {errors.readerName?.message ?? errors.readerId?.message}
+            </span>
+          )}
+          {readerSearchError && (
+            <p className={errorClass} role="alert">
+              {readerSearchError}
+            </p>
+          )}
         </div>
-      )}
 
-      {readerNotFound && (
-        <div className="rounded-lg bg-red-50 p-3 border border-red-200 text-xs text-red-800 flex justify-between items-center">
-          <span>Leitor não encontrado no sistema.</span>
-          <button
-            type="button"
-            onClick={() => {
-              const newReader = {
-                id: Date.now(),
-                name: readerInput,
-                email: 'novo.leitor@example.com',
-                affiliationType: 'STUDENT',
-                profile: 'READER',
-              };
-              const saved = localStorage.getItem('readersList');
-              const list = saved ? JSON.parse(saved) : mockReaders;
-              localStorage.setItem('readersList', JSON.stringify([newReader, ...list]));
-
-              setSelectedReader({ id: String(newReader.id), name: newReader.name, email: newReader.email });
-              setValue('readerId', String(newReader.id));
-              setValue('readerName', newReader.name);
-              setReaderNotFound(false);
-            }}
-            className="text-xs font-semibold text-white bg-[#F97316] px-2.5 py-1.5 rounded hover:bg-[#EA580C] flex items-center gap-1"
+        {readerSuggestions.length > 0 && (
+          <ul
+            id={`${formId}-reader-suggestions`}
+            role="listbox"
+            aria-label="Sugestões de leitores"
+            className="-mt-3 max-h-48 overflow-y-auto rounded-lg border border-line bg-surface"
           >
-            <UserPlus size={12} />
-            Cadastrar leitor
-          </button>
+            {readerSuggestions.map((reader) => (
+              <li key={reader.id} role="option" aria-selected={false}>
+                <button
+                  type="button"
+                  onClick={() => handleSelectReader(reader)}
+                  className="flex w-full flex-col px-3 py-2 text-left hover:bg-surface-hover"
+                >
+                  <span className="type-small font-semibold text-fg">
+                    {reader.name}
+                  </span>
+                  <span className="type-caption text-muted">
+                    {reader.email}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {selectedReader && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface-warm p-3">
+            <div className="type-caption text-fg">
+              <p className="font-semibold">{selectedReader.name}</p>
+              <p className="text-muted">{selectedReader.email}</p>
+            </div>
+            <Badge variant="success">Leitor selecionado</Badge>
+          </div>
+        )}
+
+        {readerNotFound && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warn-line bg-warn-bg p-3">
+            <span className="type-small text-warn">
+              Leitor não encontrado no sistema.
+            </span>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void handleOpenCreateReader()}
+            >
+              Cadastrar leitor
+            </Button>
+          </div>
+        )}
+
+        <div>
+          <label htmlFor={`${formId}-copy-code`} className={labelClass}>
+            Tombo do exemplar (ex.: 0001, 0002)
+          </label>
+          <input
+            id={`${formId}-copy-code`}
+            {...register('copyCode')}
+            type="text"
+            placeholder="Digite o código do tombo"
+            onChange={(event) => handleCopyCodeChange(event.target.value)}
+            className={fieldClass}
+          />
+          {copyError && <span className={errorClass}>{copyError}</span>}
+          {errors.copyCode && (
+            <span className={errorClass}>{errors.copyCode.message}</span>
+          )}
         </div>
-      )}
 
-      {/* Campo Tombo do Exemplar */}
-      <div>
-        <label className="mb-1 block text-xs font-semibold text-[#3B2A1A]">
-          Tombo do exemplar (ex: 0001, 0002)
-        </label>
-        <input
-          {...register('copyCode')}
-          type="text"
-          placeholder="Digite o código do tombo"
-          onChange={(e) => {
-            register('copyCode').onChange(e);
-            handleValidateCopy(e.target.value);
-          }}
-          className="w-full rounded-lg border border-[#E7DCC4] bg-white px-3 py-2 text-sm text-[#3B2A1A] focus:outline-none focus:border-[#9A5B00]"
-        />
-        {copyError && <span className="mt-1 block text-xs text-red-600">{copyError}</span>}
-        {errors.copyCode && <span className="mt-1 block text-xs text-red-600">{errors.copyCode.message}</span>}
-      </div>
+        {selectedCopy && !copyError && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface-warm p-3">
+            <span className="type-small font-semibold text-fg">
+              Título do livro: {selectedCopy.title}
+            </span>
+            <Badge variant="success">Disponível para empréstimo</Badge>
+          </div>
+        )}
 
-      {bookDetails && (
-        <div className="rounded-lg bg-emerald-50 p-3 border border-emerald-200 text-xs text-emerald-900">
-          <p className="font-semibold">Título do Livro: {bookDetails.title}</p>
-          <p className="text-emerald-700">Exemplar disponível para empréstimo.</p>
+        <div>
+          <label htmlFor={`${formId}-due-date`} className={labelClass}>
+            Devolução prevista
+          </label>
+          <input
+            id={`${formId}-due-date`}
+            {...register('dueDate')}
+            type="date"
+            min={dateFromToday(0)}
+            className={fieldClass}
+          />
+          {errors.dueDate && (
+            <span className={errorClass}>{errors.dueDate.message}</span>
+          )}
         </div>
-      )}
 
-      {/* Campo Devolução Prevista */}
-      <div>
-        <label className="mb-1 block text-xs font-semibold text-[#3B2A1A]">
-          Devolução prevista
-        </label>
-        <input
-          {...register('dueDate')}
-          type="date"
-          min={todayStr}
-          className="w-full rounded-lg border border-[#E7DCC4] bg-white px-3 py-2 text-sm text-[#3B2A1A] focus:outline-none focus:border-[#9A5B00]"
-        />
-        {errors.dueDate && <span className="mt-1 block text-xs text-red-600">{errors.dueDate.message}</span>}
-      </div>
+        <p className="type-caption text-muted">Registrado por Bibliotecário</p>
 
-      <p className="text-[11px] text-[#6B5A45]">Registrado por Bibliotecário</p>
+        {submitError && (
+          <p className="type-small text-danger" role="alert">
+            {submitError}
+          </p>
+        )}
 
-      <div className="flex justify-end gap-2 mt-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isLoading}
-          className="rounded-lg border border-[#6B5A45] bg-white px-4 py-2 text-sm font-medium text-[#3B2A1A] hover:bg-[#F9F0DC]"
-        >
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={isLoading || !!copyError || !bookDetails}
-          className="rounded-lg bg-[#F97316] px-4 py-2 text-sm font-medium text-white hover:bg-[#EA580C] flex items-center gap-2 disabled:opacity-50"
-        >
-          {isLoading && <Loader2 size={16} className="animate-spin" />}
-          Confirmar
-        </button>
-      </div>
-    </form>
+        <div className="mt-2 flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            disabled={
+              isSubmitting ||
+              isLoadingOptions ||
+              Boolean(optionsError) ||
+              Boolean(copyError) ||
+              !selectedReader ||
+              !selectedCopy
+            }
+          >
+            {isSubmitting ? 'Registrando...' : 'Confirmar'}
+          </Button>
+        </div>
+      </form>
+      <Modal
+        isOpen={isCreateReaderOpen}
+        onClose={() => setIsCreateReaderOpen(false)}
+        title="Cadastrar leitor"
+      >
+        {isLoadingCourses ? (
+          <p className="type-small text-muted" role="status">
+            Carregando cursos...
+          </p>
+        ) : courseLoadError ? (
+          <div className="flex flex-col gap-3">
+            <p className="type-small text-danger" role="alert">
+              {courseLoadError}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleOpenCreateReader()}
+            >
+              Tentar novamente
+            </Button>
+          </div>
+        ) : (
+          <CreateReaderForm
+            onCancel={() => setIsCreateReaderOpen(false)}
+            courseOptions={courses.map((course) => course.name)}
+            onSubmit={handleCreateReader}
+          />
+        )}
+      </Modal>
+    </>
   );
 }

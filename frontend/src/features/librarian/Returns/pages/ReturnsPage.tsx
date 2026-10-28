@@ -1,17 +1,24 @@
-import { useId, useState, useEffect, type FormEvent } from "react";
-import { Footer } from "../../../../app/layout/Footer";
-import SearchFilterBar from "../../../../shared/components/ui/SearchFilterBar";
-import TableFooter from "../../../../shared/components/ui/TableFooter";
-import { Modal } from "../../../../shared/components/ui/Modal";
-import RegisterReturnForm from "../components/RegisterReturnForm";
+import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
+import { Button } from '../../../../shared/components/ui/Button';
+import { EmptyState } from '../../../../shared/components/ui/EmptyState';
+import { Loader } from '../../../../shared/components/ui/Loader/Loader';
+import Modal from '../../../../shared/components/ui/Modal';
+import { PageHeader } from '../../../../shared/components/ui/PageHeader';
+import SearchFilterBar from '../../../../shared/components/ui/SearchFilterBar';
+import {
+  Table,
+  type TableColumn,
+} from '../../../../shared/components/ui/Table';
+import { Pagination } from '../../../../shared/components/ui/Pagination';
+import { listLoans, returnLoan } from '../../../loans/services/loans.service';
+import { mapLoanRecords, type LoanRecordItem } from '../../loans/loan.mapper';
+import RegisterReturnForm, {
+  type ReturnLoanDetails,
+} from '../components/RegisterReturnForm';
 
-export interface ActiveLoan {
-  copyCode: string;
-  title: string;
-  reader: string;
-}
+const PAGE_SIZE = 10;
 
-interface ReturnRecord {
+interface ReturnTableItem {
   id: number;
   title: string;
   copyCode: string;
@@ -19,235 +26,286 @@ interface ReturnRecord {
   returnDate: string;
 }
 
-export default function Returns() {
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : 'Não foi possível carregar as devoluções.';
+}
+
+function toReturnDetails(loan: LoanRecordItem): ReturnLoanDetails {
+  return {
+    loanId: loan.id,
+    copyCode: loan.accessionNumber,
+    title: loan.title,
+    reader: loan.readerName,
+  };
+}
+
+export default function ReturnsPage() {
   const inputId = useId();
-  const [copyCodeInput, setCopyCodeInput] = useState("");
+  const [copyCodeInput, setCopyCodeInput] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  
-  const [activeLoans, setActiveLoans] = useState<Record<string, ActiveLoan>>({});
-  const [returnsList, setReturnsList] = useState<ReturnRecord[]>([]);
-  
-  const [selectedLoanForModal, setSelectedLoanForModal] = useState<ActiveLoan | null>(null);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [loans, setLoans] = useState<LoanRecordItem[]>([]);
+  const [selectedLoan, setSelectedLoan] = useState<ReturnLoanDetails | null>(
+    null,
+  );
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
-    const savedLoans = localStorage.getItem("activeLoans");
-    const savedReturns = localStorage.getItem("returnsList");
+    let active = true;
 
-    if (savedLoans) {
-      setActiveLoans(JSON.parse(savedLoans));
-    } else {
-      const initialActive = {
-        "09123458": { copyCode: "09123458", title: "Estrutura de dados", reader: "Maria Cunha" },
-        "00123": { copyCode: "00123", title: "Algoritmos Avançados", reader: "João da Silva" }
-      };
-      setActiveLoans(initialActive);
-      localStorage.setItem("activeLoans", JSON.stringify(initialActive));
+    async function loadReturnData() {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const loanRecords = await listLoans();
+        const mappedLoans = await mapLoanRecords(loanRecords);
+        if (active) setLoans(mappedLoans);
+      } catch (error) {
+        if (active) setLoadError(getErrorMessage(error));
+      } finally {
+        if (active) setIsLoading(false);
+      }
     }
 
-    if (savedReturns) {
-      setReturnsList(JSON.parse(savedReturns));
-    }
-  }, []);
-
-  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setInputError(null);
-
-    const trimmedCode = copyCodeInput.trim();
-    if (!trimmedCode) {
-      setInputError("Informe o tombo do exemplar.");
-      return;
-    }
-
-    const loan = activeLoans[trimmedCode];
-    
-    if (!loan) {
-      setInputError("Este exemplar não está emprestado.");
-      return;
-    }
-
-    setSelectedLoanForModal(loan);
-    setIsFormOpen(true);
-  };
-
-  const handleConfirmReturn = (loan: ActiveLoan) => {
-    const todayFormatted = new Date().toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-
-    const newRecord: ReturnRecord = {
-      id: Date.now(),
-      title: loan.title,
-      copyCode: loan.copyCode,
-      reader: loan.reader,
-      returnDate: todayFormatted,
+    void loadReturnData();
+    return () => {
+      active = false;
     };
+  }, [retry]);
 
-
-    const updatedActiveLoans = { ...activeLoans };
-    delete updatedActiveLoans[loan.copyCode];
-    setActiveLoans(updatedActiveLoans);
-    localStorage.setItem("activeLoans", JSON.stringify(updatedActiveLoans));
-
-
-    const updatedReturns = [newRecord, ...returnsList];
-    setReturnsList(updatedReturns);
-    localStorage.setItem("returnsList", JSON.stringify(updatedReturns));
-
-  
-    const storedLoansList = localStorage.getItem("loansList");
-    if (storedLoansList) {
-      const parsedLoans = JSON.parse(storedLoansList);
-      const filteredLoans = parsedLoans.filter((l: any) => l.tombo !== loan.copyCode);
-      localStorage.setItem("loansList", JSON.stringify(filteredLoans));
-    }
-
-    setIsFormOpen(false);
-    setSelectedLoanForModal(null);
-    setCopyCodeInput("");
-
-    setSuccessToast(`Devolução do tombo ${loan.copyCode} registrada com sucesso!`);
-    setTimeout(() => setSuccessToast(null), 4000);
-  };
-
-  const handleCloseForm = () => {
-    setIsFormOpen(false);
-    setSelectedLoanForModal(null);
-  };
-
-  const filteredReturns = returnsList.filter(
-    (item) =>
-      item.title.toLowerCase().includes(search.toLowerCase()) ||
-      item.reader.toLowerCase().includes(search.toLowerCase()) ||
-      item.copyCode.includes(search)
+  const returnedLoans: ReturnTableItem[] = useMemo(
+    () =>
+      loans.flatMap((loan) =>
+        loan.returnDate
+          ? [
+              {
+                id: loan.id,
+                title: loan.title,
+                copyCode: loan.accessionNumber,
+                reader: loan.readerName,
+                returnDate: new Date(
+                  `${loan.returnDate}T12:00:00`,
+                ).toLocaleDateString('pt-BR'),
+              },
+            ]
+          : [],
+      ),
+    [loans],
   );
 
+  const filteredReturns = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    if (!query) return returnedLoans;
+    return returnedLoans.filter(
+      (item) =>
+        item.title.toLocaleLowerCase().includes(query) ||
+        item.reader.toLocaleLowerCase().includes(query) ||
+        item.copyCode.toLocaleLowerCase().includes(query),
+    );
+  }, [returnedLoans, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredReturns.length / PAGE_SIZE));
+  const visibleReturns = filteredReturns.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    setPage(1);
+  }
+
+  function handleLookup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setInputError(null);
+    setSuccessMessage(null);
+
+    const copyCode = copyCodeInput.trim();
+    if (!copyCode) {
+      setInputError('Informe o tombo do exemplar.');
+      return;
+    }
+
+    const activeLoan = loans.find(
+      (loan) => loan.returnDate === null && loan.accessionNumber === copyCode,
+    );
+    if (!activeLoan) {
+      setInputError('Não há empréstimo ativo para esse tombo.');
+      return;
+    }
+
+    setSelectedLoan(toReturnDetails(activeLoan));
+    setIsFormOpen(true);
+  }
+
+  async function handleConfirmReturn() {
+    if (!selectedLoan) return;
+    await returnLoan(selectedLoan.loanId);
+    setCopyCodeInput('');
+    setIsFormOpen(false);
+    setSelectedLoan(null);
+    setSuccessMessage(
+      `Devolução do tombo ${selectedLoan.copyCode} registrada com sucesso.`,
+    );
+    setRetry((current) => current + 1);
+  }
+
+  function handleCloseForm() {
+    setIsFormOpen(false);
+    setSelectedLoan(null);
+  }
+
+  const columns: TableColumn<ReturnTableItem>[] = [
+    {
+      key: 'title',
+      header: 'Título',
+      align: 'left',
+      render: (item) => item.title,
+    },
+    {
+      key: 'copyCode',
+      header: 'Tombo',
+      render: (item) => <span className="font-mono">{item.copyCode}</span>,
+    },
+    {
+      key: 'reader',
+      header: 'Leitor',
+      align: 'left',
+      render: (item) => item.reader,
+    },
+    {
+      key: 'returnDate',
+      header: 'Data devolução',
+      align: 'right',
+      render: (item) => item.returnDate,
+    },
+  ];
+
   return (
-    <div className="flex min-h-screen flex-col bg-[#FFFDF5] text-[#3B2A1A]">
-      
+    <>
+      <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8">
+        <PageHeader
+          title="Devoluções"
+          subtitle="Registre e consulte as devoluções da biblioteca"
+        />
 
-      {successToast && (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg transition-all">
-          {successToast}
-        </div>
-      )}
+        {successMessage && (
+          <p className="type-small text-ok" role="status">
+            {successMessage}
+          </p>
+        )}
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
-        <header className="mb-6">
-          <h1 className="text-3xl font-bold">Devoluções</h1>
-          <p className="text-sm text-[#6B5A45]">Registre e consulte devoluções</p>
-        </header>
-
-        <form onSubmit={handleSearchSubmit} className="mb-6">
-          <label htmlFor={inputId} className="mb-2 block text-xs font-semibold">
+        <form onSubmit={handleLookup} className="flex flex-col gap-2">
+          <label htmlFor={inputId} className="type-label text-fg">
             Tombo do exemplar devolvido
           </label>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
             <div className="w-full sm:max-w-md">
               <input
                 id={inputId}
                 type="text"
                 value={copyCodeInput}
-                onChange={(e) => {
-                  setCopyCodeInput(e.target.value);
+                onChange={(event) => {
+                  setCopyCodeInput(event.target.value);
                   if (inputError) setInputError(null);
                 }}
-                placeholder="ex: 09123458"
+                placeholder="Ex.: 09123458"
                 aria-invalid={Boolean(inputError)}
                 aria-describedby={inputError ? `${inputId}-error` : undefined}
-                className={`w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-[#3B2A1A] placeholder:text-[#9A8B76] focus:outline-none ${
-                  inputError
-                    ? "border-red-400 focus:border-red-500"
-                    : "border-[#E7DCC4] focus:border-[#9A5B00]"
-                }`}
+                className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-fg placeholder:text-subtle focus:border-primary focus:outline-none"
               />
               {inputError && (
-                <p id={`${inputId}-error`} className="mt-1 text-xs text-red-700">
+                <p
+                  id={`${inputId}-error`}
+                  className="type-caption mt-1 text-danger"
+                  role="alert"
+                >
                   {inputError}
                 </p>
               )}
             </div>
-            <button
-              type="submit"
-              className="rounded-lg bg-[#9A5B00] px-4 py-2.5 text-sm font-medium text-[#FFFDF5] hover:bg-[#7F4A00]"
-            >
+            <Button type="submit" disabled={isLoading || Boolean(loadError)}>
               Registrar devolução
-            </button>
+            </Button>
           </div>
         </form>
 
-        <div className="mb-4">
-          <SearchFilterBar
-            placeholder="Pesquise por leitor, livro ou tombo..."
-            value={search}
-            onChange={setSearch}
-          />
-        </div>
+        <SearchFilterBar
+          placeholder="Pesquise por leitor, livro ou tombo..."
+          value={search}
+          onChange={handleSearchChange}
+        />
 
-        <section className="overflow-hidden rounded-lg border border-[#E7DCC4] bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="bg-[#F9F0DC] text-xs font-semibold">
-                <tr>
-                  <th className="px-4 py-3">Título</th>
-                  <th className="px-4 py-3">Tombo</th>
-                  <th className="px-4 py-3">Leitor</th>
-                  <th className="px-4 py-3 text-right">Data devolução</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredReturns.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-12 text-center text-sm text-[#6B5A45]">
-                      Nenhuma devolução registrada.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredReturns.map((item) => (
-                    <tr key={item.id} className="border-t border-[#E7DCC4]">
-                      <td className="px-4 py-4">{item.title}</td>
-                      <td className="px-4 py-4 font-mono">{item.copyCode}</td>
-                      <td className="px-4 py-4">{item.reader}</td>
-                      <td className="px-4 py-4 text-right">{item.returnDate}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+        {isLoading ? (
+          <div
+            className="flex min-h-48 items-center justify-center"
+            role="status"
+            aria-label="Carregando devoluções"
+          >
+            <Loader />
           </div>
-
-          <TableFooter
-            text={`Mostrando ${filteredReturns.length} de ${returnsList.length} devoluções`}
-            pages={[1]}
-            activePage={currentPage}
-            onPageChange={(page) => setCurrentPage(page)}
-            onPrevious={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            onNext={() => setCurrentPage((prev) => Math.min(prev + 1, 1))}
+        ) : loadError ? (
+          <EmptyState
+            title="Não foi possível carregar as devoluções."
+            description={loadError}
+            action={
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRetry((current) => current + 1)}
+              >
+                Tentar novamente
+              </Button>
+            }
           />
-        </section>
-      </main>
-
-      <Footer />
+        ) : (
+          <Table
+            columns={columns}
+            rows={visibleReturns}
+            getRowKey={(item) => item.id}
+            caption="Devoluções registradas"
+            emptyState={
+              <EmptyState
+                title="Nenhuma devolução encontrada."
+                description="Os registros de devolução aparecerão aqui."
+              />
+            }
+            footer={
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                summary={`Mostrando ${visibleReturns.length} de ${filteredReturns.length} ${
+                  filteredReturns.length === 1 ? 'devolução' : 'devoluções'
+                }`}
+              />
+            }
+            className="shadow-sm"
+            tableClassName="min-w-[640px]"
+          />
+        )}
+      </section>
 
       <Modal
-        open={isFormOpen}
+        isOpen={isFormOpen}
         onClose={handleCloseForm}
         title="Registrar devolução"
       >
-        {selectedLoanForModal && (
+        {selectedLoan && (
           <RegisterReturnForm
-            loan={selectedLoanForModal}
+            loan={selectedLoan}
             onCancel={handleCloseForm}
             onConfirm={handleConfirmReturn}
           />
         )}
       </Modal>
-    </div>
+    </>
   );
 }
