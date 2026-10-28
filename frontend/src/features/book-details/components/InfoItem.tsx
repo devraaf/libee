@@ -1,8 +1,15 @@
-export default function InfoItem({ label, value }: { label: string; value: string }) {
+export interface InfoItemProps {
+  label: string;
+  value: string;
+}
+
+export default function InfoItem({ label, value }: InfoItemProps) {
   return (
-    <div>
-      <strong className="block text-gray-500 text-xs uppercase">{label}</strong>
-      <span className="text-gray-800">{value}</span>
+    <div className="min-w-0">
+      <dt className="type-caption font-semibold uppercase text-muted">
+        {label}
+      </dt>
+      <dd className="type-small mt-1 wrap-break-word text-fg">{value}</dd>
     </div>
   );
 }

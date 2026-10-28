@@ -389,7 +389,9 @@ export async function listBooks({
 
 export async function getBook(bookId: number): Promise<BookListItem> {
   await simulateServiceDelay();
-  const book = mockBooks.find(({ id }) => id === bookId);
+  const book = mockBooks.find(
+    ({ id }) => id === bookId && !mockDeletedBookIds.has(id),
+  );
   if (!book) throw new MockServiceError('Livro não encontrado.', 'NOT_FOUND');
   return withAvailability(book);
 }
