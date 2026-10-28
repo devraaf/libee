@@ -12,6 +12,7 @@ import { listBooks } from '../services/books.service';
 import { listCategories } from '../services/catalog.service';
 import { BookCard } from '../components/BookCard';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
+import { UpcomingReturnsPanel } from '../components/UpcomingReturnsPanel';
 
 const PAGE_SIZE = 10;
 
@@ -162,15 +163,7 @@ export function CatalogPage() {
             </>
           )}
         </div>
-
-        <aside className="w-full shrink-0 rounded-xl bg-surface-warm p-4 lg:w-64">
-          <h2 className="type-small font-semibold text-fg">
-            Próximas devoluções
-          </h2>
-          <p className="type-caption mt-3 text-muted">
-            Este painel estará disponível em breve.
-          </p>
-        </aside>
+        <UpcomingReturnsPanel />
       </div>
     </section>
   );

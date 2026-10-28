@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getBook, listActiveCopies } from '../../../catalog/services/books.service';
+import {
+  getBook,
+  listActiveCopies,
+} from '../../../catalog/services/books.service';
 import {
   listLoans,
   renewLoan as renewLoanService,
@@ -40,7 +43,10 @@ export function useReaderLoans(readerId?: number) {
 
     async function load() {
       try {
-        const [loans, copies] = await Promise.all([listLoans(), listActiveCopies()]);
+        const [loans, copies] = await Promise.all([
+          listLoans(),
+          listActiveCopies(),
+        ]);
         const mine = loans.filter((loan) => loan.readerId === readerId);
         const copiesById = new Map(copies.map((copy) => [copy.id, copy]));
 
@@ -51,7 +57,9 @@ export function useReaderLoans(readerId?: number) {
               .filter((id): id is number => id !== undefined),
           ),
         ];
-        const results = await Promise.allSettled(bookIds.map((id) => getBook(id)));
+        const results = await Promise.allSettled(
+          bookIds.map((id) => getBook(id)),
+        );
         const booksById = new Map<number, BookInfo>();
         results.forEach((result, index) => {
           if (result.status === 'fulfilled') {
@@ -68,6 +76,7 @@ export function useReaderLoans(readerId?: number) {
             title: book?.title ?? 'Título não informado',
             author: book?.author ?? null,
             coverUrl: book?.coverUrl ?? null,
+            year: book?.year ?? null,
             tombo: copy?.accessionNumber ?? null,
             loanDate: loan.loanDate,
             dueDate: loan.dueDate,
@@ -81,8 +90,12 @@ export function useReaderLoans(readerId?: number) {
         setState({
           isLoading: false,
           error: null,
-          active: items.filter((item) => item.status !== 'returned').sort(sortActive),
-          history: items.filter((item) => item.status === 'returned').sort(sortHistory),
+          active: items
+            .filter((item) => item.status !== 'returned')
+            .sort(sortActive),
+          history: items
+            .filter((item) => item.status === 'returned')
+            .sort(sortHistory),
           loadedReaderId: readerId ?? null,
         });
       } catch (error) {

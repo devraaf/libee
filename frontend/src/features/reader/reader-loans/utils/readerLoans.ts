@@ -7,6 +7,7 @@ export interface BookInfo {
   title: string;
   author: string | null;
   coverUrl: string | null;
+  year: string | null;
 }
 
 export interface ReaderLoan {
@@ -15,6 +16,7 @@ export interface ReaderLoan {
   title: string;
   author: string | null;
   coverUrl: string | null;
+  year: string | null;
   tombo: string | null;
   loanDate: string;
   dueDate: string;
@@ -30,6 +32,7 @@ export function toBookInfo(book: BookListItem): BookInfo {
     title: book.title,
     author: book.authors.map(({ name }) => name).join(', ') || null,
     coverUrl: book.coverImageUrl,
+    year: book.publicationDate?.slice(0, 4) ?? null,
   };
 }
 

@@ -53,7 +53,10 @@ export default function ReaderLoansPage({ readerId }: ReaderLoansPageProps) {
     setToast(null);
     try {
       await renew(loan.id);
-      setToast({ type: 'success', message: 'Empréstimo renovado com sucesso.' });
+      setToast({
+        type: 'success',
+        message: 'Empréstimo renovado com sucesso.',
+      });
     } catch (error) {
       setToast({
         type: 'error',

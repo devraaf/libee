@@ -2,7 +2,7 @@ import type { HTMLAttributes } from 'react';
 import { cn } from './cn';
 
 export interface CardProps extends HTMLAttributes<HTMLElement> {
-  as?: 'div' | 'section' | 'article' | 'li';
+  as?: 'div' | 'section' | 'aside' | 'article' | 'li';
   tone?: 'default' | 'warm';
 }
 
