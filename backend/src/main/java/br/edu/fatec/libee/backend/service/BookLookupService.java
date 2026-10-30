@@ -49,8 +49,7 @@ public class BookLookupService {
             }
         }
         if (anyProviderFailed){
-            throw new ExternalServiceException("Os serviços de consulta de livros estão indisponíveis no momento. "
-                    + "Tente novamente ou continue com o cadastro manual.");
+            throw new ExternalServiceException("Os serviços de consulta de livros estão indisponíveis no momento. Tente novamente ou continue com o cadastro manual.");
         }
         throw new ResourceNotFoundException("Não encontramos dados para este ISBN. Você pode continuar com o cadastro manual.");
     }

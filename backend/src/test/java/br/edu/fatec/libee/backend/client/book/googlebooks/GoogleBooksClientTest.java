@@ -116,4 +116,23 @@ class GoogleBooksClientTest {
         clientWithKey("abc").findByIsbn(ISBN);
         server.verify();
     }
+
+    @Test
+    @DisplayName("Deve mapear sem erro quando a Google Books não informa os campos opcionais")
+    void shouldMapBookWhenOptionalFieldsAreMissing() throws IOException {
+        server.expect(requestTo(containsString("q=isbn:" + ISBN)))
+                .andRespond(withSuccess(fixture("minimal.json"), MediaType.APPLICATION_JSON));
+
+        Optional<BookMetadata> result = clientWithKey("").findByIsbn(ISBN);
+
+        assertTrue(result.isPresent());
+        BookMetadata book = result.get();
+        assertEquals("Título de exemplo", book.title());
+        assertEquals(List.of(), book.authors());
+        assertNull(book.publisher());
+        assertNull(book.publicationYear());
+        assertNull(book.place());
+        assertEquals(List.of(), book.categorySuggestions());
+        assertNull(book.coverUrl());
+    }
 }

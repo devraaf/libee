@@ -97,4 +97,21 @@ class OpenLibraryClientTest {
         assertThrows(ExternalServiceException.class, () -> client().findByIsbn(ISBN));
         server.verify();
     }
+
+    @Test
+    @DisplayName("Deve mapear sem erro quando a Open Library não informa os campos opcionais")
+    void shouldMapBookWhenOptionalFieldsAreMissing() throws IOException {
+        server.expect(requestTo(containsString("bibkeys=ISBN:" + ISBN)))
+                .andRespond(withSuccess(fixture("minimal.json"), MediaType.APPLICATION_JSON));
+
+        BookMetadata book = client().findByIsbn(ISBN).orElseThrow();
+
+        assertEquals("Fantastic Mr. Fox", book.title());
+        assertEquals(List.of(), book.authors());
+        assertNull(book.publisher());
+        assertNull(book.publicationYear());
+        assertNull(book.place());
+        assertEquals(List.of(), book.categorySuggestions());
+        assertNull(book.coverUrl());
+    }
 }
