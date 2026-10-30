@@ -10,6 +10,7 @@ import {
 import { useState, type ReactNode } from 'react';
 import { Logo } from '../../shared/components/branding/Logo.tsx';
 import { Footer } from '../layout/Footer.tsx';
+import { Header } from '../layout/Header.tsx';
 import { Navbar } from '../../shared/components/navigation/Navbar.tsx';
 import { Sidebar } from '../../shared/components/navigation/Sidebar.tsx';
 import { ThemeToggle } from '../../shared/components/navigation/ThemeToggle.tsx';
@@ -26,7 +27,7 @@ import { EmptyState } from '../../shared/components/ui/EmptyState.tsx';
 import { FilterButton } from '../../shared/components/ui/FilterButton.tsx';
 import { IconButton } from '../../shared/components/ui/IconButton.tsx';
 import { Input } from '../../shared/components/ui/Input.tsx';
-import { Modal } from '../../shared/components/ui/Modal.tsx';
+import Modal from '../../shared/components/ui/Modal.tsx';
 import { PageHeader } from '../../shared/components/ui/PageHeader.tsx';
 import { PasswordInput } from '../../shared/components/ui/PasswordInput.tsx';
 import { Pagination } from '../../shared/components/ui/Pagination.tsx';
@@ -104,6 +105,7 @@ const categories = [
   'Exibição de dados',
   'Feedback e overlays',
   'Navegação',
+  'Layout',
   'Animação',
   'Identidade',
 ];
@@ -316,8 +318,6 @@ export function GalleryPage() {
           </div>
         </Demo>
       </Section>
-
-      {/* FEEDBACK E OVERLAYS */}
       <Section id="Feedback e overlays" title="Feedback e overlays">
         <Demo label="EmptyState">
           <Card className="w-full">
@@ -336,7 +336,7 @@ export function GalleryPage() {
           </Button>
         </Demo>
         <Modal
-          open={modal.isOpen}
+          isOpen={modal.isOpen}
           onClose={modal.close}
           title="Título do modal"
           footer={
@@ -356,9 +356,9 @@ export function GalleryPage() {
 
       {/* NAVEGAÇÃO */}
       <Section id="Navegação" title="Navegação">
-        <Demo label="Navbar (com sair)">
+        <Demo label="Navbar">
           <div className="w-full overflow-hidden rounded-xl border border-line">
-            <Navbar links={links} showLogout />
+            <Navbar links={links} />
           </div>
         </Demo>
         <Demo label="Sidebar + Topbar (recolhível)">
@@ -375,6 +375,16 @@ export function GalleryPage() {
             </div>
           </div>
         </Demo>
+      </Section>
+
+      {/* LAYOUT */}
+      <Section id="Layout" title="Layout">
+        <Demo label="Header">
+          <div className="w-full overflow-hidden rounded-xl border border-line">
+            <Header profile="public"></Header>
+          </div>
+        </Demo>
+
         <Demo label="Footer">
           <div className="w-full overflow-hidden rounded-xl border border-line">
             <Footer />

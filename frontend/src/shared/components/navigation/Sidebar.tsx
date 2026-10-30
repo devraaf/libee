@@ -23,7 +23,7 @@ export function Sidebar({
   mobileOpen,
   onCloseMobile,
   homeTo = '/estudante',
-  logoutTo = '/login',
+  logoutTo = '/entrar',
 }: SidebarProps) {
   // No painel móvel a sidebar sempre aparece expandida.
   const compact = collapsed && !mobileOpen;
@@ -42,7 +42,7 @@ export function Sidebar({
         aria-label="Navegação lateral"
         className={cn(
           'fixed inset-y-0 left-0 z-50 flex flex-col border-r border-line bg-bg transition-[width,transform] md:sticky md:top-0 md:h-dvh md:translate-x-0',
-          compact ? 'w-[76px]' : 'w-64',
+          compact ? 'w-19' : 'w-64',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >

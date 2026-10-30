@@ -8,14 +8,15 @@ export interface FooterProps {
 export function Footer({ githubUrl = 'https://github.com' }: FooterProps) {
   return (
     <footer className="border-t border-line bg-bg">
-      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-6 px-4 py-8 sm:px-8">
-        <div className="flex flex-col gap-2">
-          <Logo heightClassName="h-10" />
-          <p className="type-caption text-muted">
+      <div className="mx-auto flex w-full flex-wrap items-center justify-center sm:justify-between gap-6 px-6 py-8 sm:px-10">
+        <div className="flex flex-col items-center sm:items-start gap-1">
+          <Logo heightClassName="h-20" />
+          <p className="type-caption text-muted text-center sm:text-left">
             Gerenciamento Inteligente de Bibliotecas
           </p>
         </div>
-        <div className="flex items-center gap-5">
+
+        <div className="flex flex-wrap items-center justify-center gap-5">
           <p className="type-small text-muted">
             Projeto acadêmico | Fatec Cotia
           </p>

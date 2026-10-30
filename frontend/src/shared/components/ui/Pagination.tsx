@@ -6,7 +6,7 @@ export interface PaginationProps {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
-  /** Texto à esquerda, ex.: "Mostrando 5 de 100 livros". */
+  /** Resumo dos itens exibidos, ex.: "Mostrando 10 de 100 livros". */
   summary?: ReactNode;
   className?: string;
 }
@@ -14,6 +14,7 @@ export interface PaginationProps {
 type PageItem = number | 'ellipsis';
 
 function buildPages(page: number, total: number): PageItem[] {
+  if (total <= 0) return [];
   if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
   const items: PageItem[] = [1];
   const start = Math.max(2, page - 1);
@@ -35,7 +36,8 @@ export function Pagination({
   summary,
   className,
 }: PaginationProps) {
-  const total = Math.max(totalPages, 1);
+  const total = Math.max(totalPages, 0);
+  const currentPage = Math.min(Math.max(page, 1), Math.max(total, 1));
 
   return (
     <div
@@ -53,8 +55,8 @@ export function Pagination({
             pageButton,
             'border-line bg-surface text-fg hover:bg-surface-hover',
           )}
-          disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}
+          disabled={currentPage <= 1 || total === 0}
+          onClick={() => onPageChange(currentPage - 1)}
         >
           <ChevronLeft size={14} />
         </button>
@@ -71,10 +73,10 @@ export function Pagination({
             <button
               key={item}
               type="button"
-              aria-current={item === page ? 'page' : undefined}
+              aria-current={item === currentPage ? 'page' : undefined}
               className={cn(
                 pageButton,
-                item === page
+                item === currentPage
                   ? 'border-primary bg-primary text-on-primary'
                   : 'border-line bg-surface text-fg hover:bg-surface-hover',
               )}
@@ -91,8 +93,8 @@ export function Pagination({
             pageButton,
             'border-line bg-surface text-fg hover:bg-surface-hover',
           )}
-          disabled={page >= total}
-          onClick={() => onPageChange(page + 1)}
+          disabled={currentPage >= total || total === 0}
+          onClick={() => onPageChange(currentPage + 1)}
         >
           <ChevronRight size={14} />
         </button>
