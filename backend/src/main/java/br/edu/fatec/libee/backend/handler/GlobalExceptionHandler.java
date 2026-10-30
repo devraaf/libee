@@ -1,7 +1,6 @@
 package br.edu.fatec.libee.backend.handler;
 
-import br.edu.fatec.libee.backend.exception.BusinessRuleException;
-import br.edu.fatec.libee.backend.exception.ResourceNotFoundException;
+import br.edu.fatec.libee.backend.exception.*;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.*;
@@ -29,6 +28,23 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(BusinessRuleException.class)
     public ProblemDetail handleBusinessRule(BusinessRuleException exception) {
         return buildProblem(HttpStatus.UNPROCESSABLE_CONTENT, "Regra de negócio violada", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidIsbnException.class)
+    public ProblemDetail handleInvalidIsbn(InvalidIsbnException exception){
+        return buildProblem(HttpStatus.BAD_REQUEST, "ISBN inválido", exception.getMessage());
+    }
+
+    @ExceptionHandler(BookAlreadyRegisteredException.class)
+    public ProblemDetail handleBookAlreadyRegister(BookAlreadyRegisteredException exception){
+        ProblemDetail problem = buildProblem(HttpStatus.CONFLICT, "Livro já cadastrado", exception.getMessage());
+        problem.setProperty("bookId", exception.getBookId());
+        return problem;
+    }
+
+    @ExceptionHandler(ExternalServiceException.class)
+    public ProblemDetail handleExternalService(ExternalServiceException exception){
+        return buildProblem(HttpStatus.SERVICE_UNAVAILABLE, "Serviço indisponível", exception.getMessage());
     }
 
     // Segurança

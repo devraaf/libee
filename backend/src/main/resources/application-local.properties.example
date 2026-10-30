@@ -2,3 +2,6 @@
 # O application-local.properties é ignorado pelo Git. Nunca envie credenciais para o repositório.
 spring.datasource.username=postgres
 spring.datasource.password=change_me
+
+# API Google books
+libee.integrations.google-books.api-key=sua_chave_aqui

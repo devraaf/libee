@@ -8,8 +8,12 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
+import java.util.Optional;
+
 public interface BookRepository extends JpaRepository<Book, Integer>, JpaSpecificationExecutor<Book> {
     @Override
     @EntityGraph(attributePaths = "category") // Carrega a categoria junto com a página
     Page<Book> findAll(Specification<Book> spec, Pageable pageable);
+
+    Optional<Book> findByIsbn(String isbn);
 }

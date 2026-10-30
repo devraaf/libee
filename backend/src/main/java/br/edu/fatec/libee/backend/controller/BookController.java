@@ -1,6 +1,7 @@
 package br.edu.fatec.libee.backend.controller;
 
 import br.edu.fatec.libee.backend.dto.response.*;
+import br.edu.fatec.libee.backend.service.BookLookupService;
 import br.edu.fatec.libee.backend.service.BookService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class BookController {
     private final BookService bookService;
+    private final BookLookupService lookupService;
 
     @GetMapping
     public PageResponse<BookListItemResponse> list(
@@ -41,5 +43,10 @@ public class BookController {
     @GetMapping("/management/summary")
     public ResponseEntity<BookManagementSummaryResponse> getManagementSummary() {
         return ResponseEntity.ok(bookService.getManagementSummary());
+    }
+    @GetMapping("/management/lookup")
+    public BookLookupResponse lookupByIsbn(
+            @RequestParam(required = false) String isbn){
+        return BookLookupResponse.from(lookupService.lookupByIsbn(isbn));
     }
 }
