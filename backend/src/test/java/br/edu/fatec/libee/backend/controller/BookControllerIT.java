@@ -433,7 +433,7 @@ public class BookControllerIT {
         b.setPublicationPlace("São Paulo");
         b.setEdition("2ª edição");
         b.setCoverImageUrl("https://example.com/covers/estruturas.jpg");
-        b.setPublicationDate(LocalDate.of(2021, 3, 15));
+        b.setPublicationYear(2021);
         b.setPageCount(480);
         b.setSummary("Introdução a listas, pilhas, filas, árvores e grafos, com exemplos em Java.");
         b.setCategory(category);

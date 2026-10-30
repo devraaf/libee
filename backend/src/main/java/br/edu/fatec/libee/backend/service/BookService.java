@@ -51,7 +51,7 @@ public class BookService {
                 b.getId(),
                 b.getTitle(),
                 b.getAuthors().stream().map(Author::getName).sorted().toList(),
-                b.getPublicationDate() != null ? b.getPublicationDate().getYear() : null,
+                b.getPublicationYear(),
                 b.getCategory().getName(),
                 b.getCoverImageUrl(),
                 available);
@@ -77,7 +77,7 @@ public class BookService {
                 b.getPublisher(),
                 b.getPublicationPlace(),
                 b.getEdition(),
-                b.getPublicationDate() != null ? b.getPublicationDate().getYear() : null,
+                b.getPublicationYear(),
                 b.getPageCount(),
                 b.getSummary(),
                 copyResponses,
