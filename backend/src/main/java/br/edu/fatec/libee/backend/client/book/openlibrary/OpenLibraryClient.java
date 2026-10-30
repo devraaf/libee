@@ -65,11 +65,11 @@ public class OpenLibraryClient implements BookMetadataProvider {
         return new BookMetadata(
                 info.title(),
                 names(info.authors()),
-                firstName(info.publishers()).toString(),
+                firstName(info.publishers()),
                 PublicationYearParser.parse(info.publishDate()).orElse(null),
                 info.numberOfPages(),
-                names(info.subjects().stream().limit(3).toList()),
-                firstName(info.publishPlaces()).toString(),
+                names(info.subjects()).stream().limit(3).toList(),
+                firstName(info.publishPlaces()),
                 null,
                 null,
                 coverUrl(info.cover())
@@ -83,7 +83,7 @@ public class OpenLibraryClient implements BookMetadataProvider {
         return cover.large() != null ? cover.large() : cover.medium();
     }
 
-    private Object firstName(List<OpenLibraryResponse.Named> list) {
+    private String firstName(List<OpenLibraryResponse.Named> list) {
         return (list == null || list.isEmpty()) ? null : list.getFirst().name();
     }
 

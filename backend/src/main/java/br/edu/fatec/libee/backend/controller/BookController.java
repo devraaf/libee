@@ -1,11 +1,7 @@
 package br.edu.fatec.libee.backend.controller;
 
-import br.edu.fatec.libee.backend.client.book.BookMetadata;
-import br.edu.fatec.libee.backend.dto.response.BookLookupResponse;
-import br.edu.fatec.libee.backend.dto.response.PageResponse;
-import br.edu.fatec.libee.backend.dto.response.BookListItemResponse;
-import br.edu.fatec.libee.backend.service.BookLookupService;
 import br.edu.fatec.libee.backend.dto.response.*;
+import br.edu.fatec.libee.backend.service.BookLookupService;
 import br.edu.fatec.libee.backend.service.BookService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
