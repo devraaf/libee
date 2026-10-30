@@ -5,9 +5,11 @@ import br.edu.fatec.libee.backend.dto.response.BookCopyCount;
 import br.edu.fatec.libee.backend.entity.Copy;
 import br.edu.fatec.libee.backend.enums.CopyStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -30,4 +32,8 @@ public interface CopyRepository extends JpaRepository<Copy, Integer> {
             "from Copy c where c.book.id in :bookIds group by c.book.id")
     List<BookCopyCount> countCopiesByBookIds(@Param("bookIds") Collection<Integer> bookIds,
                                              @Param("status") CopyStatus status);
+
+    @Modifying
+    @Query("update Copy c set c.deletedAt = :now where c.book.id = :bookId")
+    void softDeleteByBookId(Integer bookId, Instant now);
 }

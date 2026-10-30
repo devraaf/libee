@@ -1,6 +1,7 @@
 package br.edu.fatec.libee.backend.handler;
 
 import br.edu.fatec.libee.backend.exception.BusinessRuleException;
+import br.edu.fatec.libee.backend.exception.ConflictException;
 import br.edu.fatec.libee.backend.exception.ResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -29,6 +30,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(BusinessRuleException.class)
     public ProblemDetail handleBusinessRule(BusinessRuleException exception) {
         return buildProblem(HttpStatus.UNPROCESSABLE_CONTENT, "Regra de negócio violada", exception.getMessage());
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ProblemDetail handleConflict(ConflictException exception) {
+        return buildProblem(HttpStatus.CONFLICT, "Conflito", exception.getMessage());
     }
 
     // Segurança

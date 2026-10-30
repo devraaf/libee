@@ -5,9 +5,13 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.SQLRestriction;
+
+import java.time.Instant;
 
 @Entity
 @Table(name = "book_copies")
+@SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -29,4 +33,7 @@ public class Copy {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private CopyStatus status;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 }

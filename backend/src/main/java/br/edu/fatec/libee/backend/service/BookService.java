@@ -5,9 +5,11 @@ import br.edu.fatec.libee.backend.entity.Author;
 import br.edu.fatec.libee.backend.entity.Book;
 import br.edu.fatec.libee.backend.entity.Copy;
 import br.edu.fatec.libee.backend.enums.CopyStatus;
+import br.edu.fatec.libee.backend.exception.ConflictException;
 import br.edu.fatec.libee.backend.exception.ResourceNotFoundException;
 import br.edu.fatec.libee.backend.repository.BookRepository;
 import br.edu.fatec.libee.backend.repository.CopyRepository;
+import br.edu.fatec.libee.backend.repository.LoanRepository;
 import br.edu.fatec.libee.backend.specification.BookSpecification;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -17,6 +19,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,6 +32,7 @@ import java.util.stream.Collectors;
 public class BookService {
     private final BookRepository bookRepository;
     private final CopyRepository copyRepository;
+    private final LoanRepository loanRepository;
 
     private Page<Book> searchBooks(String q, Integer categoryId, int page, int size){
         Pageable pageable = PageRequest.of(page, size, Sort.by("title").and(Sort.by("id")));
@@ -120,5 +124,30 @@ public class BookService {
         return new BookManagementSummaryResponse(
                 bookRepository.count(), totalCopies, available, onLoan
         );
+    }
+
+    @Transactional
+    public void deleteBook(Integer bookId) {
+        Book book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new ResourceNotFoundException("Livro não encontrado"));
+
+        if (loanRepository.existsByCopyBookIdAndReturnDateIsNull(bookId)) {
+            throw new ConflictException(
+                    "Não é possível excluir o livro: há exemplares em empréstimo. Aguarde as devoluções.");
+        }
+        Instant now = Instant.now();
+        copyRepository.softDeleteByBookId(bookId, now);
+        book.setDeletedAt(now);
+    }
+
+    public void deleteCopy(Integer copyId) {
+        Copy copy = copyRepository.findById(copyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Exemplar não encontrado"));
+
+        if (loanRepository.existsByCopyIdAndReturnDateIsNull(copyId)) {
+            throw new ConflictException(
+                    "Não é possível excluir o exemplar: ele está em empréstimo. Aguarde a devolução.");
+        }
+        copy.setDeletedAt(Instant.now());
     }
 }

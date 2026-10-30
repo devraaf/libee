@@ -42,4 +42,16 @@ public class BookController {
     public ResponseEntity<BookManagementSummaryResponse> getManagementSummary() {
         return ResponseEntity.ok(bookService.getManagementSummary());
     }
+
+    @DeleteMapping("/books/{id}")
+    public ResponseEntity<Void> deleteBook(@PathVariable Integer id) {
+        bookService.deleteBook(id);
+        return ResponseEntity.noContent().build();   // 204
+    }
+
+    @DeleteMapping("/copies/{id}")
+    public ResponseEntity<Void> deleteCopy(@PathVariable Integer id) {
+        bookService.deleteCopy(id);
+        return ResponseEntity.noContent().build();
+    }
 }
