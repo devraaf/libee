@@ -3,16 +3,22 @@ package br.edu.fatec.libee.backend.handler;
 import br.edu.fatec.libee.backend.exception.*;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.*;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 
+import java.sql.SQLException;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -45,6 +51,36 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ExternalServiceException.class)
     public ProblemDetail handleExternalService(ExternalServiceException exception){
         return buildProblem(HttpStatus.SERVICE_UNAVAILABLE, "Serviço indisponível", exception.getMessage());
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException exception, HttpHeaders headers, HttpStatusCode status, WebRequest request){
+        List<ValidationError> errors = exception.getBindingResult().getFieldErrors().stream()
+                .map(error -> new ValidationError(error.getField(), error.getDefaultMessage()))
+                .sorted(Comparator.comparing(ValidationError::field)
+                        .thenComparing(ValidationError::message, Comparator.nullsFirst(Comparator.naturalOrder())))
+                .toList();
+
+        ProblemDetail problem = buildProblem(HttpStatus.BAD_REQUEST, "Dados inválidos",
+                "Um ou mais campos são inválidos.");
+        problem.setProperty("errors", errors);
+
+        return ResponseEntity.badRequest().body(problem);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException exception, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        ProblemDetail problem = buildProblem(HttpStatus.BAD_REQUEST, "Dados inválidos",
+                "O corpo da requisição está ausente ou mal formatado.");
+        return ResponseEntity.badRequest().body(problem);
+    }
+
+    @ExceptionHandler(AccessionNumberAlreadyRegisteredException.class)
+    public ProblemDetail handleAccessionNumberAlreadyRegistered(AccessionNumberAlreadyRegisteredException exception) {
+        ProblemDetail problem = buildProblem(HttpStatus.CONFLICT, "Tombo já cadastrado", exception.getMessage());
+        problem.setProperty("accessionNumbers", exception.getAccessionNumbers());
+        return problem;
     }
 
     // Segurança
@@ -87,6 +123,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             problem.setProperty("timestamp", Instant.now());
         }
         return response;
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException exception) {
+        if (exception.getMostSpecificCause() instanceof SQLException sql
+                && "23505".equals(sql.getSQLState())) {
+            log.warn("Violação de unicidade: {}", sql.getMessage());
+            return buildProblem(HttpStatus.CONFLICT, "Conflito de dados",
+                    "Algum dado enviado já está cadastrado. Revise e tente novamente.");
+        }
+        return handleUnexpected(exception);
     }
 
     private ProblemDetail buildProblem(HttpStatus status, String title, String detail) {

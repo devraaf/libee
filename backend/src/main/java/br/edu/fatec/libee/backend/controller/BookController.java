@@ -1,13 +1,17 @@
 package br.edu.fatec.libee.backend.controller;
 
+import br.edu.fatec.libee.backend.dto.request.RegisterBookRequest;
 import br.edu.fatec.libee.backend.dto.response.*;
 import br.edu.fatec.libee.backend.service.BookLookupService;
 import br.edu.fatec.libee.backend.service.BookService;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URI;
 
 @RestController
 @RequestMapping("/books")
@@ -48,5 +52,13 @@ public class BookController {
     public BookLookupResponse lookupByIsbn(
             @RequestParam(required = false) String isbn){
         return BookLookupResponse.from(lookupService.lookupByIsbn(isbn));
+    }
+
+    @PostMapping
+    public ResponseEntity<BookDetailsResponse> register(@Valid @RequestBody RegisterBookRequest request) {
+        Integer id = bookService.register(request);
+        BookDetailsResponse body = bookService.getBookById(id);
+        URI location = URI.create("/books/" + id);
+        return ResponseEntity.created(location).body(body);
     }
 }
