@@ -12,24 +12,26 @@ import org.springframework.data.repository.query.Param;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public interface CopyRepository extends JpaRepository<Copy, Integer> {
     // Ids (dentre os informados) que possuem ao menos um exemplar com o status dado
-    @Query("select distinct c.book.id from Copy c where c.book.id in :bookIds and c.status = :status")
+    @Query("select distinct c.book.id from Copy c " +
+            "where c.book.id in :bookIds and c.status = :status and c.deletedAt is null")
     Set<Integer> findBookIdsWithStatus(@Param("bookIds") Collection<Integer> bookIds,
                                        @Param("status") CopyStatus status);
 
-    List<Copy> findByBookIdOrderByAccessionNumberAsc(Integer bookId );
+    List<Copy> findByBookIdAndDeletedAtIsNullOrderByAccessionNumberAsc(Integer bookId );
 
     @Query("select new br.edu.fatec.libee.backend.dto.response.StatusCount(c.status, count(c)) " +
-            "from Copy c group by c.status")
+            "from Copy c where c.deletedAt is null group by c.status")
     List<StatusCount> countByStatus();
 
     @Query("select new br.edu.fatec.libee.backend.dto.response.BookCopyCount(" +
             "c.book.id, count(c), " +
             "sum(case when c.status = :status then 1L else 0L end)) " +
-            "from Copy c where c.book.id in :bookIds group by c.book.id")
+            "from Copy c where c.book.id in :bookIds and c.deletedAt is null group by c.book.id")
     List<BookCopyCount> countCopiesByBookIds(@Param("bookIds") Collection<Integer> bookIds,
                                              @Param("status") CopyStatus status);
 
@@ -37,7 +39,20 @@ public interface CopyRepository extends JpaRepository<Copy, Integer> {
     @Query("select c.accessionNumber from Copy c where c.accessionNumber in :accessionNumbers")
     List<String> findExistingAccessionNumbers(@Param("accessionNumbers") Collection<String> accessionNumbers);
 
-    @Modifying
-    @Query("update Copy c set c.deletedAt = :now where c.book.id = :bookId")
-    void softDeleteByBookId(Integer bookId, Instant now);
+    // Exemplar ativo, que pertence ao livro da rota
+    Optional<Copy> findByIdAndBookIdAndDeletedAtIsNull(Integer id, Integer bookId);
+
+    long countByBookIdAndDeletedAtIsNull(Integer bookId);
+
+    // Tombos dos exemplares ativos do livro com o status dado (usado para achar os emprestados)
+    @Query("select c.accessionNumber from Copy c " +
+            "where c.book.id = :bookId and c.status = :status and c.deletedAt is null " +
+            "order by c.accessionNumber")
+    List<String> findAccessionNumbersByBookIdAndStatus(@Param("bookId") Integer bookId,
+                                                       @Param("status") CopyStatus status);
+
+    // Exclui de uma vez todos os exemplares ativos do livro
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Copy c set c.deletedAt = :deletedAt where c.book.id = :bookId and c.deletedAt is null")
+    int softDeleteByBookId(@Param("bookId") Integer bookId, @Param("deletedAt") Instant deletedAt);
 }

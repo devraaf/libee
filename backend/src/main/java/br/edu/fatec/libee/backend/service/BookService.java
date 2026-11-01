@@ -7,11 +7,7 @@ import br.edu.fatec.libee.backend.entity.Book;
 import br.edu.fatec.libee.backend.entity.Category;
 import br.edu.fatec.libee.backend.entity.Copy;
 import br.edu.fatec.libee.backend.enums.CopyStatus;
-import br.edu.fatec.libee.backend.exception.AccessionNumberAlreadyRegisteredException;
-import br.edu.fatec.libee.backend.exception.BookAlreadyRegisteredException;
-import br.edu.fatec.libee.backend.exception.BusinessRuleException;
-import br.edu.fatec.libee.backend.exception.ConflictException;
-import br.edu.fatec.libee.backend.exception.ResourceNotFoundException;
+import br.edu.fatec.libee.backend.exception.*;
 import br.edu.fatec.libee.backend.repository.AuthorRepository;
 import br.edu.fatec.libee.backend.repository.BookRepository;
 import br.edu.fatec.libee.backend.repository.CategoryRepository;
@@ -75,9 +71,10 @@ public class BookService {
 
     @Transactional(readOnly = true)
     public BookDetailsResponse getBookById(Integer id) {
-        Book b = bookRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Livro não encontrado com o ID informado."));
-        List<Copy> copies = copyRepository.findByBookIdOrderByAccessionNumberAsc(id);
+        Book b = bookRepository.findByIdAndDeletedAtIsNull(id).orElseThrow(() -> new ResourceNotFoundException("Livro não encontrado com o ID informado."));
+        List<Copy> copies = copyRepository.findByBookIdAndDeletedAtIsNullOrderByAccessionNumberAsc(id);
         List<CopyResponse> copyResponses = copies.stream().map(c-> new CopyResponse(
+                c.getId(),
                 c.getAccessionNumber(),
                 c.getPhysicalLocation(),
                 c.getStatus()
@@ -134,7 +131,7 @@ public class BookService {
         long totalCopies = byStatus.values().stream().mapToLong(Long::longValue).sum();
 
         return new BookManagementSummaryResponse(
-                bookRepository.count(), totalCopies, available, onLoan
+                bookRepository.countByDeletedAtIsNull(), totalCopies, available, onLoan
         );
     }
 
@@ -187,7 +184,7 @@ public class BookService {
     }
 
     private void checkIsbnIsAvailable(String isbn) {
-        bookRepository.findByIsbn(isbn).ifPresent(existing -> {
+        bookRepository.findByIsbnAndDeletedAtIsNull(isbn).ifPresent(existing -> {
             throw new BookAlreadyRegisteredException(existing.getId());
         });
     }
@@ -250,26 +247,34 @@ public class BookService {
 
     @Transactional
     public void deleteBook(Integer bookId) {
-        Book book = bookRepository.findById(bookId)
-                .orElseThrow(() -> new ResourceNotFoundException("Livro não encontrado"));
+        Book book = bookRepository.findByIdAndDeletedAtIsNull(bookId)
+                .orElseThrow(() -> new ResourceNotFoundException("Livro não encontrado."));
 
-        if (loanRepository.existsByCopyBookIdAndReturnDateIsNull(bookId)) {
-            throw new ConflictException(
-                    "Não é possível excluir o livro: há exemplares em empréstimo. Aguarde as devoluções.");
+        List<String> onLoan = copyRepository.findAccessionNumbersByBookIdAndStatus(bookId, CopyStatus.ON_LOAN);
+        if (!onLoan.isEmpty()) {
+            throw DeletionBlockedException.forBook(onLoan);
         }
+
         Instant now = Instant.now();
-        copyRepository.softDeleteByBookId(bookId, now);
         book.setDeletedAt(now);
+        copyRepository.softDeleteByBookId(bookId, now);
     }
 
-    public void deleteCopy(Integer copyId) {
-        Copy copy = copyRepository.findById(copyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Exemplar não encontrado"));
+    @Transactional
+    public void deleteCopy(Integer bookId, Integer copyId) {
+        Copy copy = copyRepository.findByIdAndBookIdAndDeletedAtIsNull(copyId, bookId)
+                .orElseThrow(() -> new ResourceNotFoundException("Exemplar não encontrado."));
 
-        if (loanRepository.existsByCopyIdAndReturnDateIsNull(copyId)) {
-            throw new ConflictException(
-                    "Não é possível excluir o exemplar: ele está em empréstimo. Aguarde a devolução.");
+        if (copy.getStatus() == CopyStatus.ON_LOAN) {
+            throw DeletionBlockedException.forCopy(copy.getAccessionNumber());
         }
-        copy.setDeletedAt(Instant.now());
+
+        Instant now = Instant.now();
+        boolean isLastActiveCopy = copyRepository.countByBookIdAndDeletedAtIsNull(bookId) == 1;
+
+        copy.setDeletedAt(now);
+        if (isLastActiveCopy) {
+            copy.getBook().setDeletedAt(now);
+        }
     }
 }

@@ -27,7 +27,7 @@ public class BookLookupService {
     public BookMetadata lookupByIsbn(String rawIsbn){
         String isbn = IsbnNormalizer.normalize(rawIsbn);
 
-        bookRepository.findByIsbn(isbn).ifPresent(book -> {
+        bookRepository.findByIsbnAndDeletedAtIsNull(isbn).ifPresent(book -> {
             throw new BookAlreadyRegisteredException(book.getId());
         });
 

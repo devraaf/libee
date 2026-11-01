@@ -15,5 +15,9 @@ public interface BookRepository extends JpaRepository<Book, Integer>, JpaSpecifi
     @EntityGraph(attributePaths = "category") // Carrega a categoria junto com a página
     Page<Book> findAll(Specification<Book> spec, Pageable pageable);
 
-    Optional<Book> findByIsbn(String isbn);
+    Optional<Book> findByIsbnAndDeletedAtIsNull(String isbn);
+
+    Optional<Book> findByIdAndDeletedAtIsNull(Integer id);
+
+    long countByDeletedAtIsNull();
 }
