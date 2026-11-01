@@ -33,6 +33,10 @@ public interface CopyRepository extends JpaRepository<Copy, Integer> {
     List<BookCopyCount> countCopiesByBookIds(@Param("bookIds") Collection<Integer> bookIds,
                                              @Param("status") CopyStatus status);
 
+    // Tombos (dentre os informados) que já existem no banco
+    @Query("select c.accessionNumber from Copy c where c.accessionNumber in :accessionNumbers")
+    List<String> findExistingAccessionNumbers(@Param("accessionNumbers") Collection<String> accessionNumbers);
+
     @Modifying
     @Query("update Copy c set c.deletedAt = :now where c.book.id = :bookId")
     void softDeleteByBookId(Integer bookId, Instant now);

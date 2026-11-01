@@ -1,0 +1,18 @@
+{
+  "kind": "books#volumes",
+  "totalItems": 1,
+  "items": [
+    {
+      "volumeInfo": {
+        "title": "Título de exemplo",
+        "authors": ["Autor Um", "Autor Dois"],
+        "publisher": "Editora Exemplo",
+        "publishedDate": "2008-05",
+        "description": "Resumo de exemplo.",
+        "pageCount": 320,
+        "categories": ["Fiction"],
+        "imageLinks": { "thumbnail": "http://books.google.com/capa.jpg" }
+      }
+    }
+  ]
+}

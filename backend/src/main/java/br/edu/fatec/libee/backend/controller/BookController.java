@@ -1,18 +1,24 @@
 package br.edu.fatec.libee.backend.controller;
 
+import br.edu.fatec.libee.backend.dto.request.RegisterBookRequest;
 import br.edu.fatec.libee.backend.dto.response.*;
+import br.edu.fatec.libee.backend.service.BookLookupService;
 import br.edu.fatec.libee.backend.service.BookService;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
+
 @RestController
 @RequestMapping("/books")
 @RequiredArgsConstructor
 public class BookController {
     private final BookService bookService;
+    private final BookLookupService lookupService;
 
     @GetMapping
     public PageResponse<BookListItemResponse> list(
@@ -41,6 +47,19 @@ public class BookController {
     @GetMapping("/management/summary")
     public ResponseEntity<BookManagementSummaryResponse> getManagementSummary() {
         return ResponseEntity.ok(bookService.getManagementSummary());
+    }
+    @GetMapping("/management/lookup")
+    public BookLookupResponse lookupByIsbn(
+            @RequestParam(required = false) String isbn){
+        return BookLookupResponse.from(lookupService.lookupByIsbn(isbn));
+    }
+
+    @PostMapping
+    public ResponseEntity<BookDetailsResponse> register(@Valid @RequestBody RegisterBookRequest request) {
+        Integer id = bookService.register(request);
+        BookDetailsResponse body = bookService.getBookById(id);
+        URI location = URI.create("/books/" + id);
+        return ResponseEntity.created(location).body(body);
     }
 
     @DeleteMapping("/books/{id}")
