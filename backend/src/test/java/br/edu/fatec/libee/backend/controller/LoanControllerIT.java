@@ -293,6 +293,137 @@ public class LoanControllerIT {
                 .andExpect(status().isUnauthorized());
     }
 
+    // TESTES DE GET /loans/upcoming-returns - Próximas devoluções do leitor
+    @Test
+    @DisplayName("Retorna id, título, autores, ano, capa e data prevista de cada item, sem status")
+    void returnsUpcomingReturnFields_whenReaderHasActiveLoan() throws Exception {
+        cleanCode.setCoverImageUrl("https://example.com/covers/clean-code.jpg");
+        cleanCode.setPublicationYear(2008);
+        bookRepository.save(cleanCode);
+        saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
+
+        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").exists())
+                .andExpect(jsonPath("$[0].title").value("Clean Code"))
+                .andExpect(jsonPath("$[0].authors[0]").value("Robert C. Martin"))
+                .andExpect(jsonPath("$[0].publicationYear").value(2008))
+                .andExpect(jsonPath("$[0].coverImageUrl").value("https://example.com/covers/clean-code.jpg"))
+                .andExpect(jsonPath("$[0].dueDate").value("2026-10-20"))
+                .andExpect(jsonPath("$[0].status").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Mostra o empréstimo atrasado primeiro, por ter a data prevista mais antiga")
+    void returnsOverdueLoanFirst() throws Exception {
+        saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(2), TODAY.plusDays(2), null, 0);
+        saveLoan(saveCopy(cleanCode, "T-002"), reader, TODAY.minusDays(10), TODAY.minusDays(3), null, 0);  // atrasado
+        saveLoan(saveCopy(cleanCode, "T-003"), reader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
+
+        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].dueDate").value("2026-10-12"))   // vencida antes de hoje (15/10)
+                .andExpect(jsonPath("$[1].dueDate").value("2026-10-17"))
+                .andExpect(jsonPath("$[2].dueDate").value("2026-10-20"));
+    }
+
+    @Test
+    @DisplayName("Retorna os autores do livro em ordem alfabética")
+    void returnsAuthorsInAlphabeticalOrder() throws Exception {
+        cleanCode.getAuthors().add(evans);   // martin já é autor; evans entra depois
+        bookRepository.save(cleanCode);
+        saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
+
+        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+                .andExpect(jsonPath("$[0].authors.length()").value(2))
+                .andExpect(jsonPath("$[0].authors[0]").value("Eric Evans"))
+                .andExpect(jsonPath("$[0].authors[1]").value("Robert C. Martin"));
+    }
+
+    @Test
+    @DisplayName("Ordena pela data prevista, do mais próximo para o mais distante")
+    void ordersUpcomingReturnsByDueDate() throws Exception {
+        saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
+        saveLoan(saveCopy(cleanCode, "T-002"), reader, TODAY.minusDays(2), TODAY.plusDays(1), null, 0);
+        saveLoan(saveCopy(cleanCode, "T-003"), reader, TODAY.minusDays(2), TODAY.plusDays(3), null, 0);
+
+        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+                .andExpect(jsonPath("$[0].dueDate").value("2026-10-16"))
+                .andExpect(jsonPath("$[1].dueDate").value("2026-10-18"))
+                .andExpect(jsonPath("$[2].dueDate").value("2026-10-20"));
+    }
+
+    @Test
+    @DisplayName("Retorna 3 itens por padrão quando limit não é informado")
+    void returnsThreeItemsByDefault_whenLimitIsNotProvided() throws Exception {
+        for (int i = 1; i <= 4; i++) {
+            saveLoan(saveCopy(cleanCode, "T-00" + i), reader, TODAY.minusDays(2), TODAY.plusDays(i), null, 0);
+        }
+
+        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+                .andExpect(jsonPath("$.length()").value(3));
+    }
+
+    @Test
+    @DisplayName("Respeita o limit informado e mantém os mais próximos")
+    void respectsLimit_whenLimitIsProvided() throws Exception {
+        for (int i = 1; i <= 4; i++) {
+            saveLoan(saveCopy(cleanCode, "T-00" + i), reader, TODAY.minusDays(2), TODAY.plusDays(i), null, 0);
+        }
+
+        mockMvc.perform(get("/loans/upcoming-returns")
+                        .param("readerId", String.valueOf(reader)).param("limit", "2"))
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].dueDate").value("2026-10-16"))
+                .andExpect(jsonPath("$[1].dueDate").value("2026-10-17"));
+    }
+
+    @Test
+    @DisplayName("Não retorna empréstimo já devolvido")
+    void doesNotReturnReturnedLoan() throws Exception {
+        saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(20), TODAY.minusDays(13),
+                TODAY.minusDays(14), 0);                                                            // devolvido
+        saveLoan(saveCopy(cleanCode, "T-002"), reader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
+
+        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].dueDate").value("2026-10-20"));
+    }
+
+    @Test
+    @DisplayName("Retorna 200 com lista vazia quando o leitor não tem empréstimos ativos")
+    void returnsEmptyList_whenReaderHasNoActiveLoans() throws Exception {
+        saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(20), TODAY.minusDays(13),
+                TODAY.minusDays(14), 0);                                                            // só devolvido
+
+        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("Não retorna empréstimos de outro leitor")
+    void doesNotReturnUpcomingReturnsOfAnotherReader() throws Exception {
+        saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
+        saveLoan(saveCopy(domainDrivenDesign, "T-002"), otherReader, TODAY.minusDays(2), TODAY.plusDays(1), null, 0);
+
+        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].title").value("Clean Code"));
+    }
+
+    @Test
+    @DisplayName("Retorna 400 quando limit é zero ou excede o máximo")
+    void returnsBadRequest_whenLimitIsOutOfRange() throws Exception {
+        mockMvc.perform(get("/loans/upcoming-returns")
+                        .param("readerId", String.valueOf(reader)).param("limit", "0"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/loans/upcoming-returns")
+                        .param("readerId", String.valueOf(reader)).param("limit", "21"))
+                .andExpect(status().isBadRequest());
+    }
+
     // métodos auxiliares para montar os dados
 
     // Cenário com os três status: 2 em dia (um vence hoje), 1 atrasado, 1 devolvido

@@ -2,6 +2,7 @@ package br.edu.fatec.libee.backend.service;
 
 import br.edu.fatec.libee.backend.dto.response.PageResponse;
 import br.edu.fatec.libee.backend.dto.response.ReaderLoanResponse;
+import br.edu.fatec.libee.backend.dto.response.UpcomingReturnResponse;
 import br.edu.fatec.libee.backend.entity.Author;
 import br.edu.fatec.libee.backend.entity.Book;
 import br.edu.fatec.libee.backend.entity.Loan;
@@ -60,5 +61,25 @@ public class LoanService {
                 loan.getReturnDate(),
                 loan.getRenewalCount(),
                 loan.getStatus(today));
+    }
+
+    @Transactional(readOnly = true)
+    public List<UpcomingReturnResponse> listUpcomingReturns(Integer readerId, int limit){
+        LocalDate today = LocalDate.now(clock);
+        Pageable pageable = PageRequest.of(0, limit,
+                Sort.by(Sort.Order.asc("dueDate"), Sort.Order.asc("id")));
+
+        Specification<Loan> spec = Specification.allOf(
+                LoanSpecification.forReader(readerId),
+                LoanSpecification.hasStatusIn(List.of(LoanStatus.ON_TIME, LoanStatus.OVERDUE), today));
+
+        return loanRepository.findAll(spec, pageable).getContent().stream()
+                .map(loan -> new UpcomingReturnResponse(
+                        loan.getId(),
+                        loan.getCopy().getBook().getTitle(),
+                        loan.getCopy().getBook().getAuthors().stream().map(Author::getName).sorted().toList(),
+                        loan.getCopy().getBook().getPublicationYear(),
+                        loan.getCopy().getBook().getCoverImageUrl(),
+                        loan.getDueDate())).toList();
     }
 }
