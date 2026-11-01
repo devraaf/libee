@@ -5,17 +5,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.BatchSize;
-import org.hibernate.annotations.SQLRestriction;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 
 @Entity
 @Table(name = "books")
-@SQLRestriction("deleted_at IS NULL")
 @Getter
 @Setter
 @NoArgsConstructor
