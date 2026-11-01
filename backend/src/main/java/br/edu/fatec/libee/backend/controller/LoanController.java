@@ -1,5 +1,6 @@
 package br.edu.fatec.libee.backend.controller;
 
+import br.edu.fatec.libee.backend.dto.response.LoanSummaryResponse;
 import br.edu.fatec.libee.backend.dto.response.PageResponse;
 import br.edu.fatec.libee.backend.dto.response.ReaderLoanResponse;
 import br.edu.fatec.libee.backend.dto.response.UpcomingReturnResponse;
@@ -8,6 +9,7 @@ import br.edu.fatec.libee.backend.service.LoanService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -38,5 +40,11 @@ public class LoanController {
             @RequestParam Integer readerId,
             @RequestParam(defaultValue = "3") @Min(1) @Max(5) int limit){
         return loanService.listUpcomingReturns(readerId, limit);
+    }
+
+    // TODO: restringir a bibliotecário/administrador quando a autenticação existir
+    @GetMapping("/management/summary")
+    public ResponseEntity<LoanSummaryResponse> getSummary(){
+        return ResponseEntity.ok(loanService.getSummary());
     }
 }

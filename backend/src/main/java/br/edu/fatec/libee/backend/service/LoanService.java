@@ -1,5 +1,6 @@
 package br.edu.fatec.libee.backend.service;
 
+import br.edu.fatec.libee.backend.dto.response.LoanSummaryResponse;
 import br.edu.fatec.libee.backend.dto.response.PageResponse;
 import br.edu.fatec.libee.backend.dto.response.ReaderLoanResponse;
 import br.edu.fatec.libee.backend.dto.response.UpcomingReturnResponse;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -81,5 +83,15 @@ public class LoanService {
                         loan.getCopy().getBook().getPublicationYear(),
                         loan.getCopy().getBook().getCoverImageUrl(),
                         loan.getDueDate())).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public LoanSummaryResponse getSummary() {
+        LocalDate today = LocalDate.now(clock);
+        long onTime = loanRepository.count(
+                LoanSpecification.hasStatusIn(List.of(LoanStatus.ON_TIME), today));
+        long overdue = loanRepository.count(
+                LoanSpecification.hasStatusIn(List.of(LoanStatus.OVERDUE), today));
+        return new LoanSummaryResponse(onTime + overdue, onTime, overdue);
     }
 }
