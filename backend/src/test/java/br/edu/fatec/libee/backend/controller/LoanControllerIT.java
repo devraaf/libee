@@ -424,6 +424,56 @@ public class LoanControllerIT {
                 .andExpect(status().isBadRequest());
     }
 
+    // TESTES DE GET /loans/management/summary - Contadores dos cards (bibliotecário)
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna os contadores de ativos, em dia e atrasados, sem contar os devolvidos")
+    void returnsLoanCounters_whenThereAreLoansInEachStatus() throws Exception {
+        saveStatusScenario();   // 2 em dia (um vence hoje), 1 atrasado, 1 devolvido
+        saveLoan(saveCopy(domainDrivenDesign, "T-005"), otherReader,
+                TODAY.minusDays(9), TODAY.minusDays(2), null, 0);   // atrasado de outro leitor
+
+        mockMvc.perform(get("/loans/management/summary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.activeLoans").value(4))
+                .andExpect(jsonPath("$.onTimeLoans").value(2))
+                .andExpect(jsonPath("$.overdueLoans").value(2));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Não conta empréstimos devolvidos em nenhum contador")
+    void doesNotCountReturnedLoans() throws Exception {
+        saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(20), TODAY.minusDays(13),
+                TODAY.minusDays(14), 0);   // devolvido no prazo
+        saveLoan(saveCopy(cleanCode, "T-002"), reader, TODAY.minusDays(30), TODAY.minusDays(23),
+                TODAY.minusDays(5), 0);    // devolvido com atraso
+
+        mockMvc.perform(get("/loans/management/summary"))
+                .andExpect(jsonPath("$.activeLoans").value(0))
+                .andExpect(jsonPath("$.onTimeLoans").value(0))
+                .andExpect(jsonPath("$.overdueLoans").value(0));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna todos os contadores zerados quando não há empréstimos")
+    void returnsZeros_whenThereAreNoLoans() throws Exception {
+        mockMvc.perform(get("/loans/management/summary"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.activeLoans").value(0))
+                .andExpect(jsonPath("$.onTimeLoans").value(0))
+                .andExpect(jsonPath("$.overdueLoans").value(0));
+    }
+
+    @Test
+    @WithAnonymousUser
+    @DisplayName("Retorna 401 quando o usuário não está autenticado")
+    void returnsUnauthorized_whenUserIsNotAuthenticatedOnSummary() throws Exception {
+        mockMvc.perform(get("/loans/management/summary"))
+                .andExpect(status().isUnauthorized());
+    }
+
     // métodos auxiliares para montar os dados
 
     // Cenário com os três status: 2 em dia (um vence hoje), 1 atrasado, 1 devolvido
