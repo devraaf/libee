@@ -3,6 +3,7 @@ package br.edu.fatec.libee.backend.handler;
 import br.edu.fatec.libee.backend.exception.*;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.*;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 
@@ -81,6 +83,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = buildProblem(HttpStatus.CONFLICT, "Tombo já cadastrado", exception.getMessage());
         problem.setProperty("accessionNumbers", exception.getAccessionNumbers());
         return problem;
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(
+            TypeMismatchException exception, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        String field = exception instanceof MethodArgumentTypeMismatchException m
+                ? m.getName() : exception.getPropertyName();
+        ProblemDetail problem = buildProblem(HttpStatus.BAD_REQUEST, "Dados inválidos",
+                "O valor informado para o parâmetro '" + field + "' é inválido.");
+        return ResponseEntity.badRequest().body(problem);
     }
 
     // Segurança
