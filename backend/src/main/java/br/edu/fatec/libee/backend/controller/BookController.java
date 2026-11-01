@@ -62,15 +62,15 @@ public class BookController {
         return ResponseEntity.created(location).body(body);
     }
 
-    @DeleteMapping("/books/{id}")
+    @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteBook(@PathVariable Integer id) {
         bookService.deleteBook(id);
-        return ResponseEntity.noContent().build();   // 204
+        return ResponseEntity.noContent().build();
     }
 
-    @DeleteMapping("/copies/{id}")
-    public ResponseEntity<Void> deleteCopy(@PathVariable Integer id) {
-        bookService.deleteCopy(id);
+    @DeleteMapping("/{bookId}/copies/{copyId}")
+    public ResponseEntity<Void> deleteCopy(@PathVariable Integer bookId, @PathVariable Integer copyId) {
+        bookService.deleteCopy(bookId, copyId);
         return ResponseEntity.noContent().build();
     }
 }

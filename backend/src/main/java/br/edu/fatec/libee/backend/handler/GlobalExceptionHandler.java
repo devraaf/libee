@@ -85,6 +85,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(DeletionBlockedException.class)
+    public ProblemDetail handleDeletionBlocked(DeletionBlockedException exception) {
+        ProblemDetail problem = buildProblem(HttpStatus.CONFLICT, "Exclusão não permitida", exception.getMessage());
+        problem.setProperty("accessionNumbers", exception.getAccessionNumbers());
+        return problem;
+    }
+
     @Override
     protected ResponseEntity<Object> handleTypeMismatch(
             TypeMismatchException exception, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
