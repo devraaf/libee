@@ -24,8 +24,10 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -34,17 +36,21 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import java.util.List;
 import java.util.Optional;
 
+import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import java.time.LocalDate;
 import java.util.List;
 
-import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
+@ActiveProfiles("test")
 @WithMockUser
 @AutoConfigureMockMvc
 @Transactional
@@ -64,6 +70,8 @@ public class BookControllerIT {
     private Category romance;
     private Category tecnologia;
     private static final int NON_EXISTENT_ID = 999_999;
+    private static final String NEW_ISBN = "9780000000002";
+    private static final String NEW_ACCESSION = "NEW-001";
     @BeforeEach
     void setUp(){
         // Esvazia o catálogo para o teste não depender de dados pré-existentes
@@ -403,6 +411,149 @@ public class BookControllerIT {
                 .andExpect(status().isServiceUnavailable());
     }
 
+    // TESTES DE POST /books - Cadastro de livro com exemplares
+    @Test
+    @DisplayName("Retorna 201 com o detalhe do livro e grava livro, exemplar AVAILABLE e só o autor novo")
+    void createsBookWithCopyAndNewAuthor_whenRequestIsValid() throws Exception {
+        long booksBefore = bookRepository.count();
+        long authorsBefore = authorRepository.count();
+
+        postBook(registerBookJson(romance.getId(), NEW_ISBN, NEW_ACCESSION,
+                "[\"Machado de Assis\", \"Clarice Lispector\"]"))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", matchesPattern(".*/books/\\d+")))
+                .andExpect(jsonPath("$.title").value("Livro de teste"))
+                .andExpect(jsonPath("$.isbn").value(NEW_ISBN))
+                .andExpect(jsonPath("$.category").value("Romance"))
+                .andExpect(jsonPath("$.authors.length()").value(2))
+                .andExpect(jsonPath("$.authors[0].name").value("Clarice Lispector"))
+                .andExpect(jsonPath("$.authors[1].name").value("Machado de Assis"))
+                .andExpect(jsonPath("$.totalCopies").value(1))
+                .andExpect(jsonPath("$.copies[0].accessionNumber").value(NEW_ACCESSION))
+                .andExpect(jsonPath("$.copies[0].status").value("AVAILABLE"));
+
+        assertEquals(booksBefore + 1, bookRepository.count());
+        assertEquals(authorsBefore + 1, authorRepository.count());   // Machado de Assis já existia
+    }
+
+    @Test
+    @DisplayName("Reaproveita o autor existente quando o nome só difere em maiúsculas e espaços")
+    void reusesExistingAuthor_whenNameDiffersOnlyInCaseAndSpaces() throws Exception {
+        long authorsBefore = authorRepository.count();
+
+        postBook(registerBookJson(romance.getId(), NEW_ISBN, NEW_ACCESSION, "[\" machado  de ASSIS \"]"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.authors.length()").value(1))
+                .andExpect(jsonPath("$.authors[0].name").value("Machado de Assis"));
+
+        assertEquals(authorsBefore, authorRepository.count());
+    }
+
+    @Test
+    @DisplayName("Retorna 201 e o livro continua aparecendo nas consultas quando autores é omitido")
+    void createsBookWithoutAuthors_whenAuthorsAreOmitted() throws Exception {
+        String json = """
+            {"title": "Livro sem autor", "categoryId": %d, "isbn": "%s",
+             "copies": [{"accessionNumber": "%s", "physicalLocation": "A-01"}]}
+            """.formatted(romance.getId(), NEW_ISBN, NEW_ACCESSION);
+
+        postBook(json)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.authors.length()").value(0));
+
+        Integer id = bookRepository.findByIsbn(NEW_ISBN).orElseThrow().getId();
+        mockMvc.perform(get("/books/{id}", id)).andExpect(status().isOk());
+        mockMvc.perform(get("/books").param("q", "sem autor"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("Retorna 400 com a lista de campos inválidos quando o corpo é vazio")
+    void returnsBadRequestWithErrorList_whenBodyIsEmpty() throws Exception {
+        postBook("{}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Dados inválidos"))
+                .andExpect(jsonPath("$.errors[*].field", hasItems("title", "categoryId", "isbn", "copies")));
+    }
+
+    @Test
+    @DisplayName("Retorna 400 apontando o campo isbn quando ele tem hífens")
+    void returnsBadRequest_whenIsbnHasHyphens() throws Exception {
+        postBook(registerBookJson(romance.getId(), "978-0-14-032872-1", NEW_ACCESSION, "[]"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field", hasItem("isbn")));
+    }
+
+    @Test
+    @DisplayName("Retorna 400 apontando o caminho do campo quando o exemplar não tem tombo")
+    void returnsBadRequestWithNestedPath_whenCopyHasNoAccessionNumber() throws Exception {
+        String json = """
+            {"title": "Livro", "categoryId": %d, "isbn": "%s",
+             "copies": [{"physicalLocation": "A-01"}]}
+            """.formatted(romance.getId(), NEW_ISBN);
+
+        postBook(json)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field", hasItem("copies[0].accessionNumber")));
+    }
+
+    @Test
+    @DisplayName("Retorna 400 quando o JSON está mal formado")
+    void returnsBadRequest_whenBodyIsMalformed() throws Exception {
+        postBook("{")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Dados inválidos"));
+    }
+
+    @Test
+    @DisplayName("Retorna 409 com o bookId quando o ISBN já está cadastrado")
+    void returnsConflictWithBookId_whenIsbnIsAlreadyRegistered() throws Exception {
+        Integer existingId = bookRepository.findByIsbn("9788535911664").orElseThrow().getId();
+
+        postBook(registerBookJson(romance.getId(), "9788535911664", NEW_ACCESSION, "[]"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.bookId").value(existingId));
+    }
+
+    @Test
+    @DisplayName("Retorna 409 com o tombo conflitante e não grava o livro quando o tombo já existe")
+    void returnsConflictWithAccessionNumbers_whenAccessionNumberAlreadyExists() throws Exception {
+        postBook(registerBookJson(romance.getId(), NEW_ISBN, "001", "[]"))   // "001" é o tombo do Dom Casmurro
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.accessionNumbers[0]").value("001"));
+
+        assertTrue(bookRepository.findByIsbn(NEW_ISBN).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Retorna 409 quando o mesmo tombo se repete dentro da requisição")
+    void returnsConflict_whenAccessionNumberRepeatsInsideRequest() throws Exception {
+        String json = """
+            {"title": "Livro", "categoryId": %d, "isbn": "%s",
+             "copies": [{"accessionNumber": "REP-001", "physicalLocation": "A-01"},
+                        {"accessionNumber": " REP-001 ", "physicalLocation": "A-02"}]}
+            """.formatted(romance.getId(), NEW_ISBN);
+
+        postBook(json)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.accessionNumbers[0]").value("REP-001"));
+
+        assertTrue(bookRepository.findByIsbn(NEW_ISBN).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Retorna 422 e não grava livro nem autor quando a categoria não existe")
+    void returnsUnprocessable_whenCategoryDoesNotExist() throws Exception {
+        long authorsBefore = authorRepository.count();
+
+        postBook(registerBookJson(NON_EXISTENT_ID, NEW_ISBN, NEW_ACCESSION, "[\"Autor Novo\"]"))
+                .andExpect(status().is(422));
+
+        assertTrue(bookRepository.findByIsbn(NEW_ISBN).isEmpty());
+        assertEquals(authorsBefore, authorRepository.count());
+    }
+
     // métodos auxiliares para montar os dados
     private Category saveCategory(String name) {
         Category c = new Category();
@@ -433,7 +584,7 @@ public class BookControllerIT {
         b.setPublicationPlace("São Paulo");
         b.setEdition("2ª edição");
         b.setCoverImageUrl("https://example.com/covers/estruturas.jpg");
-        b.setPublicationDate(LocalDate.of(2021, 3, 15));
+        b.setPublicationYear(2021);
         b.setPageCount(480);
         b.setSummary("Introdução a listas, pilhas, filas, árvores e grafos, com exemplos em Java.");
         b.setCategory(category);
@@ -448,5 +599,27 @@ public class BookControllerIT {
         c.setPhysicalLocation(location);
         c.setStatus(status);
         copyRepository.save(c);
+    }
+
+    private ResultActions postBook(String json) throws Exception {
+        return mockMvc.perform(post("/books")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json));
+    }
+
+    private String registerBookJson(int categoryId, String isbn, String accessionNumber, String authorsJson) {
+        return """
+            {
+              "title": "Livro de teste",
+              "authors": %s,
+              "categoryId": %d,
+              "isbn": "%s",
+              "publisher": "Puffin",
+              "publicationYear": 1988,
+              "pageCount": 96,
+              "copies": [{"accessionNumber": "%s", "physicalLocation": "A-01"}]
+            }
+            """.formatted(authorsJson, categoryId, isbn, accessionNumber);
     }
 }

@@ -37,8 +37,8 @@ public class Book {
     @Column(name = "cover_image_url")
     private String coverImageUrl;
 
-    @Column(name = "publication_date")
-    private LocalDate publicationDate;
+    @Column(name = "publication_year")
+    private Integer publicationYear;
 
     @Column(name = "page_count")
     private Integer pageCount;

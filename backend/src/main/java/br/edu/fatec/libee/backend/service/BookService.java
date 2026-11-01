@@ -1,14 +1,23 @@
 package br.edu.fatec.libee.backend.service;
 
+import br.edu.fatec.libee.backend.dto.request.RegisterBookRequest;
 import br.edu.fatec.libee.backend.dto.response.*;
 import br.edu.fatec.libee.backend.entity.Author;
 import br.edu.fatec.libee.backend.entity.Book;
+import br.edu.fatec.libee.backend.entity.Category;
 import br.edu.fatec.libee.backend.entity.Copy;
 import br.edu.fatec.libee.backend.enums.CopyStatus;
+import br.edu.fatec.libee.backend.exception.AccessionNumberAlreadyRegisteredException;
+import br.edu.fatec.libee.backend.exception.BookAlreadyRegisteredException;
+import br.edu.fatec.libee.backend.exception.BusinessRuleException;
 import br.edu.fatec.libee.backend.exception.ResourceNotFoundException;
+import br.edu.fatec.libee.backend.repository.AuthorRepository;
 import br.edu.fatec.libee.backend.repository.BookRepository;
+import br.edu.fatec.libee.backend.repository.CategoryRepository;
 import br.edu.fatec.libee.backend.repository.CopyRepository;
 import br.edu.fatec.libee.backend.specification.BookSpecification;
+import br.edu.fatec.libee.backend.util.IsbnNormalizer;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -17,9 +26,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -29,6 +36,8 @@ import java.util.stream.Collectors;
 public class BookService {
     private final BookRepository bookRepository;
     private final CopyRepository copyRepository;
+    private final CategoryRepository categoryRepository;
+    private final AuthorRepository authorRepository;
 
     private Page<Book> searchBooks(String q, Integer categoryId, int page, int size){
         Pageable pageable = PageRequest.of(page, size, Sort.by("title").and(Sort.by("id")));
@@ -51,7 +60,7 @@ public class BookService {
                 b.getId(),
                 b.getTitle(),
                 b.getAuthors().stream().map(Author::getName).sorted().toList(),
-                b.getPublicationDate() != null ? b.getPublicationDate().getYear() : null,
+                b.getPublicationYear(),
                 b.getCategory().getName(),
                 b.getCoverImageUrl(),
                 available);
@@ -77,7 +86,7 @@ public class BookService {
                 b.getPublisher(),
                 b.getPublicationPlace(),
                 b.getEdition(),
-                b.getPublicationDate() != null ? b.getPublicationDate().getYear() : null,
+                b.getPublicationYear(),
                 b.getPageCount(),
                 b.getSummary(),
                 copyResponses,
@@ -120,5 +129,115 @@ public class BookService {
         return new BookManagementSummaryResponse(
                 bookRepository.count(), totalCopies, available, onLoan
         );
+    }
+
+    @Transactional
+    public Integer register(RegisterBookRequest request) {
+        if (request.copies().isEmpty()) {
+            throw new BusinessRuleException("Informe ao menos um exemplar.");
+        }
+        String isbn = IsbnNormalizer.normalize(request.isbn());
+        checkIsbnIsAvailable(isbn);
+
+        List<String> accessionNumbers = request.copies().stream()
+                .map(copy -> copy.accessionNumber().trim())
+                .toList();
+        checkAccessionNumbersAreAvailable(accessionNumbers);
+
+        Category category = categoryRepository.findById(request.categoryId())
+                .orElseThrow(() -> new BusinessRuleException("Categoria não encontrada."));
+
+        List<Author> authors = resolveAuthors(request.authors());
+
+        Book book = new Book();
+        book.setTitle(request.title().trim());
+        book.setIsbn(isbn);
+        book.setCategory(category);
+        book.setAuthors(new LinkedHashSet<>(authors));
+        book.setCoverImageUrl(clean(request.coverUrl()));
+        book.setPublisher(clean(request.publisher()));
+        book.setPublicationPlace(clean(request.place()));
+        book.setEdition(clean(request.edition()));
+        book.setPublicationYear(request.publicationYear());
+        book.setPageCount(request.pageCount());
+        book.setSummary(clean(request.description()));
+
+        Book saved = bookRepository.saveAndFlush(book);
+
+        List<Copy> copies = request.copies().stream()
+                .map(copyRequest -> {
+                    Copy copy = new Copy();
+                    copy.setBook(saved);
+                    copy.setAccessionNumber(copyRequest.accessionNumber().trim());
+                    copy.setPhysicalLocation(copyRequest.physicalLocation().trim());
+                    copy.setStatus(CopyStatus.AVAILABLE);
+                    return copy;
+                })
+                .toList();
+        copyRepository.saveAllAndFlush(copies);
+
+        return saved.getId();
+    }
+
+    private void checkIsbnIsAvailable(String isbn) {
+        bookRepository.findByIsbn(isbn).ifPresent(existing -> {
+            throw new BookAlreadyRegisteredException(existing.getId());
+        });
+    }
+
+    private void checkAccessionNumbersAreAvailable(List<String> accessionNumbers) {
+        Set<String> conflicts = new LinkedHashSet<>();
+
+        // Tombos repetidos dentro da própria requisição
+        Set<String> seen = new HashSet<>();
+        for (String accessionNumber : accessionNumbers) {
+            if (!seen.add(accessionNumber)) {
+                conflicts.add(accessionNumber);
+            }
+        }
+        // Tombos que já existem no banco
+        conflicts.addAll(copyRepository.findExistingAccessionNumbers(accessionNumbers));
+        if (!conflicts.isEmpty()) {
+            throw new AccessionNumberAlreadyRegisteredException(new ArrayList<>(conflicts));
+        }
+    }
+
+    private List<Author> resolveAuthors(List<String> rawNames) {
+        if (rawNames.isEmpty()) {
+            return List.of();
+        }
+        // nome em minúsculas -> nome limpo; descarta repetidos e mantém a ordem recebida
+        Map<String, String> namesByLowerCase = new LinkedHashMap<>();
+        for (String raw : rawNames) {
+            String name = raw.trim().replaceAll("\\s+", " ");
+            namesByLowerCase.putIfAbsent(name.toLowerCase(Locale.ROOT), name);
+        }
+
+        Map<String, Author> existing = authorRepository
+                .findByLowerNameIn(namesByLowerCase.keySet()).stream()
+                .collect(Collectors.toMap(
+                        author -> author.getName().toLowerCase(Locale.ROOT),
+                        Function.identity(),
+                        (first, second) -> first));   // se o banco já tiver nomes duplicados, usa o primeiro
+
+        List<Author> result = new ArrayList<>();
+        List<Author> toCreate = new ArrayList<>();
+        namesByLowerCase.forEach((lowerCase, name) -> {
+            Author author = existing.get(lowerCase);
+            if (author == null) {
+                author = new Author();
+                author.setName(name);
+                toCreate.add(author);
+            }
+            result.add(author);
+        });
+
+        authorRepository.saveAll(toCreate);
+        return result;
+    }
+
+    // Texto opcional em branco vira null
+    private static String clean(String value) {
+        return (value == null || value.isBlank()) ? null : value.trim();
     }
 }
