@@ -164,7 +164,7 @@ class BookRegistrationServiceTest {
     void shouldThrowWhenIsbnAlreadyRegistered() {
         Book existing = new Book();
         existing.setId(42);
-        when(bookRepository.findByIsbn(ISBN)).thenReturn(Optional.of(existing));
+        when(bookRepository.findByIsbnAndDeletedAtIsNull(ISBN)).thenReturn(Optional.of(existing));
 
         BookAlreadyRegisteredException exception = assertThrows(BookAlreadyRegisteredException.class,
                 () -> service.register(request(ISBN, List.of(), copy("0001"))));

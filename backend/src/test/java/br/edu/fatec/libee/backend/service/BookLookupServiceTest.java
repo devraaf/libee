@@ -111,7 +111,7 @@ class BookLookupServiceTest {
     void shouldThrowAlreadyRegisteredWithoutCallingProvidersWhenIsbnExists() {
         Book existing = mock(Book.class);
         when(existing.getId()).thenReturn(42);
-        when(bookRepository.findByIsbn(ISBN)).thenReturn(Optional.of(existing));
+        when(bookRepository.findByIsbnAndDeletedAtIsNull(ISBN)).thenReturn(Optional.of(existing));
 
         BookAlreadyRegisteredException exception = assertThrows(
                 BookAlreadyRegisteredException.class, () -> service.lookupByIsbn(ISBN));
@@ -136,7 +136,7 @@ class BookLookupServiceTest {
 
         service.lookupByIsbn("978-0-14-032872-1");
 
-        verify(bookRepository).findByIsbn(ISBN);
+        verify(bookRepository).findByIsbnAndDeletedAtIsNull(ISBN);
         verify(google).findByIsbn(ISBN);
     }
 }
