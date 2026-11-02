@@ -651,6 +651,231 @@ public class LoanControllerIT {
                 .andExpect(status().isUnauthorized());
     }
 
+    // TESTES DE GET /loans/management/returns - Lista de devoluções
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna as devoluções com todos os campos")
+    void returnsCompleteReturns_whenThereAreReturnedLoans() throws Exception {
+        saveLoan(
+                saveCopy(cleanCode, "T-001"),
+                reader,
+                TODAY.minusDays(10),
+                TODAY.minusDays(3),
+                TODAY.minusDays(2),
+                0
+        );
+
+        mockMvc.perform(get("/loans/management/returns"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").exists())
+                .andExpect(jsonPath("$.content[0].readerName").value("Leitora Um"))
+                .andExpect(jsonPath("$.content[0].title").value("Clean Code"))
+                .andExpect(jsonPath("$.content[0].accessionNumber").value("T-001"))
+                .andExpect(jsonPath("$.content[0].returnDate").value("2026-10-13"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna devoluções paginadas quando page e size são informados")
+    void returnsPagedReturns_whenPageAndSizeAreProvided() throws Exception {
+        for (int i = 1; i <= 3; i++) {
+            saveLoan(
+                    saveCopy(cleanCode, "T-00" + i),
+                    reader,
+                    TODAY.minusDays(10),
+                    TODAY.minusDays(3),
+                    TODAY.minusDays(i),
+                    0
+            );
+        }
+
+        mockMvc.perform(get("/loans/management/returns")
+                        .param("page", "0")
+                        .param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(2));
+
+        mockMvc.perform(get("/loans/management/returns")
+                        .param("page", "1")
+                        .param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.totalElements").value(3));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Ordena devoluções pela data mais recente e pelo maior ID")
+    void returnsReturnsOrderedByReturnDateAndId() throws Exception {
+        saveLoan(
+                saveCopy(cleanCode, "T-001"),
+                reader,
+                TODAY.minusDays(10),
+                TODAY.minusDays(3),
+                TODAY.minusDays(3),
+                0
+        );
+
+        saveLoan(
+                saveCopy(cleanCode, "T-002"),
+                reader,
+                TODAY.minusDays(10),
+                TODAY.minusDays(3),
+                TODAY.minusDays(1),
+                0
+        );
+
+        saveLoan(
+                saveCopy(cleanCode, "T-003"),
+                reader,
+                TODAY.minusDays(10),
+                TODAY.minusDays(3),
+                TODAY.minusDays(1),
+                0
+        );
+
+        mockMvc.perform(get("/loans/management/returns"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(3))
+                .andExpect(jsonPath("$.content[0].accessionNumber").value("T-003"))
+                .andExpect(jsonPath("$.content[1].accessionNumber").value("T-002"))
+                .andExpect(jsonPath("$.content[2].accessionNumber").value("T-001"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Pesquisa devoluções pelo nome do leitor")
+    void searchesReturnsByReaderName() throws Exception {
+        saveLoan(
+                saveCopy(cleanCode, "T-001"),
+                reader,
+                TODAY.minusDays(10),
+                TODAY.minusDays(3),
+                TODAY.minusDays(2),
+                0
+        );
+
+        saveLoan(
+                saveCopy(domainDrivenDesign, "T-002"),
+                otherReader,
+                TODAY.minusDays(10),
+                TODAY.minusDays(3),
+                TODAY.minusDays(1),
+                0
+        );
+
+        mockMvc.perform(get("/loans/management/returns")
+                        .param("search", "LEITORA UM"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].readerName").value("Leitora Um"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Pesquisa devoluções pelo título do livro")
+    void searchesReturnsByBookTitle() throws Exception {
+        saveLoan(
+                saveCopy(cleanCode, "T-001"),
+                reader,
+                TODAY.minusDays(10),
+                TODAY.minusDays(3),
+                TODAY.minusDays(2),
+                0
+        );
+
+        saveLoan(
+                saveCopy(domainDrivenDesign, "T-002"),
+                otherReader,
+                TODAY.minusDays(10),
+                TODAY.minusDays(3),
+                TODAY.minusDays(1),
+                0
+        );
+
+        mockMvc.perform(get("/loans/management/returns")
+                        .param("search", "DOMAIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Domain-Driven Design"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Pesquisa devoluções pelo número de tombo")
+    void searchesReturnsByAccessionNumber() throws Exception {
+        saveLoan(
+                saveCopy(cleanCode, "T-001"),
+                reader,
+                TODAY.minusDays(10),
+                TODAY.minusDays(3),
+                TODAY.minusDays(2),
+                0
+        );
+
+        saveLoan(
+                saveCopy(domainDrivenDesign, "T-002"),
+                otherReader,
+                TODAY.minusDays(10),
+                TODAY.minusDays(3),
+                TODAY.minusDays(1),
+                0
+        );
+
+        mockMvc.perform(get("/loans/management/returns")
+                        .param("search", "t-002"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].accessionNumber").value("T-002"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Não retorna empréstimos ativos na listagem de devoluções")
+    void doesNotReturnActiveLoans() throws Exception {
+        // Empréstimo devolvido
+        saveLoan(
+                saveCopy(cleanCode, "T-001"),
+                reader,
+                TODAY.minusDays(10),
+                TODAY.minusDays(3),
+                TODAY.minusDays(2),
+                0
+        );
+
+        // Empréstimo ativo
+        saveLoan(
+                saveCopy(domainDrivenDesign, "T-002"),
+                otherReader,
+                TODAY.minusDays(2),
+                TODAY.plusDays(5),
+                null,
+                0
+        );
+
+        mockMvc.perform(get("/loans/management/returns"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].accessionNumber").value("T-001"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna lista vazia quando não existem devoluções")
+    void returnsEmptyList_whenThereAreNoReturns() throws Exception {
+        mockMvc.perform(get("/loans/management/returns"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0));
+    }
+
     // métodos auxiliares para montar os dados
 
     // Cenário com os três status: 2 em dia (um vence hoje), 1 atrasado, 1 devolvido

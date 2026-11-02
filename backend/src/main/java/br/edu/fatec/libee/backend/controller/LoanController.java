@@ -55,6 +55,15 @@ public class LoanController {
             @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size){
         return loanService.listActiveLoans(status, search, page, size);
     }
+
+    // TODO: restringir a bibliotecário/administrador quando a autenticação existir
+    @GetMapping("/management/returns")
+    public PageResponse<ReturnLoanResponse> listReturns(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size){
+        return loanService.listReturns(search, page, size);
+    }
 }
 
 
