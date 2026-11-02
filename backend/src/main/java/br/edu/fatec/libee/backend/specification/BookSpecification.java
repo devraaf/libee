@@ -16,6 +16,7 @@ public final class BookSpecification {
     public static Specification<Book> search(String q, Integer categoryId) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.isNull(root.get("deletedAt")));   // livro excluído nunca aparece
 
             if (q != null && !q.isBlank()) {
                 String term = q.trim().toLowerCase();

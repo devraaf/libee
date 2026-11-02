@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.Instant;
+
 @Entity
 @Table(name = "book_copies")
 @Getter
@@ -29,4 +31,7 @@ public class Copy {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private CopyStatus status;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 }

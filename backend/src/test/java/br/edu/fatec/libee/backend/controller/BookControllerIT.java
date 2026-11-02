@@ -13,6 +13,7 @@ import br.edu.fatec.libee.backend.repository.AuthorRepository;
 import br.edu.fatec.libee.backend.repository.BookRepository;
 import br.edu.fatec.libee.backend.repository.CategoryRepository;
 import br.edu.fatec.libee.backend.repository.CopyRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,20 +34,16 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.*;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import java.time.LocalDate;
-import java.util.List;
-
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
@@ -66,6 +63,7 @@ public class BookControllerIT {
     @Autowired AuthorRepository authorRepository;
     @Autowired CopyRepository copyRepository;
     @Autowired JdbcTemplate jdbcTemplate;
+    @Autowired EntityManager entityManager;
 
     private Category romance;
     private Category tecnologia;
@@ -461,7 +459,7 @@ public class BookControllerIT {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.authors.length()").value(0));
 
-        Integer id = bookRepository.findByIsbn(NEW_ISBN).orElseThrow().getId();
+        Integer id = bookRepository.findByIsbnAndDeletedAtIsNull(NEW_ISBN).orElseThrow().getId();
         mockMvc.perform(get("/books/{id}", id)).andExpect(status().isOk());
         mockMvc.perform(get("/books").param("q", "sem autor"))
                 .andExpect(status().isOk())
@@ -509,7 +507,7 @@ public class BookControllerIT {
     @Test
     @DisplayName("Retorna 409 com o bookId quando o ISBN já está cadastrado")
     void returnsConflictWithBookId_whenIsbnIsAlreadyRegistered() throws Exception {
-        Integer existingId = bookRepository.findByIsbn("9788535911664").orElseThrow().getId();
+        Integer existingId = bookRepository.findByIsbnAndDeletedAtIsNull("9788535911664").orElseThrow().getId();
 
         postBook(registerBookJson(romance.getId(), "9788535911664", NEW_ACCESSION, "[]"))
                 .andExpect(status().isConflict())
@@ -523,7 +521,7 @@ public class BookControllerIT {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.accessionNumbers[0]").value("001"));
 
-        assertTrue(bookRepository.findByIsbn(NEW_ISBN).isEmpty());
+        assertTrue(bookRepository.findByIsbnAndDeletedAtIsNull(NEW_ISBN).isEmpty());
     }
 
     @Test
@@ -539,7 +537,7 @@ public class BookControllerIT {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.accessionNumbers[0]").value("REP-001"));
 
-        assertTrue(bookRepository.findByIsbn(NEW_ISBN).isEmpty());
+        assertTrue(bookRepository.findByIsbnAndDeletedAtIsNull(NEW_ISBN).isEmpty());
     }
 
     @Test
@@ -550,8 +548,267 @@ public class BookControllerIT {
         postBook(registerBookJson(NON_EXISTENT_ID, NEW_ISBN, NEW_ACCESSION, "[\"Autor Novo\"]"))
                 .andExpect(status().is(422));
 
-        assertTrue(bookRepository.findByIsbn(NEW_ISBN).isEmpty());
+        assertTrue(bookRepository.findByIsbnAndDeletedAtIsNull(NEW_ISBN).isEmpty());
         assertEquals(authorsBefore, authorRepository.count());
+    }
+
+    // TESTES DE EXCLUSÃO LÓGICA - o que está excluído não aparece nas consultas do catálogo
+    private void markBookDeleted(String isbn) {
+        jdbcTemplate.update(
+                "update book_copies set deleted_at = now() where book_id = (select id from books where isbn = ?)", isbn);
+        jdbcTemplate.update("update books set deleted_at = now() where isbn = ?", isbn);
+    }
+
+    private void markCopyDeleted(String accessionNumber) {
+        jdbcTemplate.update("update book_copies set deleted_at = now() where accession_number = ?", accessionNumber);
+    }
+
+    @Test
+    @DisplayName("Não retorna o livro excluído na listagem do leitor")
+    void hidesDeletedBook_inReaderList() throws Exception {
+        markBookDeleted("9788535911664");
+
+        mockMvc.perform(get("/books").param("q", "casmurro"))
+                .andExpect(jsonPath("$.content.length()").value(0));
+        mockMvc.perform(get("/books"))
+                .andExpect(jsonPath("$.totalElements").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Não retorna o livro excluído na listagem do bibliotecário")
+    void hidesDeletedBook_inLibrarianList() throws Exception {
+        markBookDeleted("9788535911664");
+
+        mockMvc.perform(get("/books/management").param("q", "casmurro"))
+                .andExpect(jsonPath("$.content.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("Retorna 404 no detalhe de um livro excluído")
+    void returnsNotFound_whenBookIsDeleted() throws Exception {
+        Integer id = bookRepository.findByIsbnAndDeletedAtIsNull("9788535911664").orElseThrow().getId();
+        markBookDeleted("9788535911664");
+
+        mockMvc.perform(get("/books/{id}", id))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Não conta livro nem exemplares excluídos no resumo do acervo")
+    void ignoresDeletedBookAndCopies_inSummary() throws Exception {
+        markBookDeleted("9788535911664");   // Dom Casmurro: 1 exemplar disponível
+
+        mockMvc.perform(get("/books/management/summary"))
+                .andExpect(jsonPath("$.totalBooks").value(1))
+                .andExpect(jsonPath("$.totalCopies").value(1))
+                .andExpect(jsonPath("$.availableCopies").value(0))
+                .andExpect(jsonPath("$.onLoanCopies").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Não conta nem lista o exemplar excluído de um livro que continua ativo")
+    void ignoresDeletedCopy_whenBookRemainsActive() throws Exception {
+        Book cleanCode = bookRepository.findByIsbnAndDeletedAtIsNull("9780132350884").orElseThrow();
+        saveCopy(cleanCode, "003", "A-02", CopyStatus.AVAILABLE);
+        markCopyDeleted("003");
+
+        // detalhe: só o exemplar ativo (002, emprestado)
+        mockMvc.perform(get("/books/{id}", cleanCode.getId()))
+                .andExpect(jsonPath("$.totalCopies").value(1))
+                .andExpect(jsonPath("$.copies.length()").value(1))
+                .andExpect(jsonPath("$.copies[0].accessionNumber").value("002"));
+
+        // listagem do bibliotecário: o exemplar disponível excluído não conta
+        mockMvc.perform(get("/books/management").param("q", "clean code"))
+                .andExpect(jsonPath("$.content[0].totalCopies").value(1))
+                .andExpect(jsonPath("$.content[0].availableCopies").value(0));
+
+        // listagem do leitor: continua indisponível
+        mockMvc.perform(get("/books").param("q", "clean code"))
+                .andExpect(jsonPath("$.content[0].available").value(false));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Consulta por ISBN de livro excluído segue para as APIs em vez de retornar 409")
+    void lookupDoesNotConflict_whenBookWithSameIsbnIsDeleted() throws Exception {
+        markBookDeleted("9788535911664");
+        BookMetadata metadata = new BookMetadata("Dom Casmurro", List.of("Machado de Assis"), null,
+                null, null, List.of(), null, null, null, null);
+        when(googleBooksClient.findByIsbn("9788535911664")).thenReturn(Optional.of(metadata));
+
+        mockMvc.perform(get(URL).param("isbn", "9788535911664"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Dom Casmurro"));
+    }
+
+    // TESTES DE DELETE /books - Exclusão lógica de livro e exemplar
+    private static final String DOM_CASMURRO_ISBN = "9788535911664";   // exemplar 001, AVAILABLE
+    private static final String CLEAN_CODE_ISBN = "9780132350884";     // exemplar 002, ON_LOAN
+
+    private ResultActions deleteRequest(String url, Object... uriVars) throws Exception {
+        return mockMvc.perform(delete(url, uriVars).with(csrf()));
+    }
+
+    private Integer bookId(String isbn) {
+        return bookRepository.findByIsbnAndDeletedAtIsNull(isbn).orElseThrow().getId();
+    }
+
+    private Integer copyId(String accessionNumber) {
+        return copyRepository.findAll().stream()
+                .filter(copy -> copy.getAccessionNumber().equals(accessionNumber))
+                .findFirst().orElseThrow().getId();
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 204 e o livro com seus exemplares sai do catálogo quando não há empréstimos")
+    void deletesBookWithCopies_whenBookHasNoLoans() throws Exception {
+        Integer id = bookId(DOM_CASMURRO_ISBN);
+
+        deleteRequest("/books/{id}", id).andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/books/{id}", id)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/books").param("q", "casmurro"))
+                .andExpect(jsonPath("$.content.length()").value(0));
+        mockMvc.perform(get("/books/management/summary"))
+                .andExpect(jsonPath("$.totalBooks").value(1))
+                .andExpect(jsonPath("$.totalCopies").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Grava o mesmo deleted_at no livro e nos exemplares excluídos juntos")
+    void storesSameDeletedAt_whenBookIsDeleted() throws Exception {
+        Integer id = bookId(DOM_CASMURRO_ISBN);
+
+        deleteRequest("/books/{id}", id).andExpect(status().isNoContent());
+
+        entityManager.flush();
+        OffsetDateTime bookDeletedAt = jdbcTemplate.queryForObject(
+                "select deleted_at from books where id = ?", OffsetDateTime.class, id);
+        OffsetDateTime copyDeletedAt = jdbcTemplate.queryForObject(
+                "select deleted_at from book_copies where book_id = ?", OffsetDateTime.class, id);
+        assertNotNull(bookDeletedAt);
+        assertEquals(bookDeletedAt, copyDeletedAt);
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 409 com os tombos emprestados e mantém o livro quando há exemplar emprestado")
+    void returnsConflictWithAccessionNumbers_whenBookHasCopyOnLoan() throws Exception {
+        Integer id = bookId(CLEAN_CODE_ISBN);
+
+        deleteRequest("/books/{id}", id)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Exclusão não permitida"))
+                .andExpect(jsonPath("$.accessionNumbers[0]").value("002"));
+
+        mockMvc.perform(get("/books/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCopies").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 404 ao excluir um livro que já foi excluído")
+    void returnsNotFound_whenBookWasAlreadyDeleted() throws Exception {
+        Integer id = bookId(DOM_CASMURRO_ISBN);
+
+        deleteRequest("/books/{id}", id).andExpect(status().isNoContent());
+        deleteRequest("/books/{id}", id).andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 404 em formato ProblemDetail ao excluir livro inexistente")
+    void returnsNotFound_whenDeletingNonExistentBook() throws Exception {
+        deleteRequest("/books/{id}", NON_EXISTENT_ID)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Recurso não encontrado"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 400 quando o id do livro a excluir não é numérico")
+    void returnsBadRequest_whenDeletingWithNonNumericId() throws Exception {
+        deleteRequest("/books/abc").andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 204 e o livro continua com os outros exemplares quando exclui um de dois")
+    void deletesOnlyTheCopy_whenBookHasOtherActiveCopies() throws Exception {
+        Book dom = bookRepository.findByIsbnAndDeletedAtIsNull(DOM_CASMURRO_ISBN).orElseThrow();
+        saveCopy(dom, "003", "A-02", CopyStatus.AVAILABLE);
+
+        deleteRequest("/books/{bookId}/copies/{copyId}", dom.getId(), copyId("001"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/books/{id}", dom.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalCopies").value(1))
+                .andExpect(jsonPath("$.copies[0].accessionNumber").value("003"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Exclui também o livro quando o exemplar excluído é o último")
+    void deletesBookToo_whenLastCopyIsDeleted() throws Exception {
+        Integer id = bookId(DOM_CASMURRO_ISBN);
+
+        deleteRequest("/books/{bookId}/copies/{copyId}", id, copyId("001"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/books/{id}", id)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/books").param("q", "casmurro"))
+                .andExpect(jsonPath("$.content.length()").value(0));
+        mockMvc.perform(get("/books/management/summary"))
+                .andExpect(jsonPath("$.totalBooks").value(1))
+                .andExpect(jsonPath("$.totalCopies").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 409 com o tombo e mantém o exemplar quando ele está emprestado")
+    void returnsConflict_whenDeletingCopyOnLoan() throws Exception {
+        Integer id = bookId(CLEAN_CODE_ISBN);
+
+        deleteRequest("/books/{bookId}/copies/{copyId}", id, copyId("002"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.accessionNumbers[0]").value("002"));
+
+        mockMvc.perform(get("/books/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.copies.length()").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 404 quando o exemplar pertence a outro livro")
+    void returnsNotFound_whenCopyBelongsToAnotherBook() throws Exception {
+        Integer cleanCodeId = bookId(CLEAN_CODE_ISBN);
+
+        deleteRequest("/books/{bookId}/copies/{copyId}", cleanCodeId, copyId("001"))   // 001 é do Dom Casmurro
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/books/{id}", bookId(DOM_CASMURRO_ISBN)))
+                .andExpect(jsonPath("$.totalCopies").value(1));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 404 ao excluir um exemplar que já foi excluído")
+    void returnsNotFound_whenCopyWasAlreadyDeleted() throws Exception {
+        Book dom = bookRepository.findByIsbnAndDeletedAtIsNull(DOM_CASMURRO_ISBN).orElseThrow();
+        saveCopy(dom, "003", "A-02", CopyStatus.AVAILABLE);
+        Integer copy001 = copyId("001");
+
+        deleteRequest("/books/{bookId}/copies/{copyId}", dom.getId(), copy001).andExpect(status().isNoContent());
+        deleteRequest("/books/{bookId}/copies/{copyId}", dom.getId(), copy001).andExpect(status().isNotFound());
     }
 
     // métodos auxiliares para montar os dados
@@ -621,5 +878,10 @@ public class BookControllerIT {
               "copies": [{"accessionNumber": "%s", "physicalLocation": "A-01"}]
             }
             """.formatted(authorsJson, categoryId, isbn, accessionNumber);
+    }
+
+    private void markBookDeleted(Book book) {
+        jdbcTemplate.update("update books set deleted_at = now() where id = ?", book.getId());
+        jdbcTemplate.update("update book_copies set deleted_at = now() where book_id = ?", book.getId());
     }
 }
