@@ -83,6 +83,11 @@ public final class LoanSpecification {
         };
     }
 
+    // Somente empréstimos já devolvidos.
+    public static Specification<Loan> returned() {
+        return (root, query, cb) -> cb.isNotNull(root.get("returnDate"));
+    }
+
     // Escapa %, _ e \ para que o termo do usuário não vire curinga do LIKE
     private static String escapeLike(String s) {
         return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");

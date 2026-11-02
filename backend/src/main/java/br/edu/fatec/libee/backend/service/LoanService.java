@@ -8,6 +8,8 @@ import br.edu.fatec.libee.backend.enums.ActiveLoanStatus;
 import br.edu.fatec.libee.backend.enums.LoanStatus;
 import br.edu.fatec.libee.backend.repository.LoanRepository;
 import br.edu.fatec.libee.backend.specification.LoanSpecification;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -119,5 +121,28 @@ public class LoanService {
                 loan.getDueDate(),
                 loan.getRenewalCount(),
                 loan.getStatus(today));
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<ReturnLoanResponse> listReturns(String search, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size,
+                Sort.by(Sort.Order.desc("returnDate"), Sort.Order.desc("id")));
+
+        Specification<Loan> spec = Specification.allOf(
+                LoanSpecification.returned(),
+                LoanSpecification.matchesManagementSearch(search));
+
+        Page<Loan> loans = loanRepository.findAll(spec, pageable);
+        return PageResponse.from(loans.map(this::toReturnResponse));
+    }
+
+    private ReturnLoanResponse toReturnResponse(Loan loan) {
+        return new ReturnLoanResponse(
+                loan.getId(),
+                loan.getReader().getName(),
+                loan.getCopy().getBook().getTitle(),
+                loan.getCopy().getAccessionNumber(),
+                loan.getReturnDate()
+        );
     }
 }
