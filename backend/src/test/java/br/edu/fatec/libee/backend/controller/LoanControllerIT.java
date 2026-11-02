@@ -474,6 +474,183 @@ public class LoanControllerIT {
                 .andExpect(status().isUnauthorized());
     }
 
+    // TESTES DE GET /loans/management - Lista e pesquisa de empréstimos ativos (bibliotecário)
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna os empréstimos ativos com todos os campos, ordenados pela data prevista")
+    void returnsActiveLoansOrderedByDueDate() throws Exception {
+        saveStatusScenario();
+
+        mockMvc.perform(get("/loans/management"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(3))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.content[0].id").exists())
+                .andExpect(jsonPath("$.content[0].readerName").value("Leitora Um"))
+                .andExpect(jsonPath("$.content[0].title").value("Clean Code"))
+                .andExpect(jsonPath("$.content[0].accessionNumber").value("T-003"))
+                .andExpect(jsonPath("$.content[0].loanDate").value("2026-10-05"))
+                .andExpect(jsonPath("$.content[0].dueDate").value("2026-10-12"))
+                .andExpect(jsonPath("$.content[0].renewalCount").value(0))
+                .andExpect(jsonPath("$.content[0].status").value("OVERDUE"))
+                .andExpect(jsonPath("$.content[1].dueDate").value("2026-10-15"))
+                .andExpect(jsonPath("$.content[2].dueDate").value("2026-10-20"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Inclui empréstimos de todos os leitores e não inclui os devolvidos")
+    void includesLoansOfAllReaders_andExcludesReturnedOnes() throws Exception {
+        saveStatusScenario();
+        saveLoan(saveCopy(domainDrivenDesign, "T-005"), otherReader, TODAY.minusDays(1), TODAY.plusDays(6), null, 0);
+        saveLoan(saveCopy(domainDrivenDesign, "T-006"), otherReader, TODAY.minusDays(20), TODAY.minusDays(13),
+                TODAY.minusDays(14), 0);   // devolvido de outro leitor
+
+        mockMvc.perform(get("/loans/management"))
+                .andExpect(jsonPath("$.totalElements").value(4))
+                .andExpect(jsonPath("$.content[*].status",
+                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("RETURNED"))));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna empréstimos paginados quando page e size são informados")
+    void returnsPagedActiveLoans_whenPageAndSizeAreProvided() throws Exception {
+        saveStatusScenario();
+
+        mockMvc.perform(get("/loans/management").param("page", "0").param("size", "2"))
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.totalElements").value(3))
+                .andExpect(jsonPath("$.totalPages").value(2));
+
+        mockMvc.perform(get("/loans/management").param("page", "1").param("size", "2"))
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].dueDate").value("2026-10-20"));
+    }
+
+    // FILTRO POR STATUS
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Filtra por status: em dia, atrasado ou os dois")
+    void filtersActiveLoansByStatus() throws Exception {
+        saveStatusScenario();
+
+        mockMvc.perform(get("/loans/management").param("status", "ON_TIME"))
+                .andExpect(jsonPath("$.totalElements").value(2));
+
+        mockMvc.perform(get("/loans/management").param("status", "OVERDUE"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].accessionNumber").value("T-003"));
+
+        mockMvc.perform(get("/loans/management").param("status", "ON_TIME", "OVERDUE"))
+                .andExpect(jsonPath("$.totalElements").value(3));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 400 quando status é inválido ou é RETURNED")
+    void returnsBadRequest_whenStatusIsInvalidOrReturned() throws Exception {
+        mockMvc.perform(get("/loans/management").param("status", "INVALIDO"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.timestamp").exists());
+
+        mockMvc.perform(get("/loans/management").param("status", "RETURNED"))
+                .andExpect(status().isBadRequest());
+    }
+
+    // PESQUISA
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Pesquisa pelo nome do leitor, sem diferenciar maiúsculas de minúsculas")
+    void searchesByReaderName() throws Exception {
+        saveStatusScenario();
+        saveLoan(saveCopy(domainDrivenDesign, "T-005"), otherReader, TODAY.minusDays(1), TODAY.plusDays(6), null, 0);
+
+        mockMvc.perform(get("/loans/management").param("search", "LEITOR DOIS"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].readerName").value("Leitor Dois"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Pesquisa pelo tombo, sem diferenciar maiúsculas de minúsculas")
+    void searchesByAccessionNumber() throws Exception {
+        saveStatusScenario();
+
+        mockMvc.perform(get("/loans/management").param("search", "t-003"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].accessionNumber").value("T-003"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Pesquisa pelo título do livro, sem diferenciar maiúsculas de minúsculas")
+    void searchesByBookTitle() throws Exception {
+        saveStatusScenario();
+        saveLoan(saveCopy(domainDrivenDesign, "T-005"), otherReader, TODAY.minusDays(1), TODAY.plusDays(6), null, 0);
+
+        mockMvc.perform(get("/loans/management").param("search", "DOMAIN"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Domain-Driven Design"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Não pesquisa por autor nem encontra empréstimo devolvido")
+    void doesNotSearchByAuthor_norFindReturnedLoans() throws Exception {
+        saveStatusScenario();
+
+        mockMvc.perform(get("/loans/management").param("search", "martin"))   // autor do Clean Code
+                .andExpect(jsonPath("$.totalElements").value(0));
+
+        mockMvc.perform(get("/loans/management").param("search", "T-004"))    // tombo do devolvido
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Combina status e pesquisa")
+    void combinesStatusAndSearch() throws Exception {
+        saveStatusScenario();
+        saveLoan(saveCopy(domainDrivenDesign, "T-005"), otherReader,
+                TODAY.minusDays(9), TODAY.minusDays(2), null, 0);   // atrasado de outro livro e leitor
+
+        mockMvc.perform(get("/loans/management").param("status", "OVERDUE").param("search", "clean"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].accessionNumber").value("T-003"));
+
+        mockMvc.perform(get("/loans/management").param("status", "ON_TIME").param("search", "domain"))
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 200 com lista vazia quando a pesquisa não tem resultado")
+    void returnsEmptyList_whenSearchHasNoMatch() throws Exception {
+        saveStatusScenario();
+
+        mockMvc.perform(get("/loans/management").param("search", "zzzzzz"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(0))
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 400 quando size excede o limite de 100")
+    void returnsBadRequest_whenSizeExceedsLimitInManagement() throws Exception {
+        mockMvc.perform(get("/loans/management").param("size", "101"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithAnonymousUser
+    @DisplayName("Retorna 401 quando o usuário não está autenticado")
+    void returnsUnauthorized_whenUserIsNotAuthenticatedOnManagement() throws Exception {
+        mockMvc.perform(get("/loans/management"))
+                .andExpect(status().isUnauthorized());
+    }
+
     // métodos auxiliares para montar os dados
 
     // Cenário com os três status: 2 em dia (um vence hoje), 1 atrasado, 1 devolvido

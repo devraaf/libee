@@ -13,7 +13,7 @@ import java.time.LocalDate;
 
 public interface LoanRepository extends JpaRepository<Loan, Integer>, JpaSpecificationExecutor<Loan> {
     @Override
-    @EntityGraph(attributePaths = {"copy", "copy.book"}) // Carrega exemplar e livro na mesma query.
+    @EntityGraph(attributePaths = {"copy", "copy.book", "reader"}) // Carrega exemplar e livro na mesma query.
     Page<Loan> findAll(Specification<Loan> spec, Pageable pageable);
 
     boolean existsByCopyBookIdAndReturnDateIsNull(Integer bookId);
