@@ -1,12 +1,10 @@
 package br.edu.fatec.libee.backend.service;
 
-import br.edu.fatec.libee.backend.dto.response.LoanSummaryResponse;
-import br.edu.fatec.libee.backend.dto.response.PageResponse;
-import br.edu.fatec.libee.backend.dto.response.ReaderLoanResponse;
-import br.edu.fatec.libee.backend.dto.response.UpcomingReturnResponse;
+import br.edu.fatec.libee.backend.dto.response.*;
 import br.edu.fatec.libee.backend.entity.Author;
 import br.edu.fatec.libee.backend.entity.Book;
 import br.edu.fatec.libee.backend.entity.Loan;
+import br.edu.fatec.libee.backend.enums.ActiveLoanStatus;
 import br.edu.fatec.libee.backend.enums.LoanStatus;
 import br.edu.fatec.libee.backend.repository.LoanRepository;
 import br.edu.fatec.libee.backend.specification.LoanSpecification;
@@ -22,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -93,5 +90,34 @@ public class LoanService {
         long overdue = loanRepository.count(
                 LoanSpecification.hasStatusIn(List.of(LoanStatus.OVERDUE), today));
         return new LoanSummaryResponse(onTime + overdue, onTime, overdue);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<ActiveLoanResponse> listActiveLoans(List<ActiveLoanStatus> statuses, String search, int page, int size){
+        LocalDate today = LocalDate.now(clock);
+        Pageable pageable = PageRequest.of(page, size, Sort.by("dueDate", "id"));
+
+        List<LoanStatus> filter = (statuses == null || statuses.isEmpty())
+                ? List.of(LoanStatus.ON_TIME, LoanStatus.OVERDUE)
+                : statuses.stream().map(ActiveLoanStatus::toLoanStatus).toList();
+
+        Specification<Loan> spec = Specification.allOf(
+                LoanSpecification.hasStatusIn(filter, today),
+                LoanSpecification.matchesManagementSearch(search));
+
+        Page<Loan> loans = loanRepository.findAll(spec, pageable);
+        return PageResponse.from(loans.map(loan -> toActiveResponse(loan, today)));
+    }
+
+    private ActiveLoanResponse toActiveResponse(Loan loan, LocalDate today) {
+        return new ActiveLoanResponse(
+                loan.getId(),
+                loan.getReader().getName(),
+                loan.getCopy().getBook().getTitle(),
+                loan.getCopy().getAccessionNumber(),
+                loan.getLoanDate(),
+                loan.getDueDate(),
+                loan.getRenewalCount(),
+                loan.getStatus(today));
     }
 }

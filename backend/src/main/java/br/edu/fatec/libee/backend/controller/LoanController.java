@@ -1,9 +1,7 @@
 package br.edu.fatec.libee.backend.controller;
 
-import br.edu.fatec.libee.backend.dto.response.LoanSummaryResponse;
-import br.edu.fatec.libee.backend.dto.response.PageResponse;
-import br.edu.fatec.libee.backend.dto.response.ReaderLoanResponse;
-import br.edu.fatec.libee.backend.dto.response.UpcomingReturnResponse;
+import br.edu.fatec.libee.backend.dto.response.*;
+import br.edu.fatec.libee.backend.enums.ActiveLoanStatus;
 import br.edu.fatec.libee.backend.enums.LoanStatus;
 import br.edu.fatec.libee.backend.service.LoanService;
 import jakarta.validation.constraints.Max;
@@ -47,4 +45,16 @@ public class LoanController {
     public ResponseEntity<LoanSummaryResponse> getSummary(){
         return ResponseEntity.ok(loanService.getSummary());
     }
+
+    // TODO: restringir a bibliotecário/administrador quando a autenticação existir
+    @GetMapping("/management")
+    public PageResponse<ActiveLoanResponse> listActiveLoans(
+            @RequestParam(required = false) List<ActiveLoanStatus> status,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size){
+        return loanService.listActiveLoans(status, search, page, size);
+    }
 }
+
+

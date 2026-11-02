@@ -69,6 +69,20 @@ public final class LoanSpecification {
         };
     }
 
+    // Busca do bibliotecário: nome do leitor, tombo ou título do livro
+    public static Specification<Loan> matchesManagementSearch(String q) {
+        return (root, query, cb) -> {
+            if (q == null || q.isBlank()) {
+                return null; // sem filtro
+            }
+            String like = "%" + escapeLike(q.trim().toLowerCase()) + "%";
+            return cb.or(
+                    cb.like(cb.lower(root.get("reader").get("name")), like, '\\'),
+                    cb.like(cb.lower(root.get("copy").get("accessionNumber")), like, '\\'),
+                    cb.like(cb.lower(root.get("copy").get("book").get("title")), like, '\\'));
+        };
+    }
+
     // Escapa %, _ e \ para que o termo do usuário não vire curinga do LIKE
     private static String escapeLike(String s) {
         return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
