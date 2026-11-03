@@ -106,6 +106,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(LoanNotRenewableException.class)
+    public ProblemDetail handleLoanNotRenewable(LoanNotRenewableException exception) {
+        return buildProblem(HttpStatus.CONFLICT, "Empréstimo não renovável", exception.getMessage());
+    }
+
     @Override
     protected ResponseEntity<Object> handleTypeMismatch(
             TypeMismatchException exception, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
