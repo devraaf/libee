@@ -1,5 +1,6 @@
 package br.edu.fatec.libee.backend.entity;
 
+import br.edu.fatec.libee.backend.enums.UserProfile;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -18,4 +19,8 @@ public class User {
 
     @Column(nullable = false)
     private String name;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserProfile profile;
 }

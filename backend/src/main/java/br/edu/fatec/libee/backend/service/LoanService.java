@@ -1,12 +1,17 @@
 package br.edu.fatec.libee.backend.service;
 
+import br.edu.fatec.libee.backend.dto.request.RegisterLoanRequest;
 import br.edu.fatec.libee.backend.dto.response.*;
-import br.edu.fatec.libee.backend.entity.Author;
-import br.edu.fatec.libee.backend.entity.Book;
-import br.edu.fatec.libee.backend.entity.Loan;
+import br.edu.fatec.libee.backend.entity.*;
 import br.edu.fatec.libee.backend.enums.ActiveLoanStatus;
+import br.edu.fatec.libee.backend.enums.CopyStatus;
 import br.edu.fatec.libee.backend.enums.LoanStatus;
+import br.edu.fatec.libee.backend.enums.UserProfile;
+import br.edu.fatec.libee.backend.exception.CopyAlreadyOnLoanException;
+import br.edu.fatec.libee.backend.exception.ResourceNotFoundException;
+import br.edu.fatec.libee.backend.repository.CopyRepository;
 import br.edu.fatec.libee.backend.repository.LoanRepository;
+import br.edu.fatec.libee.backend.repository.UserRepository;
 import br.edu.fatec.libee.backend.specification.LoanSpecification;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -27,6 +32,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class LoanService {
     private final LoanRepository loanRepository;
+    private final CopyRepository copyRepository;
+    private final UserRepository userRepository;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -144,5 +151,37 @@ public class LoanService {
                 loan.getCopy().getAccessionNumber(),
                 loan.getReturnDate()
         );
+    }
+
+    @Transactional
+    public ActiveLoanResponse register(Integer librarianId, RegisterLoanRequest request) {
+        LocalDate today = LocalDate.now(clock);
+
+        // TODO: some quando o login (UC01) estiver pronto; o bibliotecário virá do usuário autenticado
+        User librarian = userRepository.findById(librarianId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bibliotecário não encontrado com o ID informado."));
+
+        // Usuário que existe mas não é leitor também é "não encontrado"
+        User reader = userRepository.findByIdAndProfile(request.readerId(), UserProfile.READER)
+                .orElseThrow(() -> new ResourceNotFoundException("Leitor não encontrado com o ID informado."));
+
+        Copy copy = copyRepository.findByAccessionNumberAndDeletedAtIsNull(request.accessionNumber().trim())
+                .orElseThrow(() -> new ResourceNotFoundException("Exemplar não encontrado com o tombo informado."));
+
+        if (copy.getStatus() == CopyStatus.ON_LOAN) {
+            throw new CopyAlreadyOnLoanException(copy.getAccessionNumber());
+        }
+
+        Loan loan = new Loan();
+        loan.setCopy(copy);
+        loan.setReader(reader);
+        loan.setLibrarian(librarian);
+        loan.setLoanDate(today);
+        loan.setDueDate(request.dueDate());   // renewalCount já começa em 0
+
+        copy.setStatus(CopyStatus.ON_LOAN);
+
+        Loan saved = loanRepository.saveAndFlush(loan);
+        return toActiveResponse(saved, today);
     }
 }

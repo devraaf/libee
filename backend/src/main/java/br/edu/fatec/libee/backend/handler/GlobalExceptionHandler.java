@@ -92,6 +92,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(CopyAlreadyOnLoanException.class)
+    public ProblemDetail handleCopyAlreadyOnLoan(CopyAlreadyOnLoanException exception) {
+        ProblemDetail problem = buildProblem(HttpStatus.CONFLICT, "Exemplar já emprestado", exception.getMessage());
+        problem.setProperty("accessionNumber", exception.getAccessionNumber());
+        return problem;
+    }
+
     @Override
     protected ResponseEntity<Object> handleTypeMismatch(
             TypeMismatchException exception, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
@@ -101,6 +108,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 "O valor informado para o parâmetro '" + field + "' é inválido.");
         return ResponseEntity.badRequest().body(problem);
     }
+
 
     // Segurança
     @ExceptionHandler(AccessDeniedException.class)

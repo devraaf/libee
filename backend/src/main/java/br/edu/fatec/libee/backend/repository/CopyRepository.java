@@ -55,4 +55,7 @@ public interface CopyRepository extends JpaRepository<Copy, Integer> {
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("update Copy c set c.deletedAt = :deletedAt where c.book.id = :bookId and c.deletedAt is null")
     int softDeleteByBookId(@Param("bookId") Integer bookId, @Param("deletedAt") Instant deletedAt);
+
+    // Exemplar excluído (exclusão lógica) não pode ser emprestado: para o empréstimo ele não existe
+    Optional<Copy> findByAccessionNumberAndDeletedAtIsNull(String accessionNumber);
 }
