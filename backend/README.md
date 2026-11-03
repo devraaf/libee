@@ -98,3 +98,20 @@ A mensagem dessas exceções é enviada ao cliente. Não inclua nela dados inter
 ### Observação
 
 Os erros 401 e 403 gerados pelos filtros do Spring Security (requisição sem login ou bloqueada por regra de URL) são produzidos antes de chegar aos controllers e **não** passam pelo `GlobalExceptionHandler`, então não seguem este formato.
+
+## Configuração local
+
+### Variáveis de ambiente
+| Variável | Obrigatória | Descrição |
+|---|---|---|
+| `JWT_SECRET` | Sim | Segredo que assina os tokens JWT (HS256). Mínimo de 32 bytes. Gere com `openssl rand -base64 48`. Nunca commitar. |
+| `CORS_ALLOWED_ORIGINS` | Não | Origens do front liberadas no CORS. Padrão: `http://localhost:5173`. |
+
+Sem `JWT_SECRET`, a aplicação não sobe (comportamento intencional).
+
+### IntelliJ
+Run → Edit Configurations → `BackendApplication` → Modify options → Environment variables
+→ `JWT_SECRET=<valor>` e, em Active profiles, `local`.
+
+### Testes
+Usam o segredo de `src/test/resources/application-test.properties`; não precisam da variável.
