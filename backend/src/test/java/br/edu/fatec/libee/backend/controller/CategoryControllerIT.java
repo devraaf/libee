@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -18,7 +19,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -46,6 +50,7 @@ public class CategoryControllerIT {
                         "RESTART IDENTITY CASCADE");
     }
 
+    // TESTES DE GET /categories - listagem de categoria
     @Test
     @DisplayName("Retorna as categorias em ordem alfabética, mesmo salvas fora de ordem")
     void returnsCategoriesOrderedByName_whenCategoriesExist() throws Exception {
@@ -89,6 +94,76 @@ public class CategoryControllerIT {
         mockMvc.perform(get("/categories"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    // TESTES DE POST /categories - Cadastro de categoria
+    @Test
+    @DisplayName("Cadastra categoria e retorna 201 quando o nome é válido")
+    void createsCategory_whenNameIsValid() throws Exception {
+        mockMvc.perform(post("/categories").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"Ficção Científica\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").isNumber())
+                .andExpect(jsonPath("$.name").value("Ficção Científica"));
+
+        assertEquals(1, categoryRepository.count());
+    }
+
+    @Test
+    @DisplayName("Remove espaços nas pontas do nome ao cadastrar")
+    void trimsName_whenNameHasSurroundingSpaces() throws Exception {
+        mockMvc.perform(post("/categories").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"  Biografia  \"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("Biografia"));
+    }
+
+    @Test
+    @DisplayName("Retorna 400 quando o nome está em branco")
+    void returnsBadRequest_whenNameIsBlank() throws Exception {
+        mockMvc.perform(post("/categories").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"   \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("name"));
+
+        assertEquals(0, categoryRepository.count());
+    }
+
+    @Test
+    @DisplayName("Retorna 400 quando o nome não é informado")
+    void returnsBadRequest_whenNameIsMissing() throws Exception {
+        mockMvc.perform(post("/categories").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("name"));
+    }
+
+    @Test
+    @DisplayName("Retorna 400 quando o nome passa de 255 caracteres")
+    void returnsBadRequest_whenNameExceedsMaxLength() throws Exception {
+        mockMvc.perform(post("/categories").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"" + "a".repeat(256) + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0].field").value("name"));
+    }
+
+    @Test
+    @DisplayName("Retorna 409 quando o nome já existe, ignorando maiúsculas e minúsculas")
+    void returnsConflict_whenNameAlreadyExistsIgnoringCase() throws Exception {
+        saveCategory("Romance");
+
+        mockMvc.perform(post("/categories").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"ROMANCE\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Recurso já cadastrado"));
+
+        assertEquals(1, categoryRepository.count());
     }
 
     private Category saveCategory(String name) {
