@@ -19,11 +19,13 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -33,10 +35,12 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
-import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.*;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -876,6 +880,143 @@ public class LoanControllerIT {
                 .andExpect(jsonPath("$.totalPages").value(0));
     }
 
+    // TESTES DE POST /loans - Registro de empréstimo (bibliotecário)
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 201 com o empréstimo criado, grava o bibliotecário e muda o exemplar para ON_LOAN")
+    void createsLoan_whenRequestIsValid() throws Exception {
+        Copy copy = saveCopy(cleanCode, "T-001");
+
+        postLoan(librarian, registerLoanJson(reader, "T-001", TODAY.plusDays(7)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").exists())
+                .andExpect(jsonPath("$.readerName").value("Leitora Um"))
+                .andExpect(jsonPath("$.title").value("Clean Code"))
+                .andExpect(jsonPath("$.accessionNumber").value("T-001"))
+                .andExpect(jsonPath("$.loanDate").value("2026-10-15"))
+                .andExpect(jsonPath("$.dueDate").value("2026-10-22"))
+                .andExpect(jsonPath("$.renewalCount").value(0))
+                .andExpect(jsonPath("$.status").value("ON_TIME"));
+
+        assertEquals("ON_LOAN", jdbcTemplate.queryForObject(
+                "select status from book_copies where id = ?", String.class, copy.getId()));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "select count(*) from loans where copy_id = ? and reader_id = ? and librarian_id = ? "
+                        + "and loan_date = ? and return_date is null and renewal_count = 0",
+                Integer.class, copy.getId(), reader, librarian, java.sql.Date.valueOf(TODAY)));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Aceita qualquer prazo posterior a hoje, sem impor os 7 dias do formulário")
+    void acceptsAnyFutureDueDate() throws Exception {
+        saveCopy(cleanCode, "T-001");
+
+        postLoan(librarian, registerLoanJson(reader, "T-001", TODAY.plusDays(60)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.dueDate").value("2026-12-14"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 404 e não grava nada quando o leitor não existe")
+    void returnsNotFound_whenReaderDoesNotExist() throws Exception {
+        Copy copy = saveCopy(cleanCode, "T-001");
+
+        postLoan(librarian, registerLoanJson(999_999, "T-001", TODAY.plusDays(7)))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Recurso não encontrado"));
+
+        assertNothingWasSaved(copy);
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 404 quando o usuário existe mas não tem perfil de leitor")
+    void returnsNotFound_whenUserIsNotAReader() throws Exception {
+        Copy copy = saveCopy(cleanCode, "T-001");
+
+        postLoan(librarian, registerLoanJson(librarian, "T-001", TODAY.plusDays(7)))   // bibliotecário como "leitor"
+                .andExpect(status().isNotFound());
+
+        assertNothingWasSaved(copy);
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 404 quando o tombo não existe")
+    void returnsNotFound_whenAccessionNumberDoesNotExist() throws Exception {
+        postLoan(librarian, registerLoanJson(reader, "NAO-EXISTE", TODAY.plusDays(7)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Recurso não encontrado"));
+
+        assertEquals(0, jdbcTemplate.queryForObject("select count(*) from loans", Integer.class));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 409 com o tombo quando o exemplar já está emprestado")
+    void returnsConflict_whenCopyIsAlreadyOnLoan() throws Exception {
+        Copy copy = saveCopy(cleanCode, "T-001");
+        copy.setStatus(CopyStatus.ON_LOAN);
+        copyRepository.save(copy);
+        saveLoan(copy, otherReader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
+
+        postLoan(librarian, registerLoanJson(reader, "T-001", TODAY.plusDays(7)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Exemplar já emprestado"))
+                .andExpect(jsonPath("$.accessionNumber").value("T-001"));
+
+        // continua só o empréstimo anterior, do outro leitor
+        assertEquals(1, jdbcTemplate.queryForObject("select count(*) from loans", Integer.class));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "select count(*) from loans where reader_id = ?", Integer.class, otherReader));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 400 apontando dueDate quando a data é hoje, anterior a hoje ou está ausente")
+    void returnsBadRequest_whenDueDateIsInvalid() throws Exception {
+        Copy copy = saveCopy(cleanCode, "T-001");
+
+        postLoan(librarian, registerLoanJson(reader, "T-001", TODAY))                  // igual a hoje
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Dados inválidos"))
+                .andExpect(jsonPath("$.errors[*].field", hasItem("dueDate")));
+
+        postLoan(librarian, registerLoanJson(reader, "T-001", TODAY.minusDays(1)))     // anterior
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field", hasItem("dueDate")));
+
+        postLoan(librarian, """
+            {"readerId": %d, "accessionNumber": "T-001"}
+            """.formatted(reader))                                                   // ausente
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field", hasItem("dueDate")));
+
+        assertNothingWasSaved(copy);
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 400 com a lista de campos inválidos quando o corpo é vazio")
+    void returnsBadRequestWithErrorList_whenBodyIsEmpty() throws Exception {
+        postLoan(librarian, "{}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field", hasItems("readerId", "accessionNumber", "dueDate")));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 400 quando librarianId não é informado")
+    void returnsBadRequest_whenLibrarianIdIsMissing() throws Exception {
+        mockMvc.perform(post("/loans").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(registerLoanJson(reader, "T-001", TODAY.plusDays(7))))
+                .andExpect(status().isBadRequest());
+    }
+
     // métodos auxiliares para montar os dados
 
     // Cenário com os três status: 2 em dia (um vence hoje), 1 atrasado, 1 devolvido
@@ -931,5 +1072,26 @@ public class LoanControllerIT {
                 insert into loans(copy_id, reader_id, librarian_id, loan_date, due_date, return_date, renewal_count)
                 values (?, ?, ?, ?, ?, ?, ?)
                 """, copy.getId(), readerId, librarian, loanDate, dueDate, returnDate, renewalCount);
+    }
+
+    private ResultActions postLoan(int librarianId, String json) throws Exception {
+        return mockMvc.perform(post("/loans")
+                .param("librarianId", String.valueOf(librarianId))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json));
+    }
+
+    private String registerLoanJson(int readerId, String accessionNumber, LocalDate dueDate) {
+        return """
+            {"readerId": %d, "accessionNumber": "%s", "dueDate": "%s"}
+            """.formatted(readerId, accessionNumber, dueDate);
+    }
+
+    // Nenhum empréstimo gravado e o exemplar continua disponível
+    private void assertNothingWasSaved(Copy copy) {
+        assertEquals(0, jdbcTemplate.queryForObject("select count(*) from loans", Integer.class));
+        assertEquals("AVAILABLE", jdbcTemplate.queryForObject(
+                "select status from book_copies where id = ?", String.class, copy.getId()));
     }
 }
