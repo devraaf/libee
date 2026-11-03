@@ -1017,6 +1017,128 @@ public class LoanControllerIT {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 200 com o empréstimo devolvido, grava a data atual e libera o exemplar")
+    void returnsLoan_whenLoanIsOnTime() throws Exception {
+        Copy copy = saveCopyOnLoan(cleanCode, "T-001", reader, TODAY.minusDays(3), TODAY.plusDays(4));
+
+        postReturn(returnJson("T-001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").exists())
+                .andExpect(jsonPath("$.readerName").value("Leitora Um"))
+                .andExpect(jsonPath("$.title").value("Clean Code"))
+                .andExpect(jsonPath("$.accessionNumber").value("T-001"))
+                .andExpect(jsonPath("$.returnDate").value("2026-10-15"));
+
+        assertEquals("AVAILABLE", jdbcTemplate.queryForObject(
+                "select status from book_copies where id = ?", String.class, copy.getId()));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "select count(*) from loans where copy_id = ? and return_date = ?",
+                Integer.class, copy.getId(), java.sql.Date.valueOf(TODAY)));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Aceita a devolução de empréstimo atrasado e o status final é RETURNED")
+    void returnsLoan_whenLoanIsOverdue() throws Exception {
+        Copy copy = saveCopyOnLoan(cleanCode, "T-001", reader, TODAY.minusDays(10), TODAY.minusDays(3));
+
+        postReturn(returnJson("T-001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.returnDate").value("2026-10-15"));
+
+        assertEquals("AVAILABLE", jdbcTemplate.queryForObject(
+                "select status from book_copies where id = ?", String.class, copy.getId()));
+
+        // O status final é derivado das datas: o histórico do leitor mostra RETURNED, com o vencimento original
+        mockMvc.perform(get("/loans")
+                        .param("readerId", String.valueOf(reader)).param("status", "RETURNED"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].status").value("RETURNED"))
+                .andExpect(jsonPath("$.content[0].dueDate").value("2026-10-12"))
+                .andExpect(jsonPath("$.content[0].returnDate").value("2026-10-15"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 404 quando o tombo não existe")
+    void returnsNotFound_whenAccessionNumberDoesNotExistOnReturn() throws Exception {
+        postReturn(returnJson("NAO-EXISTE"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Recurso não encontrado"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 409 com o tombo quando o exemplar não tem empréstimo ativo")
+    void returnsConflict_whenCopyHasNoActiveLoan() throws Exception {
+        saveCopy(cleanCode, "T-001");   // AVAILABLE, nunca emprestado
+
+        postReturn(returnJson("T-001"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Exemplar sem empréstimo ativo"))
+                .andExpect(jsonPath("$.accessionNumber").value("T-001"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 409 ao devolver pela segunda vez o mesmo exemplar")
+    void returnsConflict_whenCopyIsReturnedTwice() throws Exception {
+        saveCopyOnLoan(cleanCode, "T-001", reader, TODAY.minusDays(3), TODAY.plusDays(4));
+
+        postReturn(returnJson("T-001")).andExpect(status().isOk());
+        postReturn(returnJson("T-001"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Exemplar sem empréstimo ativo"));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("A devolução aparece em /loans/management/returns e sai de /loans/management")
+    void returnAppearsInReturnsList_andLeavesActiveList() throws Exception {
+        saveCopyOnLoan(cleanCode, "T-001", reader, TODAY.minusDays(3), TODAY.plusDays(4));
+
+        mockMvc.perform(get("/loans/management/returns"))
+                .andExpect(jsonPath("$.totalElements").value(0));
+        mockMvc.perform(get("/loans/management"))
+                .andExpect(jsonPath("$.totalElements").value(1));
+
+        postReturn(returnJson("T-001")).andExpect(status().isOk());
+
+        mockMvc.perform(get("/loans/management/returns"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].accessionNumber").value("T-001"));
+        mockMvc.perform(get("/loans/management"))
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Permite emprestar de novo o exemplar depois da devolução")
+    void allowsNewLoan_afterReturn() throws Exception {
+        saveCopyOnLoan(cleanCode, "T-001", reader, TODAY.minusDays(3), TODAY.plusDays(4));
+
+        postReturn(returnJson("T-001")).andExpect(status().isOk());
+
+        postLoan(librarian, registerLoanJson(otherReader, "T-001", TODAY.plusDays(7)))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    @WithMockUser(roles = "LIBRARIAN")
+    @DisplayName("Retorna 400 apontando accessionNumber quando o tombo está ausente ou em branco")
+    void returnsBadRequest_whenAccessionNumberIsMissingOnReturn() throws Exception {
+        postReturn("{}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field", hasItem("accessionNumber")));
+
+        postReturn(returnJson("   "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field", hasItem("accessionNumber")));
+    }
+
     // métodos auxiliares para montar os dados
 
     // Cenário com os três status: 2 em dia (um vence hoje), 1 atrasado, 1 devolvido
@@ -1093,5 +1215,27 @@ public class LoanControllerIT {
         assertEquals(0, jdbcTemplate.queryForObject("select count(*) from loans", Integer.class));
         assertEquals("AVAILABLE", jdbcTemplate.queryForObject(
                 "select status from book_copies where id = ?", String.class, copy.getId()));
+    }
+
+    // Exemplar emprestado de verdade: status ON_LOAN e empréstimo aberto
+    private Copy saveCopyOnLoan(Book book, String accession, int readerId, LocalDate loanDate, LocalDate dueDate) {
+        Copy copy = saveCopy(book, accession);
+        copy.setStatus(CopyStatus.ON_LOAN);
+        copyRepository.save(copy);
+        saveLoan(copy, readerId, loanDate, dueDate, null, 0);
+        return copy;
+    }
+
+    private ResultActions postReturn(String json) throws Exception {
+        return mockMvc.perform(post("/loans/returns")
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json));
+    }
+
+    private String returnJson(String accessionNumber) {
+        return """
+            {"accessionNumber": "%s"}
+            """.formatted(accessionNumber);
     }
 }
