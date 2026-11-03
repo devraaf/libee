@@ -99,6 +99,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(CopyNotOnLoanException.class)
+    public ProblemDetail handleCopyNotOnLoan(CopyNotOnLoanException exception) {
+        ProblemDetail problem = buildProblem(HttpStatus.CONFLICT, "Exemplar sem empréstimo ativo", exception.getMessage());
+        problem.setProperty("accessionNumber", exception.getAccessionNumber());
+        return problem;
+    }
+
     @Override
     protected ResponseEntity<Object> handleTypeMismatch(
             TypeMismatchException exception, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
