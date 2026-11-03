@@ -81,6 +81,14 @@ public class LoanController {
     public ReturnLoanResponse registerReturn(@Valid @RequestBody RegisterReturnRequest request) {
         return loanService.registerReturn(request);
     }
+
+    @PatchMapping("/{id}")
+    public ReaderLoanResponse renew(
+            // TODO: remover quando o login (UC01) estiver pronto; passar a usar o id do usuário autenticado
+            @RequestParam Integer readerId,
+            @PathVariable Integer id) {
+        return loanService.renew(readerId, id);
+    }
 }
 
 
