@@ -111,6 +111,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return buildProblem(HttpStatus.CONFLICT, "Empréstimo não renovável", exception.getMessage());
     }
 
+    @ExceptionHandler(ResourceAlreadyExistsException.class)
+    public ProblemDetail handleResourceAlreadyExists(ResourceAlreadyExistsException exception) {
+        return buildProblem(HttpStatus.CONFLICT, "Recurso já cadastrado", exception.getMessage());
+    }
+
     @Override
     protected ResponseEntity<Object> handleTypeMismatch(
             TypeMismatchException exception, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
