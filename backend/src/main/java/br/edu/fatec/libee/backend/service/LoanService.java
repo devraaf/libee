@@ -10,6 +10,7 @@ import br.edu.fatec.libee.backend.enums.LoanStatus;
 import br.edu.fatec.libee.backend.enums.UserProfile;
 import br.edu.fatec.libee.backend.exception.CopyAlreadyOnLoanException;
 import br.edu.fatec.libee.backend.exception.CopyNotOnLoanException;
+import br.edu.fatec.libee.backend.exception.LoanNotRenewableException;
 import br.edu.fatec.libee.backend.exception.ResourceNotFoundException;
 import br.edu.fatec.libee.backend.repository.CopyRepository;
 import br.edu.fatec.libee.backend.repository.LoanRepository;
@@ -18,6 +19,7 @@ import br.edu.fatec.libee.backend.specification.LoanSpecification;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -207,5 +209,29 @@ public class LoanService {
                 copy.getBook().getTitle(),
                 copy.getAccessionNumber(),
                 loan.getReturnDate());
+    }
+
+    private static final int RENEWAL_DAYS = 7;
+
+    @Transactional
+    public ReaderLoanResponse renew(Integer readerId, Integer loanId) {
+        LocalDate today = LocalDate.now(clock);
+
+        // Inexistente ou de outro leitor: o mesmo 404
+        Loan loan = loanRepository.findByIdAndReaderId(loanId, readerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Empréstimo não encontrado com o ID informado."));
+
+        switch (loan.getStatus(today)) {
+            case RETURNED -> throw new LoanNotRenewableException("O empréstimo já foi devolvido.");
+            case OVERDUE -> throw new LoanNotRenewableException(
+                    "O empréstimo está atrasado e não pode ser renovado. Devolva o livro ao bibliotecário.");
+            case ON_TIME -> { }
+        }
+
+        loan.setDueDate(loan.getDueDate().plusDays(RENEWAL_DAYS));
+        loan.setRenewalCount(loan.getRenewalCount() + 1);
+
+        loanRepository.saveAndFlush(loan);
+        return toResponse(loan, today);
     }
 }

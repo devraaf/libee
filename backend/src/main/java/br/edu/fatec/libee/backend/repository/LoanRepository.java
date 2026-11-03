@@ -25,4 +25,6 @@ public interface LoanRepository extends JpaRepository<Loan, Integer>, JpaSpecifi
 
     // No máximo um: o índice uq_loan_active_copy garante um empréstimo sem devolução por exemplar
     Optional<Loan> findByCopyIdAndReturnDateIsNull(Integer copyId);
+
+    Optional<Loan> findByIdAndReaderId(Integer id, Integer readerId);
 }
