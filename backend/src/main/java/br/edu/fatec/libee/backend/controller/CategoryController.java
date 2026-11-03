@@ -1,11 +1,13 @@
 package br.edu.fatec.libee.backend.controller;
 
+import br.edu.fatec.libee.backend.dto.request.CreateCategoryRequest;
 import br.edu.fatec.libee.backend.dto.response.CategoryResponse;
 import br.edu.fatec.libee.backend.service.CategoryService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -19,5 +21,10 @@ public class CategoryController {
     @GetMapping
     public List<CategoryResponse> getCategories(){
         return categoryService.getCategories();
+    }
+
+    @PostMapping
+    public ResponseEntity<CategoryResponse> create(@Valid @RequestBody CreateCategoryRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(categoryService.create(request));
     }
 }
