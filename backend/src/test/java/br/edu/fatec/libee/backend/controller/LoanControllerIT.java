@@ -38,8 +38,7 @@ import java.time.ZoneId;
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest
@@ -1139,6 +1138,96 @@ public class LoanControllerIT {
                 .andExpect(jsonPath("$.errors[*].field", hasItem("accessionNumber")));
     }
 
+    // TESTES DE PATCH /loans/{id}/renewals - Renovação de empréstimo (leitor)
+    @Test
+    @DisplayName("Retorna 200 com o empréstimo atualizado, soma 7 dias ao vencimento e incrementa as renovações")
+    void renewsLoan_whenLoanIsOnTime() throws Exception {
+        Copy copy = saveCopy(cleanCode, "T-001");
+        int loanId = saveLoanAndGetId(copy, reader, TODAY.minusDays(3), TODAY.plusDays(4), null, 0);
+
+        patchRenewal(loanId, reader)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(loanId))
+                .andExpect(jsonPath("$.book.title").value("Clean Code"))
+                .andExpect(jsonPath("$.accessionNumber").value("T-001"))
+                .andExpect(jsonPath("$.loanDate").value("2026-10-12"))
+                .andExpect(jsonPath("$.dueDate").value("2026-10-26"))   // 19/10 + 7, e não hoje + 7
+                .andExpect(jsonPath("$.returnDate").value(nullValue()))
+                .andExpect(jsonPath("$.renewalCount").value(1))
+                .andExpect(jsonPath("$.status").value("ON_TIME"));
+
+        assertLoanState(loanId, TODAY.plusDays(11), 1);
+    }
+
+    @Test
+    @DisplayName("Renova o empréstimo que vence hoje, porque ainda não está atrasado")
+    void renewsLoan_whenLoanDueTodayIsStillOnTime() throws Exception {
+        Copy copy = saveCopy(cleanCode, "T-001");
+        int loanId = saveLoanAndGetId(copy, reader, TODAY.minusDays(7), TODAY, null, 0);
+
+        patchRenewal(loanId, reader)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dueDate").value("2026-10-22"))
+                .andExpect(jsonPath("$.renewalCount").value(1));
+    }
+
+    @Test
+    @DisplayName("Retorna 404 e não altera nada quando o empréstimo é de outro leitor")
+    void returnsNotFound_whenLoanBelongsToAnotherReader() throws Exception {
+        Copy copy = saveCopy(cleanCode, "T-001");
+        int loanId = saveLoanAndGetId(copy, otherReader, TODAY.minusDays(3), TODAY.plusDays(4), null, 0);
+
+        patchRenewal(loanId, reader)
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Recurso não encontrado"));
+
+        assertLoanState(loanId, TODAY.plusDays(4), 0);
+    }
+
+    @Test
+    @DisplayName("Retorna 404 quando o empréstimo não existe")
+    void returnsNotFound_whenLoanDoesNotExist() throws Exception {
+        patchRenewal(999_999, reader)
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("Retorna 409 e não altera nada quando o empréstimo já foi devolvido")
+    void returnsConflict_whenLoanIsAlreadyReturned() throws Exception {
+        Copy copy = saveCopy(cleanCode, "T-001");
+        int loanId = saveLoanAndGetId(copy, reader, TODAY.minusDays(10), TODAY.plusDays(2), TODAY.minusDays(1), 0);
+
+        patchRenewal(loanId, reader)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Empréstimo não renovável"));
+
+        assertLoanState(loanId, TODAY.plusDays(2), 0);
+    }
+
+    @Test
+    @DisplayName("Retorna 409 e não altera nada quando o empréstimo está atrasado")
+    void returnsConflict_whenLoanIsOverdue() throws Exception {
+        Copy copy = saveCopy(cleanCode, "T-001");
+        int loanId = saveLoanAndGetId(copy, reader, TODAY.minusDays(10), TODAY.minusDays(3), null, 0);
+
+        patchRenewal(loanId, reader)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Empréstimo não renovável"));
+
+        assertLoanState(loanId, TODAY.minusDays(3), 0);
+    }
+
+    @Test
+    @DisplayName("Retorna 400 quando o id não é numérico ou readerId não é informado")
+    void returnsBadRequest_whenIdIsNotNumericOrReaderIdIsMissing() throws Exception {
+        mockMvc.perform(patch("/loans/abc").param("readerId", String.valueOf(reader)).with(csrf()))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(patch("/loans/1").with(csrf()))
+                .andExpect(status().isBadRequest());
+    }
+
     // métodos auxiliares para montar os dados
 
     // Cenário com os três status: 2 em dia (um vence hoje), 1 atrasado, 1 devolvido
@@ -1237,5 +1326,26 @@ public class LoanControllerIT {
         return """
             {"accessionNumber": "%s"}
             """.formatted(accessionNumber);
+    }
+
+    private ResultActions patchRenewal(int loanId, int readerId) throws Exception {
+        return mockMvc.perform(patch("/loans/{id}", loanId)
+                .param("readerId", String.valueOf(readerId))
+                .with(csrf()));
+    }
+
+    private int saveLoanAndGetId(Copy copy, int readerId, LocalDate loanDate, LocalDate dueDate,
+                                 LocalDate returnDate, int renewalCount) {
+        return jdbcTemplate.queryForObject("""
+            insert into loans(copy_id, reader_id, librarian_id, loan_date, due_date, return_date, renewal_count)
+            values (?, ?, ?, ?, ?, ?, ?) returning id
+            """, Integer.class, copy.getId(), readerId, librarian, loanDate, dueDate, returnDate, renewalCount);
+    }
+
+    // Confere no banco o vencimento e as renovações do empréstimo
+    private void assertLoanState(int loanId, LocalDate dueDate, int renewalCount) {
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "select count(*) from loans where id = ? and due_date = ? and renewal_count = ?",
+                Integer.class, loanId, java.sql.Date.valueOf(dueDate), renewalCount));
     }
 }
