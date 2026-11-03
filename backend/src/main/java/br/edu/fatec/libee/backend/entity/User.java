@@ -7,7 +7,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-// TODO: completar (email, passwordHash, perfil, vínculo...) na Issue do login (UC01)
 @Entity
 @Table(name = "users")
 @Getter
