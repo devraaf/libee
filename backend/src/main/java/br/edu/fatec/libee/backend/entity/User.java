@@ -1,5 +1,6 @@
 package br.edu.fatec.libee.backend.entity;
 
+import br.edu.fatec.libee.backend.enums.AffiliationType;
 import br.edu.fatec.libee.backend.enums.UserProfile;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -19,6 +20,18 @@ public class User {
 
     @Column(nullable = false)
     private String name;
+
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @Column(name = "password_hash", nullable = false)
+    private String passwordHash;
+
+    private String phone;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "affiliation_type", nullable = false)
+    private AffiliationType affiliationType;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
