@@ -1,6 +1,7 @@
 package br.edu.fatec.libee.backend.service;
 
 import br.edu.fatec.libee.backend.dto.request.RegisterLoanRequest;
+import br.edu.fatec.libee.backend.dto.request.RegisterReturnRequest;
 import br.edu.fatec.libee.backend.dto.response.*;
 import br.edu.fatec.libee.backend.entity.*;
 import br.edu.fatec.libee.backend.enums.ActiveLoanStatus;
@@ -8,6 +9,7 @@ import br.edu.fatec.libee.backend.enums.CopyStatus;
 import br.edu.fatec.libee.backend.enums.LoanStatus;
 import br.edu.fatec.libee.backend.enums.UserProfile;
 import br.edu.fatec.libee.backend.exception.CopyAlreadyOnLoanException;
+import br.edu.fatec.libee.backend.exception.CopyNotOnLoanException;
 import br.edu.fatec.libee.backend.exception.ResourceNotFoundException;
 import br.edu.fatec.libee.backend.repository.CopyRepository;
 import br.edu.fatec.libee.backend.repository.LoanRepository;
@@ -183,5 +185,27 @@ public class LoanService {
 
         Loan saved = loanRepository.saveAndFlush(loan);
         return toActiveResponse(saved, today);
+    }
+
+    @Transactional
+    public ReturnLoanResponse registerReturn(RegisterReturnRequest request) {
+        LocalDate today = LocalDate.now(clock);
+
+        Copy copy = copyRepository.findByAccessionNumberAndDeletedAtIsNull(request.accessionNumber().trim())
+                .orElseThrow(() -> new ResourceNotFoundException("Exemplar não encontrado com o tombo informado."));
+
+        Loan loan = loanRepository.findByCopyIdAndReturnDateIsNull(copy.getId())
+                .orElseThrow(() -> new CopyNotOnLoanException(copy.getAccessionNumber()));
+
+        loan.setReturnDate(today);
+        copy.setStatus(CopyStatus.AVAILABLE);   // mesma transação da devolução
+
+        loanRepository.saveAndFlush(loan);      // grava empréstimo e exemplar juntos
+        return new ReturnLoanResponse(
+                loan.getId(),
+                loan.getReader().getName(),
+                copy.getBook().getTitle(),
+                copy.getAccessionNumber(),
+                loan.getReturnDate());
     }
 }

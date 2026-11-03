@@ -1,6 +1,7 @@
 package br.edu.fatec.libee.backend.controller;
 
 import br.edu.fatec.libee.backend.dto.request.RegisterLoanRequest;
+import br.edu.fatec.libee.backend.dto.request.RegisterReturnRequest;
 import br.edu.fatec.libee.backend.dto.response.*;
 import br.edu.fatec.libee.backend.enums.ActiveLoanStatus;
 import br.edu.fatec.libee.backend.enums.LoanStatus;
@@ -73,6 +74,12 @@ public class LoanController {
             @Valid @RequestBody RegisterLoanRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(loanService.register(librarianId, request));
+    }
+
+    // TODO: restringir a bibliotecário/administrador quando a autenticação existir
+    @PostMapping("/returns")
+    public ReturnLoanResponse registerReturn(@Valid @RequestBody RegisterReturnRequest request) {
+        return loanService.registerReturn(request);
     }
 }
 

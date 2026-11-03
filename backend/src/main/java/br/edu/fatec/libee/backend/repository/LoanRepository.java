@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 public interface LoanRepository extends JpaRepository<Loan, Integer>, JpaSpecificationExecutor<Loan> {
     @Override
@@ -21,4 +22,7 @@ public interface LoanRepository extends JpaRepository<Loan, Integer>, JpaSpecifi
 
     @Query("select l from Loan l where l.returnDate is null and l.dueDate < :today")
     Page<Loan> findOverdue(LocalDate today, Pageable pageable);
+
+    // No máximo um: o índice uq_loan_active_copy garante um empréstimo sem devolução por exemplar
+    Optional<Loan> findByCopyIdAndReturnDateIsNull(Integer copyId);
 }
