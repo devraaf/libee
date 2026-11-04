@@ -22,7 +22,7 @@ public class CourseController {
     public List<CourseResponse> findAll() {
         return courseService.findAll();
     }
-// TODO: Proteger para adm
+
     @PostMapping
     public ResponseEntity<CourseResponse> create(@Valid @RequestBody CreateCourseRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(courseService.create(request));
