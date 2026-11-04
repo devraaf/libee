@@ -17,7 +17,10 @@ export interface TableProps<T> {
   emptyState?: ReactNode;
   caption?: string;
   footer?: ReactNode;
+  onRowClick?: (row: T) => void;
+  getRowLabel?: (row: T) => string;
   className?: string;
+  tableClassName?: string;
 }
 
 const alignClass = {
@@ -33,7 +36,10 @@ export function Table<T>({
   emptyState,
   caption,
   footer,
+  onRowClick,
+  getRowLabel,
   className,
+  tableClassName,
 }: TableProps<T>) {
   return (
     <div
@@ -43,7 +49,12 @@ export function Table<T>({
       )}
     >
       <div className="overflow-x-auto">
-        <table className="type-small w-full min-w-[640px] border-collapse text-fg">
+        <table
+          className={cn(
+            'type-small w-full border-collapse text-fg',
+            tableClassName,
+          )}
+        >
           {caption && <caption className="sr-only">{caption}</caption>}
           <thead>
             <tr className="border-b border-line-strong bg-surface-warm">
@@ -66,7 +77,33 @@ export function Table<T>({
             {rows.map((row) => (
               <tr
                 key={getRowKey(row)}
-                className="border-b border-line last:border-b-0"
+                tabIndex={onRowClick ? 0 : undefined}
+                aria-label={getRowLabel?.(row)}
+                className={cn(
+                  'border-b border-line last:border-b-0',
+                  onRowClick &&
+                    'cursor-pointer hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-primary',
+                )}
+                onClick={(event) => {
+                  if (
+                    event.target instanceof Element &&
+                    event.target.closest(
+                      'button, a, input, select, textarea, [role="button"]',
+                    )
+                  ) {
+                    return;
+                  }
+                  onRowClick?.(row);
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    event.target === event.currentTarget &&
+                    (event.key === 'Enter' || event.key === ' ')
+                  ) {
+                    event.preventDefault();
+                    onRowClick?.(row);
+                  }
+                }}
               >
                 {columns.map((column) => (
                   <td
