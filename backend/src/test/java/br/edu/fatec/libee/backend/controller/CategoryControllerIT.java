@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Testcontainers
 @Transactional
-@WithMockUser
+@WithMockUser(roles = "LIBRARIAN")
 public class CategoryControllerIT {
     @Container
     @ServiceConnection

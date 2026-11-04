@@ -1,5 +1,6 @@
 package br.edu.fatec.libee.backend.controller;
 
+import br.edu.fatec.libee.backend.AbstractIntegrationTest;
 import br.edu.fatec.libee.backend.entity.Author;
 import br.edu.fatec.libee.backend.entity.Book;
 import br.edu.fatec.libee.backend.entity.Category;
@@ -43,11 +44,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @ActiveProfiles("test")
-@WithMockUser
+@WithMockUser(roles = "READER")
 @AutoConfigureMockMvc
 @Transactional
 @Testcontainers
-public class LoanControllerIT {
+public class LoanControllerIT extends AbstractIntegrationTest {
     @Container
     @ServiceConnection
     static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16");
@@ -1052,6 +1053,7 @@ public class LoanControllerIT {
 
         // O status final é derivado das datas: o histórico do leitor mostra RETURNED, com o vencimento original
         mockMvc.perform(get("/loans")
+                        .with(asReader(reader))
                         .param("readerId", String.valueOf(reader)).param("status", "RETURNED"))
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].status").value("RETURNED"))

@@ -360,6 +360,7 @@ public class BookControllerIT {
     private static final String ISBN = "9780140328721";
 
     @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Deve retornar 200 com os dados do livro e sem gravar nada no banco")
     void shouldReturn200WithBookDataWithoutSaving() throws Exception {
         BookMetadata metadata = new BookMetadata("Fantastic Mr. Fox", List.of("Roald Dahl"), "Puffin",
@@ -376,6 +377,7 @@ public class BookControllerIT {
     }
 
     @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Deve retornar 400 quando o ISBN é inválido ou não é enviado")
     void shouldReturn400WhenIsbnIsInvalid() throws Exception {
         mockMvc.perform(get(URL).param("isbn", "abc"))
@@ -387,6 +389,7 @@ public class BookControllerIT {
     }
 
     @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Deve retornar 409 com o id do livro quando o ISBN já está cadastrado")
     void shouldReturn409WhenAlreadyRegistered() throws Exception {
         Author machado = saveAuthor("Machado de Assis");
@@ -400,6 +403,7 @@ public class BookControllerIT {
     }
 
     @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Deve retornar 503 quando as duas APIs estão indisponíveis")
     void shouldReturn503WhenBothProvidersAreDown() throws Exception {
         when(googleBooksClient.findByIsbn(ISBN)).thenThrow(new ExternalServiceException("Google Books indisponível"));
@@ -411,6 +415,7 @@ public class BookControllerIT {
 
     // TESTES DE POST /books - Cadastro de livro com exemplares
     @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna 201 com o detalhe do livro e grava livro, exemplar AVAILABLE e só o autor novo")
     void createsBookWithCopyAndNewAuthor_whenRequestIsValid() throws Exception {
         long booksBefore = bookRepository.count();
@@ -435,6 +440,7 @@ public class BookControllerIT {
     }
 
     @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Reaproveita o autor existente quando o nome só difere em maiúsculas e espaços")
     void reusesExistingAuthor_whenNameDiffersOnlyInCaseAndSpaces() throws Exception {
         long authorsBefore = authorRepository.count();
@@ -448,6 +454,7 @@ public class BookControllerIT {
     }
 
     @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna 201 e o livro continua aparecendo nas consultas quando autores é omitido")
     void createsBookWithoutAuthors_whenAuthorsAreOmitted() throws Exception {
         String json = """
@@ -467,6 +474,7 @@ public class BookControllerIT {
     }
 
     @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna 400 com a lista de campos inválidos quando o corpo é vazio")
     void returnsBadRequestWithErrorList_whenBodyIsEmpty() throws Exception {
         postBook("{}")
@@ -476,6 +484,7 @@ public class BookControllerIT {
     }
 
     @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna 400 apontando o campo isbn quando ele tem hífens")
     void returnsBadRequest_whenIsbnHasHyphens() throws Exception {
         postBook(registerBookJson(romance.getId(), "978-0-14-032872-1", NEW_ACCESSION, "[]"))
@@ -484,6 +493,7 @@ public class BookControllerIT {
     }
 
     @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna 400 apontando o caminho do campo quando o exemplar não tem tombo")
     void returnsBadRequestWithNestedPath_whenCopyHasNoAccessionNumber() throws Exception {
         String json = """
@@ -497,6 +507,7 @@ public class BookControllerIT {
     }
 
     @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna 400 quando o JSON está mal formado")
     void returnsBadRequest_whenBodyIsMalformed() throws Exception {
         postBook("{")
@@ -505,6 +516,7 @@ public class BookControllerIT {
     }
 
     @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna 409 com o bookId quando o ISBN já está cadastrado")
     void returnsConflictWithBookId_whenIsbnIsAlreadyRegistered() throws Exception {
         Integer existingId = bookRepository.findByIsbnAndDeletedAtIsNull("9788535911664").orElseThrow().getId();
@@ -515,6 +527,7 @@ public class BookControllerIT {
     }
 
     @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna 409 com o tombo conflitante e não grava o livro quando o tombo já existe")
     void returnsConflictWithAccessionNumbers_whenAccessionNumberAlreadyExists() throws Exception {
         postBook(registerBookJson(romance.getId(), NEW_ISBN, "001", "[]"))   // "001" é o tombo do Dom Casmurro
@@ -525,6 +538,7 @@ public class BookControllerIT {
     }
 
     @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna 409 quando o mesmo tombo se repete dentro da requisição")
     void returnsConflict_whenAccessionNumberRepeatsInsideRequest() throws Exception {
         String json = """
@@ -541,6 +555,7 @@ public class BookControllerIT {
     }
 
     @Test
+    @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna 422 e não grava livro nem autor quando a categoria não existe")
     void returnsUnprocessable_whenCategoryDoesNotExist() throws Exception {
         long authorsBefore = authorRepository.count();
