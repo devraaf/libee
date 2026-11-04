@@ -116,6 +116,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return buildProblem(HttpStatus.CONFLICT, "Recurso já cadastrado", exception.getMessage());
     }
 
+    @ExceptionHandler(InvalidFieldException.class)
+    public ProblemDetail handleInvalidField(InvalidFieldException exception) {
+        ProblemDetail problem = buildProblem(HttpStatus.BAD_REQUEST, "Dados inválidos",
+                "Um ou mais campos são inválidos.");
+        problem.setProperty("errors", List.of(new ValidationError(exception.getField(), exception.getMessage())));
+        return problem;
+    }
+
     @Override
     protected ResponseEntity<Object> handleTypeMismatch(
             TypeMismatchException exception, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
