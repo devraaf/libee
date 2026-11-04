@@ -153,6 +153,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ProblemDetail handleInvalidCredentials(InvalidCredentialsException exception) {
+        return buildProblem(HttpStatus.UNAUTHORIZED, "Credenciais inválidas", exception.getMessage());
+    }
+
     // Erros tratados pela classe-base (400, 404 de rota, 405...): mesmo formato
 
     @Override
