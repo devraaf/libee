@@ -1,30 +1,22 @@
-import { LogOut, Menu, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { useDisclosure } from '../../hooks/useDisclosure.ts';
 import type { NavLinkItem } from '../../types/navigation.ts';
-import { Logo } from '../branding/Logo.tsx';
-import { IconButton } from '../ui/IconButton.tsx';
+import { cn } from '../ui/cn.ts';
 import { NavItem } from './NavItem.tsx';
-import { ThemeToggle } from './ThemeToggle.tsx';
 
 export interface NavbarProps {
   links: NavLinkItem[];
-  /** Rota aberta ao clicar na logo. */
-  homeTo?: string;
-  /** Exibe o botão de sair (áreas autenticadas). */
-  showLogout?: boolean;
-  logoutTo?: string;
+  orientation?: 'horizontal' | 'vertical';
+  className?: string;
 }
 
 export function Navbar({
   links,
-  homeTo = '/',
-  showLogout = false,
-  logoutTo = '/login',
+  orientation = 'horizontal',
+  className,
 }: NavbarProps) {
-  const menu = useDisclosure();
+  const isHorizontal = orientation === 'horizontal';
 
   return (
+<<<<<<< HEAD
     <header className="sticky top-0 z-30 border-b border-line bg-bg/95 backdrop-blur">
       <div className="mx-auto flex h-20 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-8">
         <Link
@@ -99,5 +91,24 @@ export function Navbar({
         </nav>
       )}
     </header>
+=======
+    <nav
+      aria-label="Principal"
+      className={cn(isHorizontal && 'flex items-center', className)}
+    >
+      <ul
+        className={cn('flex gap-1', isHorizontal ? 'items-center' : 'flex-col')}
+      >
+        {links.map((item) => (
+          <li key={item.to}>
+            <NavItem
+              item={item}
+              className={!isHorizontal ? 'w-full' : undefined}
+            />
+          </li>
+        ))}
+      </ul>
+    </nav>
+>>>>>>> ba44c07eb90a0b89a04aec4aa83370057ede9db9
   );
 }

@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
+=======
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import type { ReactNode } from 'react';
+>>>>>>> ba44c07eb90a0b89a04aec4aa83370057ede9db9
 
 export interface TableFooterProps {
   text?: ReactNode;
@@ -44,11 +49,19 @@ export default function TableFooter({
               key={page}
               type="button"
               onClick={() => onPageChange(page)}
+<<<<<<< HEAD
               aria-current={isActive ? "page" : undefined}
               className={`flex h-6 min-w-6 items-center justify-center rounded border px-1 transition-colors cursor-pointer ${
                 isActive
                   ? "border-[#9A5B00] bg-[#9A5B00] text-white"
                   : "border-[#E7DCC4] bg-white text-[#3B2A1A] hover:bg-[#F9F5EE] hover:border-[#9A5B00]"
+=======
+              aria-current={isActive ? 'page' : undefined}
+              className={`flex h-6 min-w-6 items-center justify-center rounded border px-1 transition-colors cursor-pointer ${
+                isActive
+                  ? 'border-[#9A5B00] bg-[#9A5B00] text-white'
+                  : 'border-[#E7DCC4] bg-white text-[#3B2A1A] hover:bg-[#F9F5EE] hover:border-[#9A5B00]'
+>>>>>>> ba44c07eb90a0b89a04aec4aa83370057ede9db9
               }`}
             >
               {page}
@@ -69,4 +82,8 @@ export default function TableFooter({
       </nav>
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> ba44c07eb90a0b89a04aec4aa83370057ede9db9

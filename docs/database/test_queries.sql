@@ -1,8 +1,9 @@
--- Listar livros com autores, categoria e quantidade de exemplares
+-- Listar livros com autores, categoria, ano de publicação e quantidade de exemplares
 SELECT
     b.id,
     b.title,
     b.isbn,
+    b.publication_year,
     c.name AS category,
     STRING_AGG(DISTINCT a.name, ', ') AS authors,
     COUNT(DISTINCT bc.id) AS total_copies,
@@ -13,7 +14,7 @@ JOIN categories c ON c.id = b.category_id
 LEFT JOIN book_author ba ON ba.book_id = b.id
 LEFT JOIN authors a ON a.id = ba.author_id
 LEFT JOIN book_copies bc ON bc.book_id = b.id
-GROUP BY b.id, b.title, b.isbn, c.name
+GROUP BY b.id, b.title, b.isbn, b.publication_year, c.name
 ORDER BY b.title;
 
 -- Listar exemplares disponíveis para empréstimos

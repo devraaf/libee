@@ -29,7 +29,8 @@ JSON  ←  API                                      ←  linha no banco
 
 ## Convenções
 
-- Datas no formato: `yyyy-MM-dd`.
+- Datas no formato: `yyyy-MM-dd` (por exemplo, datas de empréstimo e devolução).
+- A entidade `Book` usa `publicationYear` como inteiro representando o ano de publicação; não existe mais `publicationDate` no payload de livro.
 - Relações entre registros por id (`categoryId`, `copyId`, `readerId`...), como no banco.
 - A relação entre livros e autores aparece em `books.json` como `authorIds` (no banco, é a tabela `book_author`).
 

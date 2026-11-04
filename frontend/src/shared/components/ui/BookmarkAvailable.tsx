@@ -16,4 +16,8 @@ export function BookmarkAvailable(props: SVGProps<SVGSVGElement>) {
       />
     </svg>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> ba44c07eb90a0b89a04aec4aa83370057ede9db9

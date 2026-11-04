@@ -7,7 +7,7 @@
     "publicationPlace": "São Paulo",
     "edition": "3ª edição",
     "coverImageUrl": "https://example.com/covers/1.jpg",
-    "publicationDate": "2021-03-15",
+    "publicationYear": 2021,
     "pageCount": 412,
     "summary": "Livro fictício sobre os fundamentos do desenvolvimento de software.",
     "category": {
@@ -29,7 +29,7 @@
     "publicationPlace": "São Paulo",
     "edition": "2ª edição",
     "coverImageUrl": "https://example.com/covers/2.jpg",
-    "publicationDate": "2019-08-01",
+    "publicationYear": 2019,
     "pageCount": 358,
     "summary": "Livro fictício sobre modelagem e consulta a bancos de dados relacionais.",
     "category": {
@@ -55,7 +55,7 @@
     "publicationPlace": "Rio de Janeiro",
     "edition": "1ª edição",
     "coverImageUrl": "https://example.com/covers/3.jpg",
-    "publicationDate": "2003-05-20",
+    "publicationYear": 2003,
     "pageCount": 520,
     "summary": "Livro fictício, com ISBN-10 de antes de 2007, sobre conceitos básicos de física.",
     "category": {
@@ -77,7 +77,7 @@
     "publicationPlace": "Campinas",
     "edition": "1ª edição",
     "coverImageUrl": "https://example.com/covers/4.jpg",
-    "publicationDate": "2018-11-10",
+    "publicationYear": 2018,
     "pageCount": 290,
     "summary": "Livro fictício que relaciona a química a situações do dia a dia.",
     "category": {
@@ -99,7 +99,7 @@
     "publicationPlace": "Belo Horizonte",
     "edition": "1ª edição",
     "coverImageUrl": "https://example.com/covers/5.jpg",
-    "publicationDate": "2020-02-14",
+    "publicationYear": 2020,
     "pageCount": 184,
     "summary": "Coletânea fictícia de contos ambientados em uma cidade inventada.",
     "category": {
@@ -121,7 +121,7 @@
     "publicationPlace": "Porto Alegre",
     "edition": "2ª edição",
     "coverImageUrl": "https://example.com/covers/6.jpg",
-    "publicationDate": "2015-09-30",
+    "publicationYear": 2015,
     "pageCount": 246,
     "summary": "Romance fictício sobre uma comunidade costeira.",
     "category": {
@@ -143,7 +143,7 @@
     "publicationPlace": "Curitiba",
     "edition": "1ª edição",
     "coverImageUrl": "https://example.com/covers/7.jpg",
-    "publicationDate": "2017-06-05",
+    "publicationYear": 2017,
     "pageCount": 332,
     "summary": "Livro fictício sobre a história de uma biblioteca inventada.",
     "category": {
@@ -165,7 +165,7 @@
     "publicationPlace": "Salvador",
     "edition": "1ª edição",
     "coverImageUrl": "https://example.com/covers/8.jpg",
-    "publicationDate": "2022-10-22",
+    "publicationYear": 2022,
     "pageCount": 400,
     "summary": "Livro fictício que reúne acontecimentos de um século imaginário.",
     "category": {
