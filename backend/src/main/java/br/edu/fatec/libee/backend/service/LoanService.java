@@ -161,7 +161,6 @@ public class LoanService {
     public ActiveLoanResponse register(Integer librarianId, RegisterLoanRequest request) {
         LocalDate today = LocalDate.now(clock);
 
-        // TODO: some quando o login (UC01) estiver pronto; o bibliotecário virá do usuário autenticado
         User librarian = userRepository.findById(librarianId)
                 .orElseThrow(() -> new ResourceNotFoundException("Bibliotecário não encontrado com o ID informado."));
 
