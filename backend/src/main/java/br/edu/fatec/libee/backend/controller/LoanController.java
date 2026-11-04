@@ -41,13 +41,11 @@ public class LoanController {
         return loanService.listUpcomingReturns(readerId, limit);
     }
 
-    // TODO: restringir a bibliotecário/administrador quando a autenticação existir
     @GetMapping("/management/summary")
     public ResponseEntity<LoanSummaryResponse> getSummary(){
         return ResponseEntity.ok(loanService.getSummary());
     }
 
-    // TODO: restringir a bibliotecário/administrador quando a autenticação existir
     @GetMapping("/management")
     public PageResponse<ActiveLoanResponse> listActiveLoans(
             @RequestParam(required = false) List<ActiveLoanStatus> status,
@@ -57,7 +55,6 @@ public class LoanController {
         return loanService.listActiveLoans(status, search, page, size);
     }
 
-    // TODO: restringir a bibliotecário/administrador quando a autenticação existir
     @GetMapping("/management/returns")
     public PageResponse<ReturnLoanResponse> listReturns(
             @RequestParam(required = false) String search,
@@ -66,7 +63,6 @@ public class LoanController {
         return loanService.listReturns(search, page, size);
     }
 
-    // TODO: restringir a bibliotecário/administrador quando a autenticação existir
     @PostMapping
     public ResponseEntity<ActiveLoanResponse> register(
             // TODO: remover quando o login (UC01) estiver pronto; passar a usar o id do usuário autenticado
@@ -76,7 +72,6 @@ public class LoanController {
                 .body(loanService.register(librarianId, request));
     }
 
-    // TODO: restringir a bibliotecário/administrador quando a autenticação existir
     @PostMapping("/returns")
     public ReturnLoanResponse registerReturn(@Valid @RequestBody RegisterReturnRequest request) {
         return loanService.registerReturn(request);

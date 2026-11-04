@@ -45,9 +45,19 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(
                         SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Públicas
                         .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/register").permitAll()
                         .requestMatchers(HttpMethod.GET, "/courses").permitAll()
+                        // Somente administrador
                         .requestMatchers(HttpMethod.POST, "/users/librarians").hasRole("ADMINISTRATOR")
+                        .requestMatchers(HttpMethod.POST, "/courses").hasRole("ADMINISTRATOR")
+                        // Bibliotecário
+                        .requestMatchers(HttpMethod.GET, "/books/management/**", "/loans/management/**").hasRole("LIBRARIAN")
+                        .requestMatchers(HttpMethod.POST, "/books", "/loans", "/loans/returns", "/categories").hasRole("LIBRARIAN")
+                        .requestMatchers(HttpMethod.DELETE, "/books/**").hasRole("LIBRARIAN")
+                        // Leitor
+                        .requestMatchers(HttpMethod.GET, "/loans", "/loans/upcoming-returns").hasRole("READER")
+                        .requestMatchers(HttpMethod.PATCH, "/loans/{id}").hasRole("READER")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
