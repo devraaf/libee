@@ -1,5 +1,6 @@
 package br.edu.fatec.libee.backend.service;
 
+import br.edu.fatec.libee.backend.dto.request.RegisterLibrarianRequest;
 import br.edu.fatec.libee.backend.dto.request.RegisterReaderRequest;
 import br.edu.fatec.libee.backend.dto.response.UserResponse;
 import br.edu.fatec.libee.backend.entity.Course;
@@ -39,25 +40,13 @@ public class UserService {
             throw new InvalidFieldException("courseId", "O curso só deve ser informado para alunos.");
         }
 
-        String email = request.email().toLowerCase(Locale.ROOT);
-        if (userRepository.existsByEmailIgnoreCase(email)) {
-            throw new ResourceAlreadyExistsException("Já existe um usuário com este e-mail.");
-        }
-
         Course course = null;
         if (isStudent) {
             course = courseRepository.findById(request.courseId())
                     .orElseThrow(() -> new ResourceNotFoundException("Curso não encontrado."));
         }
 
-        User user = new User();
-        user.setName(request.name().trim());
-        user.setEmail(email);
-        user.setPasswordHash(passwordEncoder.encode(request.password()));
-        user.setPhone(request.phone());
-        user.setAffiliationType(request.affiliationType());
-        user.setProfile(UserProfile.READER);
-        userRepository.save(user);
+        User user = saveUser(request.name(), request.email(), request.password(), request.phone(), request.affiliationType(), UserProfile.READER);
 
         if (isStudent) {
             Student student = new Student();
@@ -67,5 +56,33 @@ public class UserService {
         }
 
         return UserResponse.from(user);
+    }
+
+    @Transactional
+    public UserResponse createLibrarian(RegisterLibrarianRequest request) {
+        if (request.affiliationType() == AffiliationType.STUDENT) {
+            throw new InvalidFieldException("affiliationType",
+                    "O bibliotecário não pode ter vínculo de aluno.");
+        }
+        User user = saveUser(request.name(), request.email(), request.password(),
+                request.phone(), request.affiliationType(), UserProfile.LIBRARIAN);
+        return UserResponse.from(user);
+    }
+
+    private User saveUser(String name, String email, String password, String phone,
+                          AffiliationType affiliationType, UserProfile profile) {
+        String normalizedEmail = email.toLowerCase(Locale.ROOT);
+        if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
+            throw new ResourceAlreadyExistsException("Já existe um usuário com este e-mail.");
+        }
+
+        User user = new User();
+        user.setName(name.trim());
+        user.setEmail(normalizedEmail);
+        user.setPasswordHash(passwordEncoder.encode(password));
+        user.setPhone(phone);
+        user.setAffiliationType(affiliationType);
+        user.setProfile(profile);
+        return userRepository.save(user);
     }
 }
