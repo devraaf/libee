@@ -31,7 +31,7 @@ public class SecurityProblemHandler implements AuthenticationEntryPoint, AccessD
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
         response.getWriter().write("""
-            {"type":"about:blank","title":"%s","status":%d,"detail":"%s","timestamp":"%s"}"""
-                .formatted(title, status.value(), detail, Instant.now()));
+            {"detail":"%s", "status":%d, "title":"%s", "timestamp":"%s"}"""
+                .formatted(detail, status.value(), title, Instant.now()));
     }
 }
