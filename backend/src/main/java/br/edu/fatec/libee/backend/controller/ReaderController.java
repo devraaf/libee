@@ -21,7 +21,6 @@ import java.util.List;
 public class ReaderController {
     private final ReaderService readerService;
 
-    // TODO: restringir a bibliotecário/administrador quando a autorização por perfil estiver definida
     @GetMapping
     public PageResponse<ReaderListItemResponse> list(
             @RequestParam(required = false) String search,
