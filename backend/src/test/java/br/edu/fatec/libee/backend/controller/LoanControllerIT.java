@@ -1,5 +1,6 @@
 package br.edu.fatec.libee.backend.controller;
 
+import br.edu.fatec.libee.backend.AbstractIntegrationTest;
 import br.edu.fatec.libee.backend.entity.Author;
 import br.edu.fatec.libee.backend.entity.Book;
 import br.edu.fatec.libee.backend.entity.Category;
@@ -43,11 +44,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @ActiveProfiles("test")
-@WithMockUser
+@WithMockUser(roles = "READER")
 @AutoConfigureMockMvc
 @Transactional
 @Testcontainers
-public class LoanControllerIT {
+public class LoanControllerIT extends AbstractIntegrationTest {
     @Container
     @ServiceConnection
     static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16");
@@ -107,7 +108,7 @@ public class LoanControllerIT {
         Copy copy = saveCopy(cleanCode, "T-001");
         saveLoan(copy, reader, TODAY.minusDays(3), TODAY.plusDays(4), null, 1);
 
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader)))
+        mockMvc.perform(get("/loans").with(asReader(reader)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].id").exists())
@@ -130,7 +131,7 @@ public class LoanControllerIT {
         saveLoan(saveCopy(cleanCode, "T-002"), reader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
         saveLoan(saveCopy(cleanCode, "T-003"), reader, TODAY.minusDays(10), TODAY.minusDays(3), null, 0);
 
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader)))
+        mockMvc.perform(get("/loans").with(asReader(reader)))
                 .andExpect(jsonPath("$.content[0].loanDate").value("2026-10-13"))
                 .andExpect(jsonPath("$.content[1].loanDate").value("2026-10-05"))
                 .andExpect(jsonPath("$.content[2].loanDate").value("2026-09-15"));
@@ -143,14 +144,16 @@ public class LoanControllerIT {
             saveLoan(saveCopy(cleanCode, "T-00" + i), reader, TODAY.minusDays(i), TODAY.plusDays(7), null, 0);
         }
 
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader))
+        mockMvc.perform(get("/loans")
+                        .with(asReader(reader))
                         .param("page", "0").param("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(2))
                 .andExpect(jsonPath("$.totalElements").value(3))
                 .andExpect(jsonPath("$.totalPages").value(2));
 
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader))
+        mockMvc.perform(get("/loans")
+                        .with(asReader(reader))
                         .param("page", "1").param("size", "2"))
                 .andExpect(jsonPath("$.content.length()").value(1));
     }
@@ -161,7 +164,9 @@ public class LoanControllerIT {
     void returnsOnlyOnTimeLoans_whenStatusIsOnTime() throws Exception {
         saveStatusScenario();
 
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader)).param("status", "ON_TIME"))
+        mockMvc.perform(get("/loans")
+                        .with(asReader(reader))
+                        .param("status", "ON_TIME"))
                 .andExpect(jsonPath("$.totalElements").value(2))
                 .andExpect(jsonPath("$.content[*].status").value(org.hamcrest.Matchers.everyItem(
                         org.hamcrest.Matchers.is("ON_TIME"))));
@@ -172,7 +177,9 @@ public class LoanControllerIT {
     void returnsOnlyOverdueLoans_whenStatusIsOverdue() throws Exception {
         saveStatusScenario();
 
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader)).param("status", "OVERDUE"))
+        mockMvc.perform(get("/loans")
+                        .with(asReader(reader))
+                        .param("status", "OVERDUE"))
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].status").value("OVERDUE"))
                 .andExpect(jsonPath("$.content[0].dueDate").value("2026-10-12"));
@@ -183,7 +190,9 @@ public class LoanControllerIT {
     void returnsOnlyReturnedLoans_whenStatusIsReturned() throws Exception {
         saveStatusScenario();
 
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader)).param("status", "RETURNED"))
+        mockMvc.perform(get("/loans")
+                        .with(asReader(reader))
+                        .param("status", "RETURNED"))
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].status").value("RETURNED"))
                 .andExpect(jsonPath("$.content[0].returnDate").value("2026-10-01"));
@@ -194,7 +203,8 @@ public class LoanControllerIT {
     void returnsActiveLoans_whenMultipleStatusesAreProvided() throws Exception {
         saveStatusScenario();
 
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader))
+        mockMvc.perform(get("/loans")
+                        .with(asReader(reader))
                         .param("status", "ON_TIME", "OVERDUE"))
                 .andExpect(jsonPath("$.totalElements").value(3));
     }
@@ -202,7 +212,9 @@ public class LoanControllerIT {
     @Test
     @DisplayName("Retorna 400 quando status não é um valor válido")
     void returnsBadRequest_whenStatusIsInvalid() throws Exception {
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader)).param("status", "INVALIDO"))
+        mockMvc.perform(get("/loans")
+                        .with(asReader(reader))
+                        .param("status", "INVALIDO"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.timestamp").exists());
     }
@@ -214,7 +226,9 @@ public class LoanControllerIT {
         saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(1), TODAY.plusDays(6), null, 0);
         saveLoan(saveCopy(domainDrivenDesign, "T-002"), reader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
 
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader)).param("search", "CLEAN"))
+        mockMvc.perform(get("/loans")
+                        .with(asReader(reader))
+                        .param("search", "CLEAN"))
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].book.title").value("Clean Code"));
     }
@@ -225,7 +239,9 @@ public class LoanControllerIT {
         saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(1), TODAY.plusDays(6), null, 0);
         saveLoan(saveCopy(domainDrivenDesign, "T-002"), reader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
 
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader)).param("search", "evans"))
+        mockMvc.perform(get("/loans")
+                        .with(asReader(reader))
+                        .param("search", "evans"))
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].book.title").value("Domain-Driven Design"));
     }
@@ -235,8 +251,10 @@ public class LoanControllerIT {
     void returnsEmptyList_whenSearchMatchesButStatusDoesNot() throws Exception {
         saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(1), TODAY.plusDays(6), null, 0);
 
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader))
-                        .param("search", "clean").param("status", "OVERDUE"))
+        mockMvc.perform(get("/loans")
+                        .with(asReader(reader))
+                        .param("search", "clean")
+                        .param("status", "OVERDUE"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
@@ -245,23 +263,26 @@ public class LoanControllerIT {
     @Test
     @DisplayName("Retorna 200 com lista vazia quando o leitor não tem empréstimos")
     void returnsEmptyList_whenReaderHasNoLoans() throws Exception {
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader)))
+        mockMvc.perform(get("/loans").with(asReader(reader)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(0))
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
 
     @Test
-    @DisplayName("Não retorna empréstimos de outro leitor")
+    @DisplayName("Usa o leitor autenticado e ignora readerId enviado na query")
     void doesNotReturnLoansOfAnotherReader() throws Exception {
         saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(1), TODAY.plusDays(6), null, 0);
         saveLoan(saveCopy(domainDrivenDesign, "T-002"), otherReader, TODAY.minusDays(1), TODAY.plusDays(6), null, 0);
 
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader)))
+        mockMvc.perform(get("/loans")
+                        .with(asReader(reader))
+                        .param("readerId", String.valueOf(otherReader)))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].book.title").value("Clean Code"));
 
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(otherReader)))
+        mockMvc.perform(get("/loans").with(asReader(otherReader)))
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].book.title").value("Domain-Driven Design"));
     }
@@ -270,21 +291,24 @@ public class LoanControllerIT {
     @Test
     @DisplayName("Retorna 400 quando size é zero")
     void returnsBadRequest_whenSizeIsZero() throws Exception {
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader)).param("size", "0"))
+        mockMvc.perform(get("/loans").param("size", "0")
+                        .with(asReader(reader)))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     @DisplayName("Retorna 400 quando size excede o limite de 100")
     void returnsBadRequest_whenSizeExceedsLimit() throws Exception {
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader)).param("size", "101"))
+        mockMvc.perform(get("/loans").param("size", "101")
+                        .with(asReader(reader)))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     @DisplayName("Retorna 400 quando page é negativo")
     void returnsBadRequest_whenPageIsNegative() throws Exception {
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader)).param("page", "-1"))
+        mockMvc.perform(get("/loans").param("page", "-1")
+                        .with(asReader(reader)))
                 .andExpect(status().isBadRequest());
     }
 
@@ -292,7 +316,7 @@ public class LoanControllerIT {
     @WithAnonymousUser
     @DisplayName("Retorna 401 quando o usuário não está autenticado")
     void returnsUnauthorized_whenUserIsNotAuthenticated() throws Exception {
-        mockMvc.perform(get("/loans").param("readerId", String.valueOf(reader)))
+        mockMvc.perform(get("/loans"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -305,7 +329,7 @@ public class LoanControllerIT {
         bookRepository.save(cleanCode);
         saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
 
-        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+        mockMvc.perform(get("/loans/upcoming-returns").with(asReader(reader)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").exists())
@@ -324,7 +348,7 @@ public class LoanControllerIT {
         saveLoan(saveCopy(cleanCode, "T-002"), reader, TODAY.minusDays(10), TODAY.minusDays(3), null, 0);  // atrasado
         saveLoan(saveCopy(cleanCode, "T-003"), reader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
 
-        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+        mockMvc.perform(get("/loans/upcoming-returns").with(asReader(reader)))
                 .andExpect(jsonPath("$.length()").value(3))
                 .andExpect(jsonPath("$[0].dueDate").value("2026-10-12"))   // vencida antes de hoje (15/10)
                 .andExpect(jsonPath("$[1].dueDate").value("2026-10-17"))
@@ -338,7 +362,7 @@ public class LoanControllerIT {
         bookRepository.save(cleanCode);
         saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
 
-        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+        mockMvc.perform(get("/loans/upcoming-returns").with(asReader(reader)))
                 .andExpect(jsonPath("$[0].authors.length()").value(2))
                 .andExpect(jsonPath("$[0].authors[0]").value("Eric Evans"))
                 .andExpect(jsonPath("$[0].authors[1]").value("Robert C. Martin"));
@@ -351,7 +375,7 @@ public class LoanControllerIT {
         saveLoan(saveCopy(cleanCode, "T-002"), reader, TODAY.minusDays(2), TODAY.plusDays(1), null, 0);
         saveLoan(saveCopy(cleanCode, "T-003"), reader, TODAY.minusDays(2), TODAY.plusDays(3), null, 0);
 
-        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+        mockMvc.perform(get("/loans/upcoming-returns").with(asReader(reader)))
                 .andExpect(jsonPath("$[0].dueDate").value("2026-10-16"))
                 .andExpect(jsonPath("$[1].dueDate").value("2026-10-18"))
                 .andExpect(jsonPath("$[2].dueDate").value("2026-10-20"));
@@ -364,7 +388,7 @@ public class LoanControllerIT {
             saveLoan(saveCopy(cleanCode, "T-00" + i), reader, TODAY.minusDays(2), TODAY.plusDays(i), null, 0);
         }
 
-        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+        mockMvc.perform(get("/loans/upcoming-returns").with(asReader(reader)))
                 .andExpect(jsonPath("$.length()").value(3));
     }
 
@@ -376,7 +400,8 @@ public class LoanControllerIT {
         }
 
         mockMvc.perform(get("/loans/upcoming-returns")
-                        .param("readerId", String.valueOf(reader)).param("limit", "2"))
+                        .with(asReader(reader))
+                        .param("limit", "2"))
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].dueDate").value("2026-10-16"))
                 .andExpect(jsonPath("$[1].dueDate").value("2026-10-17"));
@@ -389,7 +414,7 @@ public class LoanControllerIT {
                 TODAY.minusDays(14), 0);                                                            // devolvido
         saveLoan(saveCopy(cleanCode, "T-002"), reader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
 
-        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+        mockMvc.perform(get("/loans/upcoming-returns").with(asReader(reader)))
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].dueDate").value("2026-10-20"));
     }
@@ -400,18 +425,21 @@ public class LoanControllerIT {
         saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(20), TODAY.minusDays(13),
                 TODAY.minusDays(14), 0);                                                            // só devolvido
 
-        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+        mockMvc.perform(get("/loans/upcoming-returns").with(asReader(reader)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test
-    @DisplayName("Não retorna empréstimos de outro leitor")
+    @DisplayName("Usa o leitor autenticado e ignora readerId enviado na query")
     void doesNotReturnUpcomingReturnsOfAnotherReader() throws Exception {
         saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
         saveLoan(saveCopy(domainDrivenDesign, "T-002"), otherReader, TODAY.minusDays(2), TODAY.plusDays(1), null, 0);
 
-        mockMvc.perform(get("/loans/upcoming-returns").param("readerId", String.valueOf(reader)))
+        mockMvc.perform(get("/loans/upcoming-returns")
+                        .with(asReader(reader))
+                        .param("readerId", String.valueOf(otherReader)))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].title").value("Clean Code"));
     }
@@ -420,10 +448,12 @@ public class LoanControllerIT {
     @DisplayName("Retorna 400 quando limit é zero ou excede o máximo")
     void returnsBadRequest_whenLimitIsOutOfRange() throws Exception {
         mockMvc.perform(get("/loans/upcoming-returns")
-                        .param("readerId", String.valueOf(reader)).param("limit", "0"))
+                        .with(asReader(reader))
+                        .param("limit", "0"))
                 .andExpect(status().isBadRequest());
         mockMvc.perform(get("/loans/upcoming-returns")
-                        .param("readerId", String.valueOf(reader)).param("limit", "21"))
+                        .with(asReader(reader))
+                        .param("limit", "21"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -1008,12 +1038,20 @@ public class LoanControllerIT {
 
     @Test
     @WithMockUser(roles = "LIBRARIAN")
-    @DisplayName("Retorna 400 quando librarianId não é informado")
-    void returnsBadRequest_whenLibrarianIdIsMissing() throws Exception {
-        mockMvc.perform(post("/loans").with(csrf())
+    @DisplayName("Usa o bibliotecário autenticado, mesmo se librarianId vier na query")
+    void usesAuthenticatedLibrarian_whenLibrarianIdQueryParameterIsProvided() throws Exception {
+        saveCopy(cleanCode, "T-001");
+
+        mockMvc.perform(post("/loans")
+                        .with(asLibrarian(librarian))
+                        .param("librarianId", String.valueOf(reader))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerLoanJson(reader, "T-001", TODAY.plusDays(7))))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isCreated());
+
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "select count(*) from loans where librarian_id = ?", Integer.class, librarian));
     }
 
     @Test
@@ -1052,7 +1090,8 @@ public class LoanControllerIT {
 
         // O status final é derivado das datas: o histórico do leitor mostra RETURNED, com o vencimento original
         mockMvc.perform(get("/loans")
-                        .param("readerId", String.valueOf(reader)).param("status", "RETURNED"))
+                        .with(asReader(reader))
+                        .param("status", "RETURNED"))
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].status").value("RETURNED"))
                 .andExpect(jsonPath("$.content[0].dueDate").value("2026-10-12"))
@@ -1172,15 +1211,17 @@ public class LoanControllerIT {
     }
 
     @Test
-    @DisplayName("Retorna 404 e não altera nada quando o empréstimo é de outro leitor")
+    @DisplayName("Retorna 404 sem alterações quando o empréstimo é de outro leitor, mesmo com readerId na query")
     void returnsNotFound_whenLoanBelongsToAnotherReader() throws Exception {
         Copy copy = saveCopy(cleanCode, "T-001");
         int loanId = saveLoanAndGetId(copy, otherReader, TODAY.minusDays(3), TODAY.plusDays(4), null, 0);
 
-        patchRenewal(loanId, reader)
-                .andExpect(status().isNotFound())
-                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
-                .andExpect(jsonPath("$.title").value("Recurso não encontrado"));
+        mockMvc.perform(patch("/loans/{id}", loanId)
+                        .with(asReader(reader))
+                        .param("readerId", String.valueOf(otherReader))
+                        .with(csrf()))
+                        .andExpect(status().isNotFound())
+                        .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON));
 
         assertLoanState(loanId, TODAY.plusDays(4), 0);
     }
@@ -1219,12 +1260,11 @@ public class LoanControllerIT {
     }
 
     @Test
-    @DisplayName("Retorna 400 quando o id não é numérico ou readerId não é informado")
-    void returnsBadRequest_whenIdIsNotNumericOrReaderIdIsMissing() throws Exception {
-        mockMvc.perform(patch("/loans/abc").param("readerId", String.valueOf(reader)).with(csrf()))
-                .andExpect(status().isBadRequest());
-
-        mockMvc.perform(patch("/loans/1").with(csrf()))
+    @DisplayName("Retorna 400 quando o id não é numérico")
+    void returnsBadRequest_whenIdIsNotNumeric() throws Exception {
+        mockMvc.perform(patch("/loans/abc")
+                        .with(asReader(reader))
+                        .with(csrf()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -1287,7 +1327,7 @@ public class LoanControllerIT {
 
     private ResultActions postLoan(int librarianId, String json) throws Exception {
         return mockMvc.perform(post("/loans")
-                .param("librarianId", String.valueOf(librarianId))
+                .with(asLibrarian(librarianId))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json));
@@ -1330,7 +1370,7 @@ public class LoanControllerIT {
 
     private ResultActions patchRenewal(int loanId, int readerId) throws Exception {
         return mockMvc.perform(patch("/loans/{id}", loanId)
-                .param("readerId", String.valueOf(readerId))
+                .with(asReader(readerId))
                 .with(csrf()));
     }
 

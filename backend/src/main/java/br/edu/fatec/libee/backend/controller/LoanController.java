@@ -1,5 +1,6 @@
 package br.edu.fatec.libee.backend.controller;
 
+import br.edu.fatec.libee.backend.config.CurrentUserId;
 import br.edu.fatec.libee.backend.dto.request.RegisterLoanRequest;
 import br.edu.fatec.libee.backend.dto.request.RegisterReturnRequest;
 import br.edu.fatec.libee.backend.dto.response.*;
@@ -24,8 +25,7 @@ public class LoanController {
 
     @GetMapping
     public PageResponse<ReaderLoanResponse> listMyLoans(
-            // TODO: remover quando o login (UC01) estiver pronto; passar a usar o id do usuário autenticado
-            @RequestParam Integer readerId,
+            @CurrentUserId Integer readerId,
             @RequestParam(required = false) List<LoanStatus> status,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") @Min(0) int page,
@@ -35,19 +35,16 @@ public class LoanController {
 
     @GetMapping("/upcoming-returns")
     public List<UpcomingReturnResponse> listUpcomingReturns(
-            // TODO: remover quando o login (UC01) estiver pronto; passar a usar o id do usuário autenticado
-            @RequestParam Integer readerId,
+            @CurrentUserId Integer readerId,
             @RequestParam(defaultValue = "3") @Min(1) @Max(5) int limit){
         return loanService.listUpcomingReturns(readerId, limit);
     }
 
-    // TODO: restringir a bibliotecário/administrador quando a autenticação existir
     @GetMapping("/management/summary")
     public ResponseEntity<LoanSummaryResponse> getSummary(){
         return ResponseEntity.ok(loanService.getSummary());
     }
 
-    // TODO: restringir a bibliotecário/administrador quando a autenticação existir
     @GetMapping("/management")
     public PageResponse<ActiveLoanResponse> listActiveLoans(
             @RequestParam(required = false) List<ActiveLoanStatus> status,
@@ -57,7 +54,6 @@ public class LoanController {
         return loanService.listActiveLoans(status, search, page, size);
     }
 
-    // TODO: restringir a bibliotecário/administrador quando a autenticação existir
     @GetMapping("/management/returns")
     public PageResponse<ReturnLoanResponse> listReturns(
             @RequestParam(required = false) String search,
@@ -66,17 +62,14 @@ public class LoanController {
         return loanService.listReturns(search, page, size);
     }
 
-    // TODO: restringir a bibliotecário/administrador quando a autenticação existir
     @PostMapping
     public ResponseEntity<ActiveLoanResponse> register(
-            // TODO: remover quando o login (UC01) estiver pronto; passar a usar o id do usuário autenticado
-            @RequestParam Integer librarianId,
+            @CurrentUserId Integer librarianId,
             @Valid @RequestBody RegisterLoanRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(loanService.register(librarianId, request));
     }
 
-    // TODO: restringir a bibliotecário/administrador quando a autenticação existir
     @PostMapping("/returns")
     public ReturnLoanResponse registerReturn(@Valid @RequestBody RegisterReturnRequest request) {
         return loanService.registerReturn(request);
@@ -84,8 +77,7 @@ public class LoanController {
 
     @PatchMapping("/{id}")
     public ReaderLoanResponse renew(
-            // TODO: remover quando o login (UC01) estiver pronto; passar a usar o id do usuário autenticado
-            @RequestParam Integer readerId,
+            @CurrentUserId Integer readerId,
             @PathVariable Integer id) {
         return loanService.renew(readerId, id);
     }

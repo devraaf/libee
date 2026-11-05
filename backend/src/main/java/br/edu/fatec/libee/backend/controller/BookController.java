@@ -34,7 +34,6 @@ public class BookController {
         return ResponseEntity.ok(bookService.getBookById(id));
     }
 
-    // TODO: restringir a bibliotecário/administrador quando a autenticação existir
     @GetMapping("/management")
     public PageResponse<BookManagementItemResponse> listForManagement(
             @RequestParam(required = false) String q,
