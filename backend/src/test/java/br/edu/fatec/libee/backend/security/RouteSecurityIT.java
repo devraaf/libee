@@ -20,6 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 public class RouteSecurityIT extends AbstractIntegrationTest {
 
     private static final List<String> ALL = List.of("READER", "LIBRARIAN", "ADMINISTRATOR");
+    private static final List<String> STAFF = List.of("LIBRARIAN", "ADMINISTRATOR");
 
     private record Route(HttpMethod method, String path, List<String> allowedRoles) {}
 
@@ -37,6 +38,7 @@ public class RouteSecurityIT extends AbstractIntegrationTest {
             new Route(HttpMethod.POST, "/categories", List.of("LIBRARIAN")),
             new Route(HttpMethod.DELETE, "/books/1", List.of("LIBRARIAN")),
             new Route(HttpMethod.DELETE, "/books/1/copies/1", List.of("LIBRARIAN")),
+            new Route(HttpMethod.GET, "/readers/summary", STAFF),
             new Route(HttpMethod.GET, "/loans", List.of("READER")),
             new Route(HttpMethod.GET, "/loans/upcoming-returns", List.of("READER")),
             new Route(HttpMethod.PATCH, "/loans/1", List.of("READER")),

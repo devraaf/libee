@@ -1,4 +1,4 @@
-package br.edu.fatec.libee.backend.controller;
+package br.edu.fatec.libee.backend.config;
 
 import br.edu.fatec.libee.backend.entity.User;
 import br.edu.fatec.libee.backend.enums.UserProfile;
