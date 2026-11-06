@@ -1,15 +1,24 @@
 package br.edu.fatec.libee.backend.controller;
 
 import br.edu.fatec.libee.backend.AbstractIntegrationTest;
+import br.edu.fatec.libee.backend.entity.Course;
+import br.edu.fatec.libee.backend.entity.Student;
 import br.edu.fatec.libee.backend.entity.User;
+import br.edu.fatec.libee.backend.enums.AffiliationType;
 import br.edu.fatec.libee.backend.enums.UserProfile;
+import br.edu.fatec.libee.backend.repository.StudentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
 
 import java.time.LocalDate;
 
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -17,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WithMockUser(roles = "LIBRARIAN")
 public class ReaderControllerIT extends AbstractIntegrationTest {
 
+    @Autowired private StudentRepository studentRepository;
     private User librarian;
     private User reader;
     private User otherReader;
@@ -27,6 +37,193 @@ public class ReaderControllerIT extends AbstractIntegrationTest {
         truncate("loans", "book_copies", "book_author", "books", "authors",
                 "categories", "students", "users", "courses");
         librarian = testData.saveUser("biblio@test.com", UserProfile.LIBRARIAN);
+        testData.saveUser("admin@test.com", UserProfile.ADMINISTRATOR);
+    }
+
+    // TESTES DE GET /readers - Lista de leitores do bibliotecário
+    @Test
+    @DisplayName("Lista todos os leitores quando autenticado como administrador")
+    @WithMockUser(username = "admin@fatec.br", roles = "ADMINISTRATOR")
+    void listsAllReaders_whenAuthenticatedAsAdministrator() throws Exception {
+        saveReaders();
+
+        mockMvc.perform(get("/readers")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[0].name").value("Ana Silva"))
+                .andExpect(jsonPath("$.content[1].name").value("Bruno Souza"))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.content[0].courseName").value(nullValue()))
+                .andExpect(jsonPath("$.content[0].passwordHash").doesNotExist())
+                .andExpect(jsonPath("$.content[0].email").value("ana@test.com"))
+                .andExpect(jsonPath("$.content[0].phone").value("11999990000"));
+    }
+
+    @Test
+    @DisplayName("Retorna a página e o total de páginas solicitados")
+    void paginatesReaders() throws Exception {
+        saveReaders();
+
+        mockMvc.perform(get("/readers").param("page", "1").param("size", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].name").value("Bruno Souza"))
+                .andExpect(jsonPath("$.page").value(1))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.totalPages").value(2));
+    }
+
+    @Test
+    @DisplayName("Filtra leitores pelo nome")
+    @WithMockUser(username = "admin@fatec.br", roles = "ADMINISTRATOR")
+    void filtersReadersByName() throws Exception {
+        saveReaders();
+
+        mockMvc.perform(get("/readers")
+                        .param("search", "Ana")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].name").value("Ana Silva"));
+    }
+
+    @Test
+    @DisplayName("Pesquisa por e-mail sem diferenciar maiúsculas de minúsculas")
+    void searchesByEmailIgnoringCase() throws Exception {
+        saveReaders();
+
+        mockMvc.perform(get("/readers").param("search", "ANA@TEST.COM"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].name").value("Ana Silva"));
+    }
+
+    @Test
+    @DisplayName("Filtra leitores pelo tipo de vínculo")
+    void filtersReadersByLinkType() throws Exception {
+        saveReaders();
+        reader.setAffiliationType(AffiliationType.PROFESSOR);
+
+        mockMvc.perform(get("/readers").param("linkType", "PROFESSOR"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].name").value("Ana Silva"));
+    }
+
+    @Test
+    @DisplayName("Filtra leitores pelo curso")
+    void filtersReadersByCourse() throws Exception {
+        saveReaders();
+        reader.setAffiliationType(AffiliationType.STUDENT);
+        Course course = testData.saveCourse("Engenharia de Software");
+        Student student = new Student();
+        student.setUser(reader);
+        student.setCourse(course);
+        studentRepository.save(student);
+
+        mockMvc.perform(get("/readers").param("courseId", course.getId().toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].name").value("Ana Silva"))
+                .andExpect(jsonPath("$.content[0].courseName").value("Engenharia de Software"));
+    }
+
+    @Test
+    @DisplayName("Filtra leitores pendentes pela situação calculada na view")
+    void filtersReadersByPendingStatus() throws Exception {
+        saveReaders();
+        testData.saveLoan(reader, librarian, TODAY.minusDays(1), null);
+        testData.saveLoan(otherReader, librarian, TODAY.plusDays(1), null);
+
+        mockMvc.perform(get("/readers").param("status", "PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].name").value("Ana Silva"))
+                .andExpect(jsonPath("$.content[0].status").value("PENDING"));
+    }
+
+    @Test
+    @DisplayName("Filtra leitores regulares pela situação calculada na view")
+    void filtersReadersByRegularStatus() throws Exception {
+        saveReaders();
+        testData.saveLoan(reader, librarian, TODAY.minusDays(1), null);
+        testData.saveLoan(otherReader, librarian, TODAY.plusDays(1), null);
+
+        mockMvc.perform(get("/readers").param("status", "REGULAR"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].name").value("Bruno Souza"))
+                .andExpect(jsonPath("$.content[0].status").value("REGULAR"));
+    }
+
+    @Test
+    @DisplayName("Combina pesquisa, vínculo e situação")
+    void combinesSearchLinkTypeAndStatusFilters() throws Exception {
+        saveReaders();
+        reader.setAffiliationType(AffiliationType.PROFESSOR);
+        testData.saveLoan(reader, librarian, TODAY.minusDays(1), null);
+        testData.saveLoan(otherReader, librarian, TODAY.plusDays(1), null);
+
+        mockMvc.perform(get("/readers")
+                        .param("search", "ANA")
+                        .param("linkType", "PROFESSOR")
+                        .param("status", "PENDING"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].name").value("Ana Silva"));
+    }
+
+    @Test
+    @DisplayName("Retorna lista vazia quando a pesquisa não encontra leitores")
+    void returnsEmptyList_whenSearchHasNoMatches() throws Exception {
+        mockMvc.perform(get("/readers").param("search", "inexistente"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(0)))
+                .andExpect(jsonPath("$.totalElements").value(0))
+                .andExpect(jsonPath("$.totalPages").value(0));
+    }
+
+    @Test
+    @DisplayName("Retorna 400 para tipo de vínculo inválido")
+    void returnsBadRequest_whenLinkTypeIsInvalid() throws Exception {
+        mockMvc.perform(get("/readers").param("linkType", "INVALID"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Retorna 400 para situação inválida")
+    void returnsBadRequest_whenStatusIsInvalid() throws Exception {
+        mockMvc.perform(get("/readers").param("status", "INVALID"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Retorna quantidade de empréstimos ativos e situação regular ou pendente")
+    void returnsActiveLoanCountAndReaderStatus() throws Exception {
+        saveReaders();
+        testData.saveLoan(reader, librarian, TODAY.plusDays(1), null);
+        testData.saveLoan(reader, librarian, TODAY.minusDays(1), null);
+        testData.saveLoan(reader, librarian, TODAY.minusDays(3), TODAY.minusDays(1));
+        testData.saveLoan(otherReader, librarian, TODAY.plusDays(2), null);
+
+        mockMvc.perform(get("/readers"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].activeLoans").value(2))
+                .andExpect(jsonPath("$.content[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.content[1].activeLoans").value(1))
+                .andExpect(jsonPath("$.content[1].status").value("REGULAR"));
+    }
+
+    @Test
+    @DisplayName("Retorna não autorizado quando não há usuário autenticado")
+    @WithAnonymousUser
+    void returnsUnauthorized_whenNotAuthenticated() throws Exception {
+        mockMvc.perform(get("/readers")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isUnauthorized());
     }
 
     // TESTES DE GET /readers/summary - Resumo de leitores do bibliotecário
@@ -134,5 +331,8 @@ public class ReaderControllerIT extends AbstractIntegrationTest {
     private void saveReaders() {
         reader = testData.saveUser("ana@test.com", UserProfile.READER);
         otherReader = testData.saveUser("bruno@test.com", UserProfile.READER);
+        reader.setName("Ana Silva");
+        reader.setPhone("11999990000");
+        otherReader.setName("Bruno Souza");
     }
 }
