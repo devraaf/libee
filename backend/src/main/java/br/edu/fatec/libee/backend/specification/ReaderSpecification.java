@@ -1,10 +1,11 @@
 package br.edu.fatec.libee.backend.specification;
 
-import br.edu.fatec.libee.backend.entity.Loan;
+import br.edu.fatec.libee.backend.entity.LoanStatusView;
 import br.edu.fatec.libee.backend.entity.Student;
 import br.edu.fatec.libee.backend.entity.User;
 import br.edu.fatec.libee.backend.enums.AffiliationType;
 import br.edu.fatec.libee.backend.enums.LoanStatus;
+import br.edu.fatec.libee.backend.enums.ReaderStatus;
 import br.edu.fatec.libee.backend.enums.UserProfile;
 import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
@@ -12,7 +13,6 @@ import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -61,28 +61,26 @@ public final class ReaderSpecification {
 
     // Leitores com pelo menos um empréstimo em algum dos status informados.
     // Mesma regra de LoanStatus.of, traduzida para SQL.
-    public static Specification<User> hasLoanInStatus(Collection<LoanStatus> statuses, LocalDate today) {
+    public static Specification<User> hasStatus(Collection<ReaderStatus> statuses) {
         return (root, query, cb) -> {
             if (statuses == null || statuses.isEmpty()) {
                 return null; // sem filtro
             }
-            Subquery<Integer> sub = query.subquery(Integer.class);
-            Root<Loan> l = sub.from(Loan.class);
-            Path<LocalDate> dueDate = l.get("dueDate");
-            Predicate open = cb.isNull(l.get("returnDate"));
 
-            List<Predicate> anyOf = new ArrayList<>();
-            for (LoanStatus status : statuses) {
-                anyOf.add(switch (status) {
-                    case RETURNED -> cb.isNotNull(l.get("returnDate"));
-                    case OVERDUE -> cb.and(open, cb.lessThan(dueDate, today));
-                    case ON_TIME -> cb.and(open, cb.greaterThanOrEqualTo(dueDate, today));
-                });
+            Subquery<Integer> sub = query.subquery(Integer.class);
+            Root<LoanStatusView> loan = sub.from(LoanStatusView.class);
+            sub.select(loan.get("id")).where(
+                    cb.equal(loan.get("readerId"), root.get("id")),
+                    cb.equal(loan.get("status"), LoanStatus.OVERDUE));
+            Predicate hasOverdueLoan = cb.exists(sub);
+
+            List<Predicate> anyOf = new ArrayList<>(statuses.size());
+            for (ReaderStatus status : statuses) {
+                anyOf.add(status == ReaderStatus.PENDING
+                        ? hasOverdueLoan
+                        : cb.not(hasOverdueLoan));
             }
-            sub.select(l.get("id")).where(
-                    cb.equal(l.get("reader").get("id"), root.get("id")),
-                    cb.or(anyOf.toArray(new Predicate[0])));
-            return cb.exists(sub);
+            return cb.or(anyOf.toArray(new Predicate[0]));
         };
     }
 

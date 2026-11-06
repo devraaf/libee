@@ -39,6 +39,7 @@ public class RouteSecurityIT extends AbstractIntegrationTest {
             new Route(HttpMethod.DELETE, "/books/1", List.of("LIBRARIAN")),
             new Route(HttpMethod.DELETE, "/books/1/copies/1", List.of("LIBRARIAN")),
             new Route(HttpMethod.GET, "/readers/summary", STAFF),
+            new Route(HttpMethod.GET, "/readers", STAFF),
             new Route(HttpMethod.GET, "/loans", List.of("READER")),
             new Route(HttpMethod.GET, "/loans/upcoming-returns", List.of("READER")),
             new Route(HttpMethod.PATCH, "/loans/1", List.of("READER")),

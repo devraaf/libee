@@ -1,6 +1,7 @@
 package br.edu.fatec.libee.backend.dto.response;
 
 import br.edu.fatec.libee.backend.enums.AffiliationType;
+import br.edu.fatec.libee.backend.enums.ReaderStatus;
 
 public record ReaderListItemResponse(
         Integer id,
@@ -10,6 +11,5 @@ public record ReaderListItemResponse(
         AffiliationType affiliationType,
         String courseName,
         long activeLoans,
-        long overdueLoans,
-        long totalLoans) {
+        ReaderStatus status) {
 }

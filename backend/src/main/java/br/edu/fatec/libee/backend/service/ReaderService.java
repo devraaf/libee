@@ -6,6 +6,7 @@ import br.edu.fatec.libee.backend.dto.response.ReaderSummaryResponse;
 import br.edu.fatec.libee.backend.entity.User;
 import br.edu.fatec.libee.backend.enums.AffiliationType;
 import br.edu.fatec.libee.backend.enums.LoanStatus;
+import br.edu.fatec.libee.backend.enums.ReaderStatus;
 import br.edu.fatec.libee.backend.repository.UserRepository;
 import br.edu.fatec.libee.backend.specification.ReaderSpecification;
 import jakarta.persistence.EntityManager;
@@ -43,9 +44,8 @@ public class ReaderService {
     @Transactional(readOnly = true)
     public PageResponse<ReaderListItemResponse> list(
             String search, AffiliationType linkType, Integer courseId,
-            List<LoanStatus> loanStatuses, int page, int size) {
+            List<ReaderStatus> statuses, int page, int size) {
 
-        LocalDate today = LocalDate.now(clock);
         Pageable pageable = PageRequest.of(page, size, Sort.by("name", "id"));
 
         Specification<User> spec = Specification.allOf(
@@ -53,16 +53,16 @@ public class ReaderService {
                 ReaderSpecification.matchesSearch(search),
                 ReaderSpecification.hasAffiliationType(linkType),
                 ReaderSpecification.hasCourse(courseId),
-                ReaderSpecification.hasLoanInStatus(loanStatuses, today));
+                ReaderSpecification.hasStatus(statuses));
 
         Page<User> readers = userRepository.findAll(spec, pageable);
 
         List<Integer> ids = readers.getContent().stream().map(User::getId).toList();
         Map<Integer, String> courses = loadCourseNames(ids);
-        Map<Integer, long[]> loans = loadLoanCounts(ids, today);
+        Map<Integer, LoanCounts> loans = loadLoanCounts(ids);
 
         return PageResponse.from(readers.map(user -> {
-            long[] c = loans.getOrDefault(user.getId(), new long[]{0, 0, 0});
+            LoanCounts counts = loans.getOrDefault(user.getId(), new LoanCounts(0, 0));
             return new ReaderListItemResponse(
                     user.getId(),
                     user.getName(),
@@ -70,10 +70,10 @@ public class ReaderService {
                     user.getPhone(),
                     user.getAffiliationType(),
                     courses.get(user.getId()),
-                    c[0], c[1], c[2]);
+                    counts.activeLoans(),
+                    counts.overdueLoans() > 0 ? ReaderStatus.PENDING : ReaderStatus.REGULAR);
         }));
     }
-
 
     private Map<Integer, String> loadCourseNames(List<Integer> ids) {
         Map<Integer, String> result = new HashMap<>();
@@ -91,27 +91,29 @@ public class ReaderService {
         return result;
     }
 
-    private Map<Integer, long[]> loadLoanCounts(List<Integer> ids, LocalDate today) {
-        Map<Integer, long[]> result = new HashMap<>();
+    private Map<Integer, LoanCounts> loadLoanCounts(List<Integer> ids) {
+        Map<Integer, LoanCounts> result = new HashMap<>();
         if (ids.isEmpty()) {
             return result;
         }
         List<Object[]> rows = entityManager.createQuery(
-                        "select l.reader.id, "
-                                + "sum(case when l.returnDate is null then 1L else 0L end), "
-                                + "sum(case when l.returnDate is null and l.dueDate < :today then 1L else 0L end), "
-                                + "count(l) "
-                                + "from Loan l where l.reader.id in :ids group by l.reader.id",
+                        "select l.readerId, "
+                                + "sum(case when l.status <> :returned then 1L else 0L end), "
+                                + "sum(case when l.status = :overdue then 1L else 0L end) "
+                                + "from LoanStatusView l where l.readerId in :ids group by l.readerId",
                         Object[].class)
                 .setParameter("ids", ids)
-                .setParameter("today", today)
+                .setParameter("returned", LoanStatus.RETURNED)
+                .setParameter("overdue", LoanStatus.OVERDUE)
                 .getResultList();
         for (Object[] row : rows) {
-            result.put((Integer) row[0], new long[]{
+            result.put((Integer) row[0], new LoanCounts(
                     ((Number) row[1]).longValue(),
-                    ((Number) row[2]).longValue(),
-                    ((Number) row[3]).longValue()});
+                    ((Number) row[2]).longValue()));
         }
         return result;
+    }
+
+    private record LoanCounts(long activeLoans, long overdueLoans) {
     }
 }
