@@ -27,16 +27,23 @@ public class TestData {
     private final BookRepository bookRepository;
     private final CopyRepository copyRepository;
     private final LoanRepository loanRepository;
+    private final StudentRepository studentRepository;
     private final AtomicInteger sequence = new AtomicInteger();
 
-    public User saveUser(String email, UserProfile profile) {
+    public User saveUser(String name, String email, String phone,
+                         AffiliationType affiliationType, UserProfile profile) {
         User user = new User();
-        user.setName("Usuário de Teste");
+        user.setName(name);
         user.setEmail(email);
+        user.setPhone(phone);
         user.setPasswordHash(passwordEncoder.encode(PASSWORD));
-        user.setAffiliationType(AffiliationType.EMPLOYEE);
+        user.setAffiliationType(affiliationType);
         user.setProfile(profile);
         return userRepository.save(user);
+    }
+
+    public User saveUser(String email, UserProfile profile) {
+        return saveUser("Usuário de Teste", email, null, AffiliationType.EMPLOYEE, profile);
     }
 
     public Course saveCourse(String name) {
@@ -94,5 +101,12 @@ public class TestData {
         loan.setDueDate(dueDate);
         loan.setReturnDate(returnDate);
         return loanRepository.saveAndFlush(loan);
+    }
+
+    public Student saveStudent(User user, Course course) {
+        Student student = new Student();
+        student.setUser(user);
+        student.setCourse(course);
+        return studentRepository.saveAndFlush(student);
     }
 }
