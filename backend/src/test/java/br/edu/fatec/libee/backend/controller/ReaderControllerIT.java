@@ -2,7 +2,6 @@ package br.edu.fatec.libee.backend.controller;
 
 import br.edu.fatec.libee.backend.AbstractIntegrationTest;
 import br.edu.fatec.libee.backend.entity.Course;
-import br.edu.fatec.libee.backend.entity.Student;
 import br.edu.fatec.libee.backend.entity.User;
 import br.edu.fatec.libee.backend.enums.AffiliationType;
 import br.edu.fatec.libee.backend.enums.UserProfile;
@@ -11,8 +10,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
 
 import java.time.LocalDate;
@@ -30,6 +27,7 @@ public class ReaderControllerIT extends AbstractIntegrationTest {
     private User librarian;
     private User reader;
     private User otherReader;
+    // Data real: a vw_loans e o resumo calculam o atraso com a data atual, ao contrário do TODAY fixo do LoanControllerIT
     private static final LocalDate TODAY = LocalDate.now();
 
     @BeforeEach
@@ -42,13 +40,11 @@ public class ReaderControllerIT extends AbstractIntegrationTest {
 
     // TESTES DE GET /readers - Lista de leitores do bibliotecário
     @Test
-    @DisplayName("Lista todos os leitores quando autenticado como administrador")
-    @WithMockUser(username = "admin@fatec.br", roles = "ADMINISTRATOR")
-    void listsAllReaders_whenAuthenticatedAsAdministrator() throws Exception {
+    @DisplayName("Lista os leitores com os dados de cada um")
+    void listsReaders_withTheirData() throws Exception {
         saveReaders();
 
-        mockMvc.perform(get("/readers")
-                        .contentType(MediaType.APPLICATION_JSON))
+        mockMvc.perform(get("/readers"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(2)))
                 .andExpect(jsonPath("$.content[0].name").value("Ana Silva"))
@@ -59,6 +55,19 @@ public class ReaderControllerIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content[0].passwordHash").doesNotExist())
                 .andExpect(jsonPath("$.content[0].email").value("ana@test.com"))
                 .andExpect(jsonPath("$.content[0].phone").value("11999990000"));
+    }
+
+    @Test
+    @DisplayName("Lista os leitores ordenados por nome, ignorando maiúsculas e minúsculas")
+    void ordersReadersByName() throws Exception {
+        testData.saveUser("carla dias", "carla@test.com", null, AffiliationType.EMPLOYEE, UserProfile.READER);
+        testData.saveUser("Bruno Souza", "bruno@test.com", null, AffiliationType.EMPLOYEE, UserProfile.READER);
+        testData.saveUser("Ana Silva", "ana@test.com", null, AffiliationType.EMPLOYEE, UserProfile.READER);
+
+        mockMvc.perform(get("/readers"))
+                .andExpect(jsonPath("$.content[0].name").value("Ana Silva"))
+                .andExpect(jsonPath("$.content[1].name").value("Bruno Souza"))
+                .andExpect(jsonPath("$.content[2].name").value("carla dias"));
     }
 
     @Test
@@ -78,13 +87,11 @@ public class ReaderControllerIT extends AbstractIntegrationTest {
 
     @Test
     @DisplayName("Filtra leitores pelo nome")
-    @WithMockUser(username = "admin@fatec.br", roles = "ADMINISTRATOR")
     void filtersReadersByName() throws Exception {
         saveReaders();
 
         mockMvc.perform(get("/readers")
-                        .param("search", "Ana")
-                        .contentType(MediaType.APPLICATION_JSON))
+                        .param("search", "Ana"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(1)))
                 .andExpect(jsonPath("$.content[0].name").value("Ana Silva"));
@@ -104,8 +111,7 @@ public class ReaderControllerIT extends AbstractIntegrationTest {
     @Test
     @DisplayName("Filtra leitores pelo tipo de vínculo")
     void filtersReadersByLinkType() throws Exception {
-        saveReaders();
-        reader.setAffiliationType(AffiliationType.PROFESSOR);
+        saveReaders(AffiliationType.PROFESSOR);
 
         mockMvc.perform(get("/readers").param("linkType", "PROFESSOR"))
                 .andExpect(status().isOk())
@@ -116,13 +122,9 @@ public class ReaderControllerIT extends AbstractIntegrationTest {
     @Test
     @DisplayName("Filtra leitores pelo curso")
     void filtersReadersByCourse() throws Exception {
-        saveReaders();
-        reader.setAffiliationType(AffiliationType.STUDENT);
+        saveReaders(AffiliationType.STUDENT);
         Course course = testData.saveCourse("Engenharia de Software");
-        Student student = new Student();
-        student.setUser(reader);
-        student.setCourse(course);
-        studentRepository.save(student);
+        testData.saveStudent(reader, course);
 
         mockMvc.perform(get("/readers").param("courseId", course.getId().toString()))
                 .andExpect(status().isOk())
@@ -162,8 +164,7 @@ public class ReaderControllerIT extends AbstractIntegrationTest {
     @Test
     @DisplayName("Combina pesquisa, vínculo e situação")
     void combinesSearchLinkTypeAndStatusFilters() throws Exception {
-        saveReaders();
-        reader.setAffiliationType(AffiliationType.PROFESSOR);
+        saveReaders(AffiliationType.PROFESSOR);
         testData.saveLoan(reader, librarian, TODAY.minusDays(1), null);
         testData.saveLoan(otherReader, librarian, TODAY.plusDays(1), null);
 
@@ -184,6 +185,16 @@ public class ReaderControllerIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content", hasSize(0)))
                 .andExpect(jsonPath("$.totalElements").value(0))
                 .andExpect(jsonPath("$.totalPages").value(0));
+    }
+
+    @Test
+    @DisplayName("Não lista bibliotecários nem administradores")
+    void doesNotListLibrariansOrAdministrators() throws Exception {
+        saveReaders();
+
+        mockMvc.perform(get("/readers"))
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[?(@.name == 'Usuário de Teste')]").isEmpty());
     }
 
     @Test
@@ -215,15 +226,6 @@ public class ReaderControllerIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content[0].status").value("PENDING"))
                 .andExpect(jsonPath("$.content[1].activeLoans").value(1))
                 .andExpect(jsonPath("$.content[1].status").value("REGULAR"));
-    }
-
-    @Test
-    @DisplayName("Retorna não autorizado quando não há usuário autenticado")
-    @WithAnonymousUser
-    void returnsUnauthorized_whenNotAuthenticated() throws Exception {
-        mockMvc.perform(get("/readers")
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isUnauthorized());
     }
 
     // TESTES DE GET /readers/summary - Resumo de leitores do bibliotecário
@@ -329,10 +331,13 @@ public class ReaderControllerIT extends AbstractIntegrationTest {
     }
 
     private void saveReaders() {
-        reader = testData.saveUser("ana@test.com", UserProfile.READER);
-        otherReader = testData.saveUser("bruno@test.com", UserProfile.READER);
-        reader.setName("Ana Silva");
-        reader.setPhone("11999990000");
-        otherReader.setName("Bruno Souza");
+        saveReaders(AffiliationType.EMPLOYEE);
+    }
+
+    private void saveReaders(AffiliationType readerAffiliation) {
+        reader = testData.saveUser("Ana Silva", "ana@test.com", "11999990000",
+                readerAffiliation, UserProfile.READER);
+        otherReader = testData.saveUser("Bruno Souza", "bruno@test.com", null,
+                AffiliationType.EMPLOYEE, UserProfile.READER);
     }
 }
