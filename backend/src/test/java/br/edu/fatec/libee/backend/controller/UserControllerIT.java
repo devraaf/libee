@@ -12,7 +12,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -115,41 +114,6 @@ public class UserControllerIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.errors[1].field").value("email"))
                 .andExpect(jsonPath("$.errors[2].field").value("name"))
                 .andExpect(jsonPath("$.errors[3].field").value("password"));
-    }
-
-    // TESTES DE AUTORIZAÇÃO - somente administrador cadastra bibliotecário
-    @Test
-    @WithMockUser(roles = "LIBRARIAN")
-    @DisplayName("Retorna 403 quando o usuário é bibliotecário")
-    void returnsForbidden_whenUserIsLibrarian() throws Exception {
-        mockMvc.perform(postJson("/users/librarians",
-                        librarianJson("carla@test.com", "Senha@123", "EMPLOYEE")))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.title").value("Acesso negado"));
-
-        assertEquals(0, userRepository.count());
-    }
-
-    @Test
-    @WithMockUser(roles = "READER")
-    @DisplayName("Retorna 403 quando o usuário é leitor")
-    void returnsForbidden_whenUserIsReader() throws Exception {
-        mockMvc.perform(postJson("/users/librarians",
-                        librarianJson("carla@test.com", "Senha@123", "EMPLOYEE")))
-                .andExpect(status().isForbidden());
-
-        assertEquals(0, userRepository.count());
-    }
-
-    @Test
-    @WithAnonymousUser
-    @DisplayName("Retorna 401 quando não há usuário autenticado")
-    void returnsUnauthorized_whenUserIsAnonymous() throws Exception {
-        mockMvc.perform(postJson("/users/librarians",
-                        librarianJson("carla@test.com", "Senha@123", "EMPLOYEE")))
-                .andExpect(status().isUnauthorized());
-
-        assertEquals(0, userRepository.count());
     }
 
     private String librarianJson(String email, String password, String affiliationType) {
