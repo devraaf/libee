@@ -1,5 +1,6 @@
 package br.edu.fatec.libee.backend.config;
 
+import br.edu.fatec.libee.backend.AbstractIntegrationTest;
 import br.edu.fatec.libee.backend.entity.User;
 import br.edu.fatec.libee.backend.enums.UserProfile;
 import br.edu.fatec.libee.backend.service.TokenService;
@@ -7,22 +8,12 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.*;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -30,21 +21,11 @@ import java.time.Instant;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
-@ActiveProfiles("test")
-@AutoConfigureMockMvc
-@Transactional
-@Testcontainers
-public class SecurityConfigIT {
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16");
 
-    @Autowired MockMvc mockMvc;
+public class SecurityConfigIT extends AbstractIntegrationTest {
+
     @Autowired TokenService tokenService;
     @Autowired JwtEncoder jwtEncoder;
-
-    // Sem @WithMockUser de propósito: esta classe testa a autenticação real
 
     // TESTES DE ROTA PROTEGIDA - token ausente, inválido, de outro segredo e expirado
     @Test
