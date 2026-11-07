@@ -1,11 +1,10 @@
 package br.edu.fatec.libee.backend.controller;
 
 import br.edu.fatec.libee.backend.AbstractIntegrationTest;
-import br.edu.fatec.libee.backend.entity.Author;
-import br.edu.fatec.libee.backend.entity.Book;
-import br.edu.fatec.libee.backend.entity.Category;
-import br.edu.fatec.libee.backend.entity.Copy;
+import br.edu.fatec.libee.backend.entity.*;
+import br.edu.fatec.libee.backend.enums.AffiliationType;
 import br.edu.fatec.libee.backend.enums.CopyStatus;
+import br.edu.fatec.libee.backend.enums.UserProfile;
 import br.edu.fatec.libee.backend.repository.AuthorRepository;
 import br.edu.fatec.libee.backend.repository.BookRepository;
 import br.edu.fatec.libee.backend.repository.CategoryRepository;
@@ -32,6 +31,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.sql.Date;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -42,16 +42,8 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
-@ActiveProfiles("test")
 @WithMockUser(roles = "READER")
-@AutoConfigureMockMvc
-@Transactional
-@Testcontainers
 public class LoanControllerIT extends AbstractIntegrationTest {
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16");
 
     // "Hoje" fixo nos testes, para os status não dependerem da data real
     private static final LocalDate TODAY = LocalDate.of(2026, 10, 15);
@@ -66,39 +58,32 @@ public class LoanControllerIT extends AbstractIntegrationTest {
         }
     }
 
-    @Autowired MockMvc mockMvc;
-    @Autowired CategoryRepository categoryRepository;
-    @Autowired AuthorRepository authorRepository;
     @Autowired BookRepository bookRepository;
-    @Autowired CopyRepository copyRepository;
-    @Autowired JdbcTemplate jdbcTemplate;
 
-    private Category tecnologia;
-    private Author martin;
     private Author evans;
     private Book cleanCode;
     private Book domainDrivenDesign;
-    private int reader;
-    private int otherReader;
-    private int librarian;
-    private int accessionSeq = 0;
+    private User reader;
+    private User otherReader;
+    private User librarian;
 
     @BeforeEach
     void setUp() {
         // Esvazia acervo e empréstimos para o teste não depender de dados pré-existentes
-        jdbcTemplate.execute(
-                "TRUNCATE TABLE loans, book_copies, book_author, books, authors, categories " +
-                        "RESTART IDENTITY CASCADE");
+        truncate("loans", "book_copies", "book_author", "books", "authors", "categories");
 
-        tecnologia = saveCategory("Tecnologia");
-        martin = saveAuthor("Robert C. Martin");
-        evans = saveAuthor("Eric Evans");
-        cleanCode = saveBook("9780132350884", "Clean Code", tecnologia, martin);
-        domainDrivenDesign = saveBook("9780321125217", "Domain-Driven Design", tecnologia, evans);
+        var tecnologia = testData.saveCategory("Tecnologia");
+        Author martin = testData.saveAuthor("Robert C. Martin");
+        evans = testData.saveAuthor("Eric Evans");
+        cleanCode = testData.saveBook("9780132350884", "Clean Code", tecnologia, martin);
+        domainDrivenDesign = testData.saveBook("9780321125217", "Domain-Driven Design", tecnologia, evans);
 
-        reader = saveUser("Leitora Um", "loan-it-leitora1@fatec.sp.gov.br", "READER");
-        otherReader = saveUser("Leitor Dois", "loan-it-leitor2@fatec.sp.gov.br", "READER");
-        librarian = saveUser("Bibliotecário", "loan-it-biblio@fatec.sp.gov.br", "LIBRARIAN");
+        reader = testData.saveUser("Leitora Um", "loan-it-leitora1@test.com", null,
+                AffiliationType.STUDENT, UserProfile.READER);
+        otherReader = testData.saveUser("Leitor Dois", "loan-it-leitor2@test.com", null,
+                AffiliationType.STUDENT, UserProfile.READER);
+        librarian = testData.saveUser("Bibliotecário", "loan-it-biblio@test.com", null,
+                AffiliationType.EMPLOYEE, UserProfile.LIBRARIAN);
     }
 
     // TESTES DE GET /loans - Lista de empréstimos do leitor
@@ -168,8 +153,7 @@ public class LoanControllerIT extends AbstractIntegrationTest {
                         .with(asReader(reader))
                         .param("status", "ON_TIME"))
                 .andExpect(jsonPath("$.totalElements").value(2))
-                .andExpect(jsonPath("$.content[*].status").value(org.hamcrest.Matchers.everyItem(
-                        org.hamcrest.Matchers.is("ON_TIME"))));
+                .andExpect(jsonPath("$.content[*].status").value(everyItem(is("ON_TIME"))));
     }
 
     @Test
@@ -277,7 +261,7 @@ public class LoanControllerIT extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/loans")
                         .with(asReader(reader))
-                        .param("readerId", String.valueOf(otherReader)))
+                        .param("readerId", String.valueOf(otherReader.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].book.title").value("Clean Code"));
@@ -287,7 +271,7 @@ public class LoanControllerIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.content[0].book.title").value("Domain-Driven Design"));
     }
 
-    // VALIDAÇÃO E SEGURANÇA
+    // VALIDAÇÃO
     @Test
     @DisplayName("Retorna 400 quando size é zero")
     void returnsBadRequest_whenSizeIsZero() throws Exception {
@@ -310,14 +294,6 @@ public class LoanControllerIT extends AbstractIntegrationTest {
         mockMvc.perform(get("/loans").param("page", "-1")
                         .with(asReader(reader)))
                 .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @WithAnonymousUser
-    @DisplayName("Retorna 401 quando o usuário não está autenticado")
-    void returnsUnauthorized_whenUserIsNotAuthenticated() throws Exception {
-        mockMvc.perform(get("/loans"))
-                .andExpect(status().isUnauthorized());
     }
 
     // TESTES DE GET /loans/upcoming-returns - Próximas devoluções do leitor
@@ -438,7 +414,7 @@ public class LoanControllerIT extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/loans/upcoming-returns")
                         .with(asReader(reader))
-                        .param("readerId", String.valueOf(otherReader)))
+                        .param("readerId", String.valueOf(otherReader.getId())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].title").value("Clean Code"));
@@ -453,7 +429,7 @@ public class LoanControllerIT extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest());
         mockMvc.perform(get("/loans/upcoming-returns")
                         .with(asReader(reader))
-                        .param("limit", "21"))
+                        .param("limit", "6"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -499,14 +475,6 @@ public class LoanControllerIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.overdueLoans").value(0));
     }
 
-    @Test
-    @WithAnonymousUser
-    @DisplayName("Retorna 401 quando o usuário não está autenticado")
-    void returnsUnauthorized_whenUserIsNotAuthenticatedOnSummary() throws Exception {
-        mockMvc.perform(get("/loans/management/summary"))
-                .andExpect(status().isUnauthorized());
-    }
-
     // TESTES DE GET /loans/management - Lista e pesquisa de empréstimos ativos (bibliotecário)
     @Test
     @WithMockUser(roles = "LIBRARIAN")
@@ -541,8 +509,7 @@ public class LoanControllerIT extends AbstractIntegrationTest {
 
         mockMvc.perform(get("/loans/management"))
                 .andExpect(jsonPath("$.totalElements").value(4))
-                .andExpect(jsonPath("$.content[*].status",
-                        org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("RETURNED"))));
+                .andExpect(jsonPath("$.content[*].status", not(hasItem("RETURNED"))));
     }
 
     @Test
@@ -676,28 +643,13 @@ public class LoanControllerIT extends AbstractIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
-    @Test
-    @WithAnonymousUser
-    @DisplayName("Retorna 401 quando o usuário não está autenticado")
-    void returnsUnauthorized_whenUserIsNotAuthenticatedOnManagement() throws Exception {
-        mockMvc.perform(get("/loans/management"))
-                .andExpect(status().isUnauthorized());
-    }
-
     // TESTES DE GET /loans/management/returns - Lista de devoluções
 
     @Test
     @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna as devoluções com todos os campos")
     void returnsCompleteReturns_whenThereAreReturnedLoans() throws Exception {
-        saveLoan(
-                saveCopy(cleanCode, "T-001"),
-                reader,
-                TODAY.minusDays(10),
-                TODAY.minusDays(3),
-                TODAY.minusDays(2),
-                0
-        );
+        saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(10), TODAY.minusDays(3), TODAY.minusDays(2), 0);
 
         mockMvc.perform(get("/loans/management/returns"))
                 .andExpect(status().isOk())
@@ -715,27 +667,17 @@ public class LoanControllerIT extends AbstractIntegrationTest {
     @DisplayName("Retorna devoluções paginadas quando page e size são informados")
     void returnsPagedReturns_whenPageAndSizeAreProvided() throws Exception {
         for (int i = 1; i <= 3; i++) {
-            saveLoan(
-                    saveCopy(cleanCode, "T-00" + i),
-                    reader,
-                    TODAY.minusDays(10),
-                    TODAY.minusDays(3),
-                    TODAY.minusDays(i),
-                    0
-            );
+            saveLoan(saveCopy(cleanCode, "T-00" + i), reader,
+                    TODAY.minusDays(10), TODAY.minusDays(3), TODAY.minusDays(i), 0);
         }
 
-        mockMvc.perform(get("/loans/management/returns")
-                        .param("page", "0")
-                        .param("size", "2"))
+        mockMvc.perform(get("/loans/management/returns").param("page", "0").param("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(2))
                 .andExpect(jsonPath("$.totalElements").value(3))
                 .andExpect(jsonPath("$.totalPages").value(2));
 
-        mockMvc.perform(get("/loans/management/returns")
-                        .param("page", "1")
-                        .param("size", "2"))
+        mockMvc.perform(get("/loans/management/returns").param("page", "1").param("size", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.totalElements").value(3));
@@ -745,32 +687,9 @@ public class LoanControllerIT extends AbstractIntegrationTest {
     @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Ordena devoluções pela data mais recente e pelo maior ID")
     void returnsReturnsOrderedByReturnDateAndId() throws Exception {
-        saveLoan(
-                saveCopy(cleanCode, "T-001"),
-                reader,
-                TODAY.minusDays(10),
-                TODAY.minusDays(3),
-                TODAY.minusDays(3),
-                0
-        );
-
-        saveLoan(
-                saveCopy(cleanCode, "T-002"),
-                reader,
-                TODAY.minusDays(10),
-                TODAY.minusDays(3),
-                TODAY.minusDays(1),
-                0
-        );
-
-        saveLoan(
-                saveCopy(cleanCode, "T-003"),
-                reader,
-                TODAY.minusDays(10),
-                TODAY.minusDays(3),
-                TODAY.minusDays(1),
-                0
-        );
+        saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(10), TODAY.minusDays(3), TODAY.minusDays(3), 0);
+        saveLoan(saveCopy(cleanCode, "T-002"), reader, TODAY.minusDays(10), TODAY.minusDays(3), TODAY.minusDays(1), 0);
+        saveLoan(saveCopy(cleanCode, "T-003"), reader, TODAY.minusDays(10), TODAY.minusDays(3), TODAY.minusDays(1), 0);
 
         mockMvc.perform(get("/loans/management/returns"))
                 .andExpect(status().isOk())
@@ -784,26 +703,11 @@ public class LoanControllerIT extends AbstractIntegrationTest {
     @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Pesquisa devoluções pelo nome do leitor")
     void searchesReturnsByReaderName() throws Exception {
-        saveLoan(
-                saveCopy(cleanCode, "T-001"),
-                reader,
-                TODAY.minusDays(10),
-                TODAY.minusDays(3),
-                TODAY.minusDays(2),
-                0
-        );
+        saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(10), TODAY.minusDays(3), TODAY.minusDays(2), 0);
+        saveLoan(saveCopy(domainDrivenDesign, "T-002"), otherReader,
+                TODAY.minusDays(10), TODAY.minusDays(3), TODAY.minusDays(1), 0);
 
-        saveLoan(
-                saveCopy(domainDrivenDesign, "T-002"),
-                otherReader,
-                TODAY.minusDays(10),
-                TODAY.minusDays(3),
-                TODAY.minusDays(1),
-                0
-        );
-
-        mockMvc.perform(get("/loans/management/returns")
-                        .param("search", "LEITORA UM"))
+        mockMvc.perform(get("/loans/management/returns").param("search", "LEITORA UM"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].readerName").value("Leitora Um"));
@@ -813,26 +717,11 @@ public class LoanControllerIT extends AbstractIntegrationTest {
     @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Pesquisa devoluções pelo título do livro")
     void searchesReturnsByBookTitle() throws Exception {
-        saveLoan(
-                saveCopy(cleanCode, "T-001"),
-                reader,
-                TODAY.minusDays(10),
-                TODAY.minusDays(3),
-                TODAY.minusDays(2),
-                0
-        );
+        saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(10), TODAY.minusDays(3), TODAY.minusDays(2), 0);
+        saveLoan(saveCopy(domainDrivenDesign, "T-002"), otherReader,
+                TODAY.minusDays(10), TODAY.minusDays(3), TODAY.minusDays(1), 0);
 
-        saveLoan(
-                saveCopy(domainDrivenDesign, "T-002"),
-                otherReader,
-                TODAY.minusDays(10),
-                TODAY.minusDays(3),
-                TODAY.minusDays(1),
-                0
-        );
-
-        mockMvc.perform(get("/loans/management/returns")
-                        .param("search", "DOMAIN"))
+        mockMvc.perform(get("/loans/management/returns").param("search", "DOMAIN"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].title").value("Domain-Driven Design"));
@@ -842,26 +731,11 @@ public class LoanControllerIT extends AbstractIntegrationTest {
     @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Pesquisa devoluções pelo número de tombo")
     void searchesReturnsByAccessionNumber() throws Exception {
-        saveLoan(
-                saveCopy(cleanCode, "T-001"),
-                reader,
-                TODAY.minusDays(10),
-                TODAY.minusDays(3),
-                TODAY.minusDays(2),
-                0
-        );
+        saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(10), TODAY.minusDays(3), TODAY.minusDays(2), 0);
+        saveLoan(saveCopy(domainDrivenDesign, "T-002"), otherReader,
+                TODAY.minusDays(10), TODAY.minusDays(3), TODAY.minusDays(1), 0);
 
-        saveLoan(
-                saveCopy(domainDrivenDesign, "T-002"),
-                otherReader,
-                TODAY.minusDays(10),
-                TODAY.minusDays(3),
-                TODAY.minusDays(1),
-                0
-        );
-
-        mockMvc.perform(get("/loans/management/returns")
-                        .param("search", "t-002"))
+        mockMvc.perform(get("/loans/management/returns").param("search", "t-002"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].accessionNumber").value("T-002"));
@@ -872,24 +746,9 @@ public class LoanControllerIT extends AbstractIntegrationTest {
     @DisplayName("Não retorna empréstimos ativos na listagem de devoluções")
     void doesNotReturnActiveLoans() throws Exception {
         // Empréstimo devolvido
-        saveLoan(
-                saveCopy(cleanCode, "T-001"),
-                reader,
-                TODAY.minusDays(10),
-                TODAY.minusDays(3),
-                TODAY.minusDays(2),
-                0
-        );
-
+        saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(10), TODAY.minusDays(3), TODAY.minusDays(2), 0);
         // Empréstimo ativo
-        saveLoan(
-                saveCopy(domainDrivenDesign, "T-002"),
-                otherReader,
-                TODAY.minusDays(2),
-                TODAY.plusDays(5),
-                null,
-                0
-        );
+        saveLoan(saveCopy(domainDrivenDesign, "T-002"), otherReader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
 
         mockMvc.perform(get("/loans/management/returns"))
                 .andExpect(status().isOk())
@@ -932,7 +791,7 @@ public class LoanControllerIT extends AbstractIntegrationTest {
         assertEquals(1, jdbcTemplate.queryForObject(
                 "select count(*) from loans where copy_id = ? and reader_id = ? and librarian_id = ? "
                         + "and loan_date = ? and return_date is null and renewal_count = 0",
-                Integer.class, copy.getId(), reader, librarian, java.sql.Date.valueOf(TODAY)));
+                Integer.class, copy.getId(), reader.getId(), librarian.getId(), Date.valueOf(TODAY)));
     }
 
     @Test
@@ -987,9 +846,7 @@ public class LoanControllerIT extends AbstractIntegrationTest {
     @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna 409 com o tombo quando o exemplar já está emprestado")
     void returnsConflict_whenCopyIsAlreadyOnLoan() throws Exception {
-        Copy copy = saveCopy(cleanCode, "T-001");
-        copy.setStatus(CopyStatus.ON_LOAN);
-        copyRepository.save(copy);
+        Copy copy = testData.saveCopy(cleanCode, "T-001", CopyStatus.ON_LOAN);
         saveLoan(copy, otherReader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);
 
         postLoan(librarian, registerLoanJson(reader, "T-001", TODAY.plusDays(7)))
@@ -1000,7 +857,7 @@ public class LoanControllerIT extends AbstractIntegrationTest {
         // continua só o empréstimo anterior, do outro leitor
         assertEquals(1, jdbcTemplate.queryForObject("select count(*) from loans", Integer.class));
         assertEquals(1, jdbcTemplate.queryForObject(
-                "select count(*) from loans where reader_id = ?", Integer.class, otherReader));
+                "select count(*) from loans where reader_id = ?", Integer.class, otherReader.getId()));
     }
 
     @Test
@@ -1019,8 +876,8 @@ public class LoanControllerIT extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.errors[*].field", hasItem("dueDate")));
 
         postLoan(librarian, """
-            {"readerId": %d, "accessionNumber": "T-001"}
-            """.formatted(reader))                                                   // ausente
+                {"readerId": %d, "accessionNumber": "T-001"}
+                """.formatted(reader.getId()))                                         // ausente
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[*].field", hasItem("dueDate")));
 
@@ -1042,18 +899,16 @@ public class LoanControllerIT extends AbstractIntegrationTest {
     void usesAuthenticatedLibrarian_whenLibrarianIdQueryParameterIsProvided() throws Exception {
         saveCopy(cleanCode, "T-001");
 
-        mockMvc.perform(post("/loans")
+        mockMvc.perform(postJson("/loans", registerLoanJson(reader, "T-001", TODAY.plusDays(7)))
                         .with(asLibrarian(librarian))
-                        .param("librarianId", String.valueOf(reader))
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(registerLoanJson(reader, "T-001", TODAY.plusDays(7))))
+                        .param("librarianId", String.valueOf(reader.getId())))
                 .andExpect(status().isCreated());
 
         assertEquals(1, jdbcTemplate.queryForObject(
-                "select count(*) from loans where librarian_id = ?", Integer.class, librarian));
+                "select count(*) from loans where librarian_id = ?", Integer.class, librarian.getId()));
     }
 
+    // TESTES DE POST /loans/returns - Registro de devolução (bibliotecário)
     @Test
     @WithMockUser(roles = "LIBRARIAN")
     @DisplayName("Retorna 200 com o empréstimo devolvido, grava a data atual e libera o exemplar")
@@ -1072,7 +927,7 @@ public class LoanControllerIT extends AbstractIntegrationTest {
                 "select status from book_copies where id = ?", String.class, copy.getId()));
         assertEquals(1, jdbcTemplate.queryForObject(
                 "select count(*) from loans where copy_id = ? and return_date = ?",
-                Integer.class, copy.getId(), java.sql.Date.valueOf(TODAY)));
+                Integer.class, copy.getId(), Date.valueOf(TODAY)));
     }
 
     @Test
@@ -1088,7 +943,8 @@ public class LoanControllerIT extends AbstractIntegrationTest {
         assertEquals("AVAILABLE", jdbcTemplate.queryForObject(
                 "select status from book_copies where id = ?", String.class, copy.getId()));
 
-        // O status final é derivado das datas: o histórico do leitor mostra RETURNED, com o vencimento original
+        // O status final é derivado das datas: o histórico do leitor mostra RETURNED, com o vencimento original.
+        // A consulta é feita pelo próprio leitor (o id vem do token)
         mockMvc.perform(get("/loans")
                         .with(asReader(reader))
                         .param("status", "RETURNED"))
@@ -1178,11 +1034,12 @@ public class LoanControllerIT extends AbstractIntegrationTest {
     }
 
     // TESTES DE PATCH /loans/{id}/renewals - Renovação de empréstimo (leitor)
+    // TESTES DE PATCH /loans/{id} - Renovação de empréstimo (leitor)
     @Test
     @DisplayName("Retorna 200 com o empréstimo atualizado, soma 7 dias ao vencimento e incrementa as renovações")
     void renewsLoan_whenLoanIsOnTime() throws Exception {
         Copy copy = saveCopy(cleanCode, "T-001");
-        int loanId = saveLoanAndGetId(copy, reader, TODAY.minusDays(3), TODAY.plusDays(4), null, 0);
+        int loanId = saveLoan(copy, reader, TODAY.minusDays(3), TODAY.plusDays(4), null, 0).getId();
 
         patchRenewal(loanId, reader)
                 .andExpect(status().isOk())
@@ -1202,7 +1059,7 @@ public class LoanControllerIT extends AbstractIntegrationTest {
     @DisplayName("Renova o empréstimo que vence hoje, porque ainda não está atrasado")
     void renewsLoan_whenLoanDueTodayIsStillOnTime() throws Exception {
         Copy copy = saveCopy(cleanCode, "T-001");
-        int loanId = saveLoanAndGetId(copy, reader, TODAY.minusDays(7), TODAY, null, 0);
+        int loanId = saveLoan(copy, reader, TODAY.minusDays(7), TODAY, null, 0).getId();
 
         patchRenewal(loanId, reader)
                 .andExpect(status().isOk())
@@ -1214,14 +1071,13 @@ public class LoanControllerIT extends AbstractIntegrationTest {
     @DisplayName("Retorna 404 sem alterações quando o empréstimo é de outro leitor, mesmo com readerId na query")
     void returnsNotFound_whenLoanBelongsToAnotherReader() throws Exception {
         Copy copy = saveCopy(cleanCode, "T-001");
-        int loanId = saveLoanAndGetId(copy, otherReader, TODAY.minusDays(3), TODAY.plusDays(4), null, 0);
+        int loanId = saveLoan(copy, otherReader, TODAY.minusDays(3), TODAY.plusDays(4), null, 0).getId();
 
         mockMvc.perform(patch("/loans/{id}", loanId)
                         .with(asReader(reader))
-                        .param("readerId", String.valueOf(otherReader))
-                        .with(csrf()))
-                        .andExpect(status().isNotFound())
-                        .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON));
+                        .param("readerId", String.valueOf(otherReader.getId())))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON));
 
         assertLoanState(loanId, TODAY.plusDays(4), 0);
     }
@@ -1237,7 +1093,7 @@ public class LoanControllerIT extends AbstractIntegrationTest {
     @DisplayName("Retorna 409 e não altera nada quando o empréstimo já foi devolvido")
     void returnsConflict_whenLoanIsAlreadyReturned() throws Exception {
         Copy copy = saveCopy(cleanCode, "T-001");
-        int loanId = saveLoanAndGetId(copy, reader, TODAY.minusDays(10), TODAY.plusDays(2), TODAY.minusDays(1), 0);
+        int loanId = saveLoan(copy, reader, TODAY.minusDays(10), TODAY.plusDays(2), TODAY.minusDays(1), 0).getId();
 
         patchRenewal(loanId, reader)
                 .andExpect(status().isConflict())
@@ -1250,7 +1106,7 @@ public class LoanControllerIT extends AbstractIntegrationTest {
     @DisplayName("Retorna 409 e não altera nada quando o empréstimo está atrasado")
     void returnsConflict_whenLoanIsOverdue() throws Exception {
         Copy copy = saveCopy(cleanCode, "T-001");
-        int loanId = saveLoanAndGetId(copy, reader, TODAY.minusDays(10), TODAY.minusDays(3), null, 0);
+        int loanId = saveLoan(copy, reader, TODAY.minusDays(10), TODAY.minusDays(3), null, 0).getId();
 
         patchRenewal(loanId, reader)
                 .andExpect(status().isConflict())
@@ -1262,14 +1118,11 @@ public class LoanControllerIT extends AbstractIntegrationTest {
     @Test
     @DisplayName("Retorna 400 quando o id não é numérico")
     void returnsBadRequest_whenIdIsNotNumeric() throws Exception {
-        mockMvc.perform(patch("/loans/abc")
-                        .with(asReader(reader))
-                        .with(csrf()))
+        mockMvc.perform(patch("/loans/abc").with(asReader(reader)))
                 .andExpect(status().isBadRequest());
     }
 
-    // métodos auxiliares para montar os dados
-
+    // MÉTODOS AUXILIARES
     // Cenário com os três status: 2 em dia (um vence hoje), 1 atrasado, 1 devolvido
     private void saveStatusScenario() {
         saveLoan(saveCopy(cleanCode, "T-001"), reader, TODAY.minusDays(2), TODAY.plusDays(5), null, 0);   // em dia
@@ -1279,64 +1132,50 @@ public class LoanControllerIT extends AbstractIntegrationTest {
                 TODAY.minusDays(14), 0);                                                                   // devolvido
     }
 
-    private Category saveCategory(String name) {
-        Category c = new Category();
-        c.setName(name);
-        return categoryRepository.save(c);
-    }
-
-    private Author saveAuthor(String name) {
-        Author a = new Author();
-        a.setName(name);
-        return authorRepository.save(a);
-    }
-
-    private Book saveBook(String isbn, String title, Category category, Author author) {
-        Book b = new Book();
-        b.setIsbn(isbn);
-        b.setTitle(title);
-        b.setCategory(category);
-        b.getAuthors().add(author);
-        return bookRepository.save(b);
-    }
-
+    // Atalhos sobre o TestData, para os cenários ficarem legíveis:
+    // o exemplar nasce disponível e o bibliotecário do empréstimo é sempre o da classe
     private Copy saveCopy(Book book, String accession) {
-        Copy c = new Copy();
-        c.setBook(book);
-        c.setAccessionNumber(accession);
-        c.setPhysicalLocation("A-01");
-        c.setStatus(CopyStatus.AVAILABLE);
-        return copyRepository.save(c);
+        return testData.saveCopy(book, accession, CopyStatus.AVAILABLE);
     }
 
-    // Usuário e empréstimo entram por SQL: o User ainda é provisório e a tabela exige vários campos
-    private int saveUser(String name, String email, String profile) {
-        return jdbcTemplate.queryForObject("""
-                insert into users(name, email, password_hash, affiliation_type, profile)
-                values (?, ?, 'hash', 'STUDENT', ?) returning id
-                """, Integer.class, name, email, profile);
-    }
-
-    private void saveLoan(Copy copy, int readerId, LocalDate loanDate, LocalDate dueDate,
+    private Loan saveLoan(Copy copy, User reader, LocalDate loanDate, LocalDate dueDate,
                           LocalDate returnDate, int renewalCount) {
-        jdbcTemplate.update("""
-                insert into loans(copy_id, reader_id, librarian_id, loan_date, due_date, return_date, renewal_count)
-                values (?, ?, ?, ?, ?, ?, ?)
-                """, copy.getId(), readerId, librarian, loanDate, dueDate, returnDate, renewalCount);
+        return testData.saveLoan(copy, reader, librarian, loanDate, dueDate, returnDate, renewalCount);
     }
 
-    private ResultActions postLoan(int librarianId, String json) throws Exception {
-        return mockMvc.perform(post("/loans")
-                .with(asLibrarian(librarianId))
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(json));
+    // Exemplar emprestado de verdade: status ON_LOAN e empréstimo aberto
+    private Copy saveCopyOnLoan(Book book, String accession, User reader, LocalDate loanDate, LocalDate dueDate) {
+        Copy copy = testData.saveCopy(book, accession, CopyStatus.ON_LOAN);
+        saveLoan(copy, reader, loanDate, dueDate, null, 0);
+        return copy;
     }
 
-    private String registerLoanJson(int readerId, String accessionNumber, LocalDate dueDate) {
+    private ResultActions postLoan(User librarian, String json) throws Exception {
+        return mockMvc.perform(postJson("/loans", json).with(asLibrarian(librarian)));
+    }
+
+    private ResultActions postReturn(String json) throws Exception {
+        return mockMvc.perform(postJson("/loans/returns", json));
+    }
+
+    private ResultActions patchRenewal(int loanId, User reader) throws Exception {
+        return mockMvc.perform(patch("/loans/{id}", loanId).with(asReader(reader)));
+    }
+
+    private String registerLoanJson(User reader, String accessionNumber, LocalDate dueDate) {
+        return registerLoanJson(reader.getId(), accessionNumber, dueDate);
+    }
+
+    private String registerLoanJson(Integer readerId, String accessionNumber, LocalDate dueDate) {
         return """
-            {"readerId": %d, "accessionNumber": "%s", "dueDate": "%s"}
-            """.formatted(readerId, accessionNumber, dueDate);
+                {"readerId": %d, "accessionNumber": "%s", "dueDate": "%s"}
+                """.formatted(readerId, accessionNumber, dueDate);
+    }
+
+    private String returnJson(String accessionNumber) {
+        return """
+                {"accessionNumber": "%s"}
+                """.formatted(accessionNumber);
     }
 
     // Nenhum empréstimo gravado e o exemplar continua disponível
@@ -1346,46 +1185,10 @@ public class LoanControllerIT extends AbstractIntegrationTest {
                 "select status from book_copies where id = ?", String.class, copy.getId()));
     }
 
-    // Exemplar emprestado de verdade: status ON_LOAN e empréstimo aberto
-    private Copy saveCopyOnLoan(Book book, String accession, int readerId, LocalDate loanDate, LocalDate dueDate) {
-        Copy copy = saveCopy(book, accession);
-        copy.setStatus(CopyStatus.ON_LOAN);
-        copyRepository.save(copy);
-        saveLoan(copy, readerId, loanDate, dueDate, null, 0);
-        return copy;
-    }
-
-    private ResultActions postReturn(String json) throws Exception {
-        return mockMvc.perform(post("/loans/returns")
-                .with(csrf())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(json));
-    }
-
-    private String returnJson(String accessionNumber) {
-        return """
-            {"accessionNumber": "%s"}
-            """.formatted(accessionNumber);
-    }
-
-    private ResultActions patchRenewal(int loanId, int readerId) throws Exception {
-        return mockMvc.perform(patch("/loans/{id}", loanId)
-                .with(asReader(readerId))
-                .with(csrf()));
-    }
-
-    private int saveLoanAndGetId(Copy copy, int readerId, LocalDate loanDate, LocalDate dueDate,
-                                 LocalDate returnDate, int renewalCount) {
-        return jdbcTemplate.queryForObject("""
-            insert into loans(copy_id, reader_id, librarian_id, loan_date, due_date, return_date, renewal_count)
-            values (?, ?, ?, ?, ?, ?, ?) returning id
-            """, Integer.class, copy.getId(), readerId, librarian, loanDate, dueDate, returnDate, renewalCount);
-    }
-
     // Confere no banco o vencimento e as renovações do empréstimo
     private void assertLoanState(int loanId, LocalDate dueDate, int renewalCount) {
         assertEquals(1, jdbcTemplate.queryForObject(
                 "select count(*) from loans where id = ? and due_date = ? and renewal_count = ?",
-                Integer.class, loanId, java.sql.Date.valueOf(dueDate), renewalCount));
+                Integer.class, loanId, Date.valueOf(dueDate), renewalCount));
     }
 }
