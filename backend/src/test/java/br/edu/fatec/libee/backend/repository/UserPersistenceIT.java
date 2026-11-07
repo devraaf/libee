@@ -1,42 +1,31 @@
 package br.edu.fatec.libee.backend.repository;
 
+import br.edu.fatec.libee.backend.AbstractIntegrationTest;
 import br.edu.fatec.libee.backend.entity.Course;
 import br.edu.fatec.libee.backend.entity.Student;
 import br.edu.fatec.libee.backend.entity.User;
 import br.edu.fatec.libee.backend.enums.AffiliationType;
 import br.edu.fatec.libee.backend.enums.UserProfile;
 import jakarta.persistence.EntityManager;
-import jakarta.transaction.Transactional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
-@Transactional
-class UserPersistenceIT {
+class UserPersistenceIT extends AbstractIntegrationTest {
 
     @Autowired UserRepository userRepository;
     @Autowired StudentRepository studentRepository;
-    @Autowired CourseRepository courseRepository;
     @Autowired EntityManager entityManager;
 
     @Test
-    @DisplayName("Deve persistir o aluno vinculado ao curso")
-    void shouldPersistStudentLinkedToUserAndCourse() {
-        Course course = new Course();
-        course.setName("Curso de Teste");
-        courseRepository.save(course);
-
-        User user = newUser("ana.persistence@test.com", AffiliationType.STUDENT);
-        userRepository.save(user);
-
-        Student student = new Student();
-        student.setUser(user);
-        student.setCourse(course);
-        studentRepository.save(student);
+    @DisplayName("Persiste o aluno vinculado ao usuário e ao curso")
+    void persistsStudentLinkedToUserAndCourse() {
+        Course course = testData.saveCourse("Curso de Teste");
+        User user = testData.saveUser("Usuário de Teste", "ana.persistence@test.com", null,
+                AffiliationType.STUDENT, UserProfile.READER);
+        testData.saveStudent(user, course);
 
         // força o SQL real e descarta o cache, para ler do banco
         entityManager.flush();
@@ -49,22 +38,13 @@ class UserPersistenceIT {
     }
 
     @Test
-    @DisplayName("Deve buscar usuário por e-mail ignorando letras maiúsculas")
-    void shouldFindUserByEmailIgnoringCase() {
-        userRepository.save(newUser("maria.persistence@test.com", AffiliationType.PROFESSOR));
+    @DisplayName("Busca usuário por e-mail ignorando maiúsculas e minúsculas")
+    void findsUserByEmailIgnoringCase() {
+        testData.saveUser("Usuário de Teste", "maria.persistence@test.com", null,
+                AffiliationType.PROFESSOR, UserProfile.READER);
 
         assertThat(userRepository.findByEmailIgnoreCase("MARIA.Persistence@TEST.com")).isPresent();
         assertThat(userRepository.existsByEmailIgnoreCase("MARIA.PERSISTENCE@TEST.COM")).isTrue();
         assertThat(userRepository.existsByEmailIgnoreCase("ninguem@test.com")).isFalse();
-    }
-
-    private User newUser(String email, AffiliationType affiliationType) {
-        User user = new User();
-        user.setName("Usuário de Teste");
-        user.setEmail(email);
-        user.setPasswordHash("hash-de-teste");
-        user.setAffiliationType(affiliationType);
-        user.setProfile(UserProfile.READER);
-        return user;
     }
 }
