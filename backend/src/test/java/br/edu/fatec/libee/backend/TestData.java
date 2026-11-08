@@ -27,16 +27,32 @@ public class TestData {
     private final BookRepository bookRepository;
     private final CopyRepository copyRepository;
     private final LoanRepository loanRepository;
+    private final StudentRepository studentRepository;
     private final AtomicInteger sequence = new AtomicInteger();
 
-    public User saveUser(String email, UserProfile profile) {
+    private String passwordHash;
+
+    private String passwordHash() {
+        if (passwordHash == null) {
+            passwordHash = passwordEncoder.encode(PASSWORD);
+        }
+        return passwordHash;
+    }
+
+    public User saveUser(String name, String email, String phone,
+                         AffiliationType affiliationType, UserProfile profile) {
         User user = new User();
-        user.setName("Usuário de Teste");
+        user.setName(name);
         user.setEmail(email);
-        user.setPasswordHash(passwordEncoder.encode(PASSWORD));
-        user.setAffiliationType(AffiliationType.EMPLOYEE);
+        user.setPhone(phone);
+        user.setPasswordHash(passwordHash());
+        user.setAffiliationType(affiliationType);
         user.setProfile(profile);
         return userRepository.save(user);
+    }
+
+    public User saveUser(String email, UserProfile profile) {
+        return saveUser("Usuário de Teste", email, null, AffiliationType.EMPLOYEE, profile);
     }
 
     public Course saveCourse(String name) {
@@ -75,24 +91,36 @@ public class TestData {
         return copyRepository.save(c);
     }
 
-    public Loan saveLoan(User reader, User librarian, LocalDate dueDate, LocalDate returnDate) {
-        int n = sequence.incrementAndGet();
-
-        Category category = categoryRepository.findAll().stream()
-                .findFirst()
-                .orElseGet(() -> saveCategory("Geral"));
-
-        Book book = saveBook(String.format("979000000%04d", n), "Livro de Teste " + n, category);
-        Copy copy = saveCopy(book, "TD-" + n,
-                returnDate == null ? CopyStatus.ON_LOAN : CopyStatus.AVAILABLE);
-
+    public Loan saveLoan(Copy copy, User reader, User librarian, LocalDate loanDate,
+                         LocalDate dueDate, LocalDate returnDate, int renewalCount) {
         Loan loan = new Loan();
         loan.setCopy(copy);
         loan.setReader(reader);
         loan.setLibrarian(librarian);
-        loan.setLoanDate(dueDate.minusDays(10)); // respeita due_date >= loan_date do banco
+        loan.setLoanDate(loanDate);
         loan.setDueDate(dueDate);
         loan.setReturnDate(returnDate);
+        loan.setRenewalCount(renewalCount);
         return loanRepository.saveAndFlush(loan);
     }
+
+    public Loan saveLoan(User reader, User librarian, LocalDate dueDate, LocalDate returnDate) {
+        int n = sequence.incrementAndGet();
+        Category category = categoryRepository.findAll().stream()
+                .findFirst()
+                .orElseGet(() -> saveCategory("Geral"));
+        Book book = saveBook(String.format("979000000%04d", n), "Livro de Teste " + n, category);
+        Copy copy = saveCopy(book, "TD-" + n,
+                returnDate == null ? CopyStatus.ON_LOAN : CopyStatus.AVAILABLE);
+        // data do empréstimo 10 dias antes do vencimento: respeita due_date >= loan_date do banco
+        return saveLoan(copy, reader, librarian, dueDate.minusDays(10), dueDate, returnDate, 0);
+    }
+
+    public Student saveStudent(User user, Course course) {
+        Student student = new Student();
+        student.setUser(user);
+        student.setCourse(course);
+        return studentRepository.saveAndFlush(student);
+    }
+
 }

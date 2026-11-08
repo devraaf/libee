@@ -1,5 +1,6 @@
 package br.edu.fatec.libee.backend;
 
+import br.edu.fatec.libee.backend.entity.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -45,17 +46,17 @@ public abstract class AbstractIntegrationTest {
         return post(path).contentType(MediaType.APPLICATION_JSON).content(body);
     }
 
-    protected RequestPostProcessor asReader(Integer userId) {
-        return asUser(userId, "READER");
+    protected RequestPostProcessor asReader(User user) {
+        return asUser(user, "READER");
     }
 
-    protected RequestPostProcessor asLibrarian(Integer userId) {
-        return asUser(userId, "LIBRARIAN");
+    protected RequestPostProcessor asLibrarian(User user) {
+        return asUser(user, "LIBRARIAN");
     }
 
-    private RequestPostProcessor asUser(Integer userId, String role) {
+    private RequestPostProcessor asUser(User user, String role) {
         return jwt()
-                .jwt(token -> token.subject(String.valueOf(userId)).claim("profile", role))
+                .jwt(token -> token.subject(String.valueOf(user.getId())).claim("profile", role))
                 .authorities(new SimpleGrantedAuthority("ROLE_" + role));
     }
 }
