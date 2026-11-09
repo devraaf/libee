@@ -81,11 +81,11 @@ export interface Loan {
   status: LoanStatus;
 }
 
-export interface PaginatedResult<T> {
-  items: T[];
+export interface PageResponse<T> {
+  content: T[];
   page: number;
   size: number;
-  totalItems: number;
+  totalElements: number;
   totalPages: number;
 }
 

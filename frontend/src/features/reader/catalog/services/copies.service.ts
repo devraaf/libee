@@ -3,12 +3,12 @@ import {
   mockCopies,
   mockDeletedBookIds,
   mockLoans,
-} from '../../../shared/mocks/data';
+} from '../../../../shared/mocks/data';
 import {
   MockServiceError,
   simulateServiceDelay,
-} from '../../../shared/mocks/service-utils';
-import type { Copy, CopyStatus } from '../../../shared/types/library';
+} from '../../../../shared/mocks/service-utils';
+import type { Copy, CopyStatus } from '../../../../shared/types/library';
 
 export interface CreateCopyInput {
   bookId: number;

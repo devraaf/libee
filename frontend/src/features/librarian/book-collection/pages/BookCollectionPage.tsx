@@ -1,28 +1,28 @@
+import {
+  deleteBook,
+  listActiveCopies,
+  listAllBooks,
+  type RegisteredBook,
+} from '@/features/reader/catalog/services/books.service';
+import { listLoans } from '@/features/loans/services/loans.service';
+import { Button } from '@/shared/components/ui/Button';
+import { EmptyState } from '@/shared/components/ui/EmptyState';
+import { Loader } from '@/shared/components/ui/loader/Loader';
+import { PageHeader } from '@/shared/components/ui/PageHeader';
+import SearchFilterBar from '@/shared/components/ui/SearchFilterBar';
+import { useTableData } from '@/shared/hooks/useTableData';
+import type { BookListItem, Copy } from '@/shared/types/library';
+import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus } from 'lucide-react';
-import { Button } from '../../../shared/components/ui/Button';
-import { EmptyState } from '../../../shared/components/ui/EmptyState';
-import { Loader } from '../../../shared/components/ui/Loader/Loader';
-import { PageHeader } from '../../../shared/components/ui/PageHeader';
-import SearchFilterBar from '../../../shared/components/ui/SearchFilterBar';
-import {
-  listAllBooks,
-  listActiveCopies,
-  deleteBook,
-  type RegisteredBook,
-} from '../../catalog/services/books.service';
-import { listLoans } from '../../loans/services/loans.service';
-import type { BookListItem, Copy } from '../../../shared/types/library';
-import { useTableData } from '../../../shared/hooks/useTableData';
+import { BookCollectionStats } from '../components/BookCollectionStats';
 import {
   BookCollectionTable,
   type BookCollectionItem,
-} from './components/BookCollectionTable';
-import { BookCollectionStats } from './components/BookCollectionStats';
-import RegisterBookModal from './components/RegisterBookModal';
-import EditBookModal from './components/EditBookModal';
-import DeleteBookModal from './components/DeleteBookModal';
+} from '../components/BookCollectionTable';
+import DeleteBookModal from '../components/DeleteBookModal';
+import EditBookModal from '../components/EditBookModal';
+import RegisterBookModal from '../components/RegisterBookModal';
 
 interface BookCollectionStatsData {
   totalBooks: number;

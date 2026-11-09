@@ -5,19 +5,19 @@ import {
   mockCopies,
   mockDeletedBookIds,
   mockLoans,
-} from '../../../shared/mocks/data';
+} from '../../../../shared/mocks/data';
 import {
   MockServiceError,
   simulateSearchError,
   simulateServiceDelay,
-} from '../../../shared/mocks/service-utils';
+} from '../../../../shared/mocks/service-utils';
 import type {
   Book,
   BookListItem,
   Copy,
   CreateBookInput,
-  PaginatedResult,
-} from '../../../shared/types/library';
+  PageResponse,
+} from '../../../../shared/types/library';
 
 export interface ListBooksParams {
   page: number;
@@ -349,7 +349,7 @@ export async function listBooks({
   size,
   search = '',
   categoryId,
-}: ListBooksParams): Promise<PaginatedResult<BookListItem>> {
+}: ListBooksParams): Promise<PageResponse<BookListItem>> {
   await simulateServiceDelay();
   simulateSearchError(search);
   if (
@@ -379,10 +379,10 @@ export async function listBooks({
   const start = (page - 1) * size;
 
   return {
-    items: filtered.slice(start, start + size).map(withAvailability),
+    content: filtered.slice(start, start + size).map(withAvailability),
     page,
     size,
-    totalItems: filtered.length,
+    totalElements: filtered.length,
     totalPages: Math.ceil(filtered.length / size),
   };
 }
@@ -390,7 +390,7 @@ export async function listBooks({
 export async function listAllBooks(): Promise<BookListItem[]> {
   const size = 100;
   const firstPage = await listBooks({ page: 1, size });
-  if (firstPage.totalPages <= 1) return firstPage.items;
+  if (firstPage.totalPages <= 1) return firstPage.content;
 
   const remainingPages = await Promise.all(
     Array.from({ length: firstPage.totalPages - 1 }, (_, index) =>
@@ -398,8 +398,8 @@ export async function listAllBooks(): Promise<BookListItem[]> {
     ),
   );
   return [
-    ...firstPage.items,
-    ...remainingPages.flatMap((result) => result.items),
+    ...firstPage.content,
+    ...remainingPages.flatMap((result) => result.content),
   ];
 }
 

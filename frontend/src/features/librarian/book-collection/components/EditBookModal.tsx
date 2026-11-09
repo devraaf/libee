@@ -9,8 +9,8 @@ import {
   listCopies,
   updateBookWithCopies,
   type RegisteredBook,
-} from '../../../catalog/services/books.service';
-import { listCategories } from '../../../catalog/services/catalog.service';
+} from '../../../reader/catalog/services/books.service';
+import { listCategories } from '../../../reader/catalog/services/catalog.service';
 import { MockServiceError } from '../../../../shared/mocks/service-utils';
 import type { Category } from '../../../../shared/types/library';
 import {

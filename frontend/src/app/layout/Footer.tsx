@@ -5,7 +5,7 @@ export interface FooterProps {
   githubUrl?: string;
 }
 
-export function Footer({ githubUrl = 'https://github.com' }: FooterProps) {
+export function Footer({ githubUrl = 'https://github.com/devraaf/libee' }: FooterProps) {
   return (
     <footer className="border-t border-line bg-bg">
       <div className="mx-auto flex w-full flex-wrap items-center justify-center sm:justify-between gap-6 px-6 py-8 sm:px-10">

@@ -39,7 +39,7 @@ import { Table, type TableColumn } from '../../shared/components/ui/Table.tsx';
 import { Tabs } from '../../shared/components/ui/Tabs.tsx';
 import { useDisclosure } from '../../shared/hooks/useDisclosure.ts';
 import type { NavLinkItem } from '../../shared/types/navigation.ts';
-import { Loader } from '../../shared/components/ui/Loader/Loader.tsx';
+import { Loader } from '../../shared/components/ui/loader/Loader.tsx';
 
 const links: NavLinkItem[] = [
   { label: 'Item um', to: '/galeria#um', icon: Library, end: true },
