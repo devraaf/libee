@@ -7,11 +7,11 @@ import { MainLayout } from '../layout/MainLayout';
 import { BookDetailsPage } from '@/features/book-details/pages/BooksDetailsPage';
 import { GalleryPage } from '../pages/GalleryPage';
 import LoansPage from '@/features/librarian/loans/pages/LoanPage';
-import BookCollectionPage from '@/features/librarian/book-collection/BookCollectionPage';
 import ReadersPage from '@/features/librarian/readers/pages/ReadersPage';
 import ReturnsPage from '@/features/librarian/returns/pages/ReturnsPage';
 import ReaderLoansPage from '@/features/reader/reader-loans/pages/ReaderLoansPage';
-import { CatalogPage } from '@/features/catalog/pages/CatalogPage';
+import { CatalogPage } from '@/features/reader/catalog/pages/CatalogPage';
+import BookCollectionPage from '@/features/librarian/book-collection/pages/BookCollectionPage';
 
 export function AppRoutes() {
   return (

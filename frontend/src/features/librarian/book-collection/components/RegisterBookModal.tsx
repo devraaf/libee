@@ -9,9 +9,8 @@ import {
   listCopies,
   registerBookWithCopies,
   type RegisteredBook,
-} from '../../../catalog/services/books.service';
-import { listCategories } from '../../../catalog/services/catalog.service';
-import { lookupBookByIsbn } from '../../../catalog/services/isbn-lookup.service';
+} from '../../../reader/catalog/services/books.service';
+import { listCategories } from '../../../reader/catalog/services/catalog.service';
 import { MockServiceError } from '../../../../shared/mocks/service-utils';
 import type { Category } from '../../../../shared/types/library';
 import {
@@ -19,6 +18,7 @@ import {
   type RegisterBookFormData,
   type RegisterBookFormInput,
 } from '../schemas/book.schema';
+import { lookupBookByIsbn } from '../services/isbn-lookup.service';
 
 interface RegisterBookModalProps {
   open: boolean;
@@ -163,11 +163,11 @@ export default function RegisterBookModal({
     setIsbnNotice(null);
     const cleanedIsbn = normalizeIsbn(isbnValue);
     setValue('isbn', cleanedIsbn);
-    let existingBooks: Awaited<ReturnType<typeof listBooks>>['items'] = [];
+    let existingBooks: Awaited<ReturnType<typeof listBooks>>['content'] = [];
 
     try {
       const result = await listBooks({ page: 1, size: 1000 });
-      existingBooks = result.items;
+      existingBooks = result.content;
       const existingBook = existingBooks.find(
         (book) => normalizeIsbn(book.isbn) === cleanedIsbn,
       );

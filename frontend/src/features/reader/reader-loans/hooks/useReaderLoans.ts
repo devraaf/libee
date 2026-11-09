@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   getBook,
   listActiveCopies,
-} from '../../../catalog/services/books.service';
+} from '../../catalog/services/books.service';
 import {
   listLoans,
   renewLoan as renewLoanService,

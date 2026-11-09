@@ -1,9 +1,9 @@
-import { mockBooks } from '../../../shared/mocks/data';
+import { mockBooks } from '@/shared/mocks/data';
 import {
   MockServiceError,
   simulateServiceDelay,
-} from '../../../shared/mocks/service-utils';
-import type { Book } from '../../../shared/types/library';
+} from '@/shared/mocks/service-utils';
+import type { Book } from '@/shared/types/library';
 
 export const isbnLookupExamples = {
   found: ['9786500000001', '9786500000002', '9786500000003'],

@@ -4,9 +4,9 @@ import { Logo } from '../../../shared/components/branding/Logo';
 import { AuthLayout } from '../components/AuthLayout';
 import { RegisterForm } from '../components/RegisterForm';
 import type { RegisterFormData } from '../schemas/auth.schema';
-import type { Course } from '../types/course';
-import { listCourses } from '../../catalog/services/catalog.service';
+import type { Course } from '@/shared/types/library';
 import { register } from '../services/auth.service';
+import { listCourses } from '@/features/courses/services/course.service';
 
 interface RegisterPageProps {
   courses?: Course[];

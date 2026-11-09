@@ -9,7 +9,7 @@ import {
   affiliationTypes,
   type AffiliationType,
 } from '../../../shared/schemas/enums.schema';
-import type { Course } from '../types/course';
+import type { Course } from '@/shared/types/library';
 import type { RegisterFormData } from '../schemas/auth.schema';
 
 const initialValues = {

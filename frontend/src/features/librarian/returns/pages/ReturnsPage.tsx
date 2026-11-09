@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
 import { Button } from '../../../../shared/components/ui/Button';
 import { EmptyState } from '../../../../shared/components/ui/EmptyState';
-import { Loader } from '../../../../shared/components/ui/Loader/Loader';
+import { Loader } from '../../../../shared/components/ui/loader/Loader';
 import Modal from '../../../../shared/components/ui/Modal';
 import { PageHeader } from '../../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../../shared/components/ui/SearchFilterBar';
@@ -12,10 +12,10 @@ import {
 import { Pagination } from '../../../../shared/components/ui/Pagination';
 import { useTableData } from '../../../../shared/hooks/useTableData';
 import { listLoans, returnLoan } from '../../../loans/services/loans.service';
-import { mapLoanRecords, type LoanRecordItem } from '../../loans/loan.mapper';
 import RegisterReturnForm, {
   type ReturnLoanDetails,
 } from '../components/RegisterReturnForm';
+import { mapLoanRecords, type LoanRecordItem } from '../../loans/utils/loan.mapper';
 
 interface ReturnTableItem {
   id: number;

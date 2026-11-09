@@ -1,7 +1,11 @@
-import { getBook, listCopies } from '../../catalog/services/books.service';
-import { listReaders } from '../readers/services/readers.service';
-import type { Loan } from '../../../shared/types/library';
-import type { LoanTableItem } from './components/LoanTable';
+import {
+  getBook,
+  listCopies,
+} from '@/features/reader/catalog/services/books.service';
+
+import type { Loan } from '@/shared/types/library';
+import { listReaders } from '../../readers/services/readers.service';
+import type { LoanTableItem } from '../components/LoanTable';
 
 export interface LoanRecordItem extends LoanTableItem {
   returnDate: string | null;

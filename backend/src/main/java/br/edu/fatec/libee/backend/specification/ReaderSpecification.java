@@ -7,7 +7,6 @@ import br.edu.fatec.libee.backend.enums.AffiliationType;
 import br.edu.fatec.libee.backend.enums.LoanStatus;
 import br.edu.fatec.libee.backend.enums.ReaderStatus;
 import br.edu.fatec.libee.backend.enums.UserProfile;
-import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;

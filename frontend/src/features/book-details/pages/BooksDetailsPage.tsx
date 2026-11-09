@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/shared/components/ui/Button';
 import { EmptyState } from '@/shared/components/ui/EmptyState';
-import { Loader } from '@/shared/components/ui/Loader/Loader';
+import { Loader } from '@/shared/components/ui/loader/Loader';
 import type { BookListItem, Copy } from '@/shared/types/library';
 import { MockServiceError } from '@/shared/mocks/service-utils';
 import {
   getBook,
   listActiveCopies,
-} from '@/features/catalog/services/books.service';
+} from '@/features/reader/catalog/services/books.service';
 import BookDetails from '../components/BookDetails';
 
 type BookDetailsState =

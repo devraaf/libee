@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '../../../../shared/components/ui/Button';
 import { EmptyState } from '../../../../shared/components/ui/EmptyState';
-import { Loader } from '../../../../shared/components/ui/Loader/Loader';
+import { Loader } from '../../../../shared/components/ui/loader/Loader';
 import { PageHeader } from '../../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../../shared/components/ui/SearchFilterBar';
 import Modal from '../../../../shared/components/ui/Modal';
 import { getCurrentSession } from '../../../auth/services/auth.service';
-import { listActiveCopies } from '../../../catalog/services/books.service';
+import { listActiveCopies } from '../../../reader/catalog/services/books.service';
 import {
   createLoan,
   listLoans,
@@ -21,8 +21,8 @@ import RegisterReturnForm, {
 import RegisterLoanForm from '../components/RegisterLoanForm';
 import { LoanStats } from '../components/LoanStats';
 import { LoanTable } from '../components/LoanTable';
-import { mapLoanRecords, type LoanRecordItem } from '../loan.mapper';
 import type { RegisterLoanFormData } from '../schemas/loan.schema';
+import { mapLoanRecords, type LoanRecordItem } from '../utils/loan.mapper';
 
 interface LoanStatsData {
   activeLoans: number;

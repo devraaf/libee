@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '../../../../shared/components/ui/Button';
 import { EmptyState } from '../../../../shared/components/ui/EmptyState';
-import { Loader } from '../../../../shared/components/ui/Loader/Loader';
+import { Loader } from '../../../../shared/components/ui/loader/Loader';
 import Modal from '../../../../shared/components/ui/Modal';
 import { PageHeader } from '../../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../../shared/components/ui/SearchFilterBar';
 import { useTableData } from '../../../../shared/hooks/useTableData';
-import { listCourses } from '../../../catalog/services/catalog.service';
+import { listCourses } from '../../../reader/catalog/services/catalog.service';
 import { listLoans } from '../../../loans/services/loans.service';
 import { createReader, listReaders } from '../services/readers.service';
 import type { AffiliationType } from '../../../../shared/schemas/enums.schema';
@@ -205,9 +205,7 @@ export default function ReadersPage() {
                 Vínculo
                 <select
                   value={affiliationFilter}
-                  onChange={(event) =>
-                    setAffiliationFilter(event.target.value)
-                  }
+                  onChange={(event) => setAffiliationFilter(event.target.value)}
                   className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
                 >
                   <option value="">Todos os vínculos</option>

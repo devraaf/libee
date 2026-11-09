@@ -6,7 +6,7 @@ import SearchFilterBar from '@/shared/components/ui/SearchFilterBar';
 import type {
   Category,
   BookListItem,
-  PaginatedResult,
+  PageResponse,
 } from '@/shared/types/library';
 import { listBooks } from '../services/books.service';
 import { listCategories } from '../services/catalog.service';
@@ -26,9 +26,7 @@ export function CatalogPage() {
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [page, setPage] = useState(1);
-  const [result, setResult] = useState<PaginatedResult<BookListItem> | null>(
-    null,
-  );
+  const [result, setResult] = useState<PageResponse<BookListItem> | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -139,7 +137,7 @@ export function CatalogPage() {
               description={error}
               action={<Button onClick={retryLoading}>Tentar novamente</Button>}
             />
-          ) : result && result.items.length === 0 ? (
+          ) : result && result.content.length === 0 ? (
             <EmptyState
               title="Nenhum livro encontrado"
               description="Tente alterar a busca ou escolher outra categoria."
@@ -147,7 +145,7 @@ export function CatalogPage() {
           ) : (
             <>
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                {result?.items.map((book) => (
+                {result?.content.map((book) => (
                   <BookCard key={book.id} book={book} />
                 ))}
               </div>
@@ -156,7 +154,7 @@ export function CatalogPage() {
                   page={result.page}
                   totalPages={result.totalPages}
                   onPageChange={setPage}
-                  summary={`Mostrando ${result.items.length} de ${result.totalItems} livros`}
+                  summary={`Mostrando ${result.content.length} de ${result.totalElements} livros`}
                   className="mt-6"
                 />
               )}
