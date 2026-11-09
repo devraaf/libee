@@ -8,14 +8,9 @@ import br.edu.fatec.libee.backend.entity.Category;
 import br.edu.fatec.libee.backend.entity.Copy;
 import br.edu.fatec.libee.backend.enums.CopyStatus;
 import br.edu.fatec.libee.backend.exception.*;
-import br.edu.fatec.libee.backend.repository.AuthorRepository;
-import br.edu.fatec.libee.backend.repository.BookRepository;
-import br.edu.fatec.libee.backend.repository.CategoryRepository;
-import br.edu.fatec.libee.backend.repository.CopyRepository;
-import br.edu.fatec.libee.backend.repository.LoanRepository;
+import br.edu.fatec.libee.backend.repository.*;
 import br.edu.fatec.libee.backend.specification.BookSpecification;
 import br.edu.fatec.libee.backend.util.IsbnNormalizer;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -24,11 +19,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.*;
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -40,7 +32,6 @@ public class BookService {
     private final CopyRepository copyRepository;
     private final CategoryRepository categoryRepository;
     private final AuthorRepository authorRepository;
-    private final LoanRepository loanRepository;
 
     private Page<Book> searchBooks(String q, Integer categoryId, int page, int size){
         Pageable pageable = PageRequest.of(page, size, Sort.by("title").and(Sort.by("id")));

@@ -5,31 +5,17 @@ import br.edu.fatec.libee.backend.entity.*;
 import br.edu.fatec.libee.backend.enums.AffiliationType;
 import br.edu.fatec.libee.backend.enums.CopyStatus;
 import br.edu.fatec.libee.backend.enums.UserProfile;
-import br.edu.fatec.libee.backend.repository.AuthorRepository;
 import br.edu.fatec.libee.backend.repository.BookRepository;
-import br.edu.fatec.libee.backend.repository.CategoryRepository;
-import br.edu.fatec.libee.backend.repository.CopyRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.sql.Date;
 import java.time.Clock;
@@ -37,9 +23,9 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 
 import static org.hamcrest.Matchers.*;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WithMockUser(roles = "READER")

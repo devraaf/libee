@@ -1,29 +1,27 @@
 package br.edu.fatec.libee.backend.controller;
 
-import br.edu.fatec.libee.backend.AbstractIntegrationTest;
-import br.edu.fatec.libee.backend.entity.Course;
-import br.edu.fatec.libee.backend.entity.User;
-import br.edu.fatec.libee.backend.enums.AffiliationType;
-import br.edu.fatec.libee.backend.enums.UserProfile;
-import br.edu.fatec.libee.backend.repository.StudentRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.test.context.support.WithMockUser;
-
-import java.time.LocalDate;
-
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.LocalDate;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.security.test.context.support.WithMockUser;
+
+import br.edu.fatec.libee.backend.AbstractIntegrationTest;
+import br.edu.fatec.libee.backend.entity.Course;
+import br.edu.fatec.libee.backend.entity.User;
+import br.edu.fatec.libee.backend.enums.AffiliationType;
+import br.edu.fatec.libee.backend.enums.UserProfile;
+
 @WithMockUser(roles = "LIBRARIAN")
 public class ReaderControllerIT extends AbstractIntegrationTest {
 
-    @Autowired private StudentRepository studentRepository;
     private User librarian;
     private User reader;
     private User otherReader;
