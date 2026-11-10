@@ -13,10 +13,7 @@ export function HeroSection() {
             </span>
           </div>
           
-          <h1 className="type-display mb-6 max-w-4xl font-bold tracking-tight text-fg">
-            Gerenciamento Inteligente de{' '}
-            <span className="text-primary">Bibliotecas</span>
-          </h1>
+          
           
           <p className="type-body mb-10 max-w-2xl text-muted">
             Simplifique a gestão do seu acervo. Controle de livros, empréstimos 
