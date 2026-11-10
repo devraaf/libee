@@ -7,6 +7,7 @@
 ------------------------------------------------------------------- */
 :root {
   --bg: #fffdf7;
+  --bg-secondary: #FBF6E8;
   --surface: #ffffff;
   --surface-warm: #fbf4e4;
   --surface-hover: #fbf6e8;
@@ -55,6 +56,7 @@
 
 [data-theme='dark'] {
   --bg: #17130f;
+  --bg-secondary: #1D1712;
   --surface: #1f1812;
   --surface-warm: #1e1710;
   --surface-hover: #2c2219;
@@ -107,6 +109,7 @@
   --font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
 
   --color-bg: var(--bg);
+  --color-bg-secondary: var(--bg-secondary);
   --color-surface: var(--surface);
   --color-surface-warm: var(--surface-warm);
   --color-surface-hover: var(--surface-hover);

@@ -18,11 +18,9 @@ import type {
   CreateBookInput,
   PageResponse,
 } from '../../../../shared/types/library';
+import type { SearchablePaginationParams } from '../../../../shared/api/request-params';
 
-export interface ListBooksParams {
-  page: number;
-  size: number;
-  search?: string;
+export interface ListBooksParams extends SearchablePaginationParams {
   categoryId?: number;
 }
 

@@ -1,15 +1,15 @@
 import { Link } from 'react-router-dom';
 import { Card } from '@/shared/components/ui/Card';
 import { CoverImage } from '@/shared/components/ui/CoverImage';
-import type { BookListItem } from '@/shared/types/library';
+import type { BookDisplay } from '@/shared/types/library';
 import { BookmarkAvailable } from '@/shared/components/ui/BookmarkAvailable';
 
 export interface BookCardProps {
-  book: BookListItem;
+  book: BookDisplay;
 }
 
 export function BookCard({ book }: BookCardProps) {
-  const authors = book.authors.map(({ name }) => name).join(', ');
+  const authors = book.authors.join(', ');
 
   return (
     <Link

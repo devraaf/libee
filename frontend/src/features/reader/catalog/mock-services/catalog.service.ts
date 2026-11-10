@@ -1,19 +1,6 @@
-import {
-  mockAuthors,
-  mockCategories,
-  mockCourses,
-} from '../../../../shared/mocks/data';
+import { mockAuthors, mockCourses } from '../../../../shared/mocks/data';
 import { simulateServiceDelay } from '../../../../shared/mocks/service-utils';
-import type {
-  Author,
-  Category,
-  Course,
-} from '../../../../shared/types/library';
-
-export async function listCategories(): Promise<Category[]> {
-  await simulateServiceDelay();
-  return mockCategories.map((category) => ({ ...category }));
-}
+import type { Author, Course } from '../../../../shared/types/library';
 
 export async function listAuthors(): Promise<Author[]> {
   await simulateServiceDelay();
