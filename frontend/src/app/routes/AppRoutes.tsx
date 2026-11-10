@@ -35,6 +35,7 @@ export function AppRoutes() {
         <Route path="/gerenciamento/leitores" element={<ReadersPage />} />
       </Route>
 
+
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
