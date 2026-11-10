@@ -7,7 +7,7 @@ import Modal from '../../../../shared/components/ui/Modal';
 import { PageHeader } from '../../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../../shared/components/ui/SearchFilterBar';
 import { useTableData } from '../../../../shared/hooks/useTableData';
-import { listCourses } from '../../../reader/catalog/services/catalog.service';
+import { listCourses } from '../../../reader/catalog/mock-services/catalog.service';
 import { listLoans } from '../../../loans/services/loans.service';
 import { createReader, listReaders } from '../services/readers.service';
 import type { AffiliationType } from '../../../../shared/schemas/enums.schema';

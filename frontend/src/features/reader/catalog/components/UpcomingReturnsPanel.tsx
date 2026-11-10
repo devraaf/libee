@@ -1,35 +1,23 @@
 import { CalendarDays, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { Button } from '@/shared/components/ui/Button';
 import { Card } from '@/shared/components/ui/Card';
 import { CoverImage } from '@/shared/components/ui/CoverImage';
 import { EmptyState } from '@/shared/components/ui/EmptyState';
-import { useReaderLoans } from '@/features/reader/reader-loans/hooks/useReaderLoans';
-import {
-  getBookPath,
-  type ReaderLoan,
-} from '@/features/reader/reader-loans/utils/readerLoans';
+import { listUpcomingReturns } from '@/features/reader/services/reader-api.service';
+import type { UpcomingReturn } from '@/features/reader/services/reader-api.mapper';
+import { formatLibraryDate } from '@/shared/utils/format-date';
 
-function formatDueDate(value: string): string {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return 'Data não disponível';
+const getBookPath = (bookId: number) => `/livros/${bookId}`;
 
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return 'Data não disponível';
-
-  return new Intl.DateTimeFormat('pt-BR', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(date);
-}
-
-function UpcomingReturnItem({ loan }: { loan: ReaderLoan }) {
+function UpcomingReturnItem({ loan }: { loan: UpcomingReturn }) {
   const content = (
     <>
       <CoverImage
         src={loan.coverUrl}
         alt={`Capa de ${loan.title}`}
-        className="h-[90px] w-[60px] shrink-0 rounded-sm bg-surface"
+        className="h-22.5 w-15 shrink-0 rounded-sm bg-surface"
       />
       <div className="flex min-w-0 flex-1 flex-col justify-between py-2">
         <div className="min-w-0">
@@ -43,7 +31,13 @@ function UpcomingReturnItem({ loan }: { loan: ReaderLoan }) {
         </div>
         <p className="type-caption flex items-center gap-1.5 text-fg">
           <CalendarDays size={13} aria-hidden="true" className="shrink-0" />
-          <span>{formatDueDate(loan.dueDate)}</span>
+          <span>
+            {formatLibraryDate(
+              loan.dueDate,
+              { day: 'numeric', month: 'short', year: 'numeric' },
+              'Data não disponível',
+            )}
+          </span>
         </p>
       </div>
       <ChevronRight
@@ -56,17 +50,13 @@ function UpcomingReturnItem({ loan }: { loan: ReaderLoan }) {
 
   return (
     <li className="border-b border-line/70 last:border-b-0">
-      {loan.bookId === null ? (
-        <div className="flex gap-2.5 py-2.5">{content}</div>
-      ) : (
-        <Link
-          to={getBookPath(loan.bookId)}
-          aria-label={`Ver detalhes de ${loan.title}`}
-          className="flex gap-2.5 rounded-md py-2.5 focus-visible:outline"
-        >
-          {content}
-        </Link>
-      )}
+      <Link
+        to={getBookPath(loan.bookId)}
+        aria-label={`Ver detalhes de ${loan.title}`}
+        className="flex gap-2.5 rounded-md py-2.5 focus-visible:outline"
+      >
+        {content}
+      </Link>
     </li>
   );
 }
@@ -84,7 +74,7 @@ function LoadingItems() {
           key={item}
           className="flex animate-pulse gap-2.5 border-b border-line/70 py-2.5 last:border-b-0"
         >
-          <div className="h-[90px] w-[60px] shrink-0 rounded-sm bg-surface" />
+          <div className="h-22.5 w-15 shrink-0 rounded-sm bg-surface" />
           <div className="flex flex-1 flex-col justify-between py-3">
             <div className="space-y-2">
               <div className="h-3 w-4/5 rounded bg-surface" />
@@ -99,8 +89,37 @@ function LoadingItems() {
 }
 
 export function UpcomingReturnsPanel() {
-  const { active, error, isLoading, reload } = useReaderLoans(4);
-  const upcomingReturns = active.slice(0, 3);
+  const [upcomingReturns, setUpcomingReturns] = useState<UpcomingReturn[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadUpcomingReturns() {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const items = await listUpcomingReturns();
+        if (active) setUpcomingReturns(items);
+      } catch (loadError) {
+        if (!active) return;
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Não foi possível carregar as próximas devoluções.',
+        );
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    }
+
+    void loadUpcomingReturns();
+    return () => {
+      active = false;
+    };
+  }, [retryCount]);
 
   return (
     <Card
@@ -129,9 +148,14 @@ export function UpcomingReturnsPanel() {
       ) : error ? (
         <EmptyState
           title="Não foi possível carregar as devoluções"
-          description={error}
+          description={error ?? undefined}
           action={
-            <Button type="button" size="sm" variant="outline" onClick={reload}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setRetryCount((count) => count + 1)}
+            >
               Tentar novamente
             </Button>
           }

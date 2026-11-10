@@ -18,9 +18,9 @@ import {
   type StoredSession,
 } from '@/features/auth/storage/session-storage';
 import type { UserProfile } from '@/shared/schemas/enums.schema';
-import { ProtectedRoute } from '../app/routes/ProtectedRoute';
-import { PublicOnlyRoute } from '../app/routes/PublicOnlyRoute';
-import { homePathByProfile } from '../app/routes/homePathByProfile';
+import { ProtectedRoute } from '@/app/routes/ProtectedRoute';
+import { PublicOnlyRoute } from '@/app/routes/PublicOnlyRoute';
+import { homePathByProfile } from '@/app/routes/homePathByProfile';
 
 function session(profile: UserProfile): StoredSession {
   return {
