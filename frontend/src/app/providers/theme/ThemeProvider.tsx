@@ -5,8 +5,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { Theme } from '../../shared/types/theme';
 import { ThemeContext } from './ThemeContext';
+import type { Theme } from '@/shared/types/theme';
 
 const STORAGE_KEY = 'libee-theme';
 

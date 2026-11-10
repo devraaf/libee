@@ -5,8 +5,10 @@ import { AuthLayout } from '../components/AuthLayout';
 import { RegisterForm } from '../components/RegisterForm';
 import type { RegisterFormData } from '../schemas/auth.schema';
 import type { Course } from '@/shared/types/library';
-import { register } from '../services/auth.service';
+import { register, type AuthSession } from '../services/auth.service';
 import { listCourses } from '@/features/courses/services/course.service';
+import { useAuth } from '@/app/providers/auth/useAuth';
+import { homePathByProfile } from '@/app/routes/homePathByProfile';
 
 interface RegisterPageProps {
   courses?: Course[];
@@ -15,6 +17,7 @@ interface RegisterPageProps {
 
 export function RegisterPage({ courses, onSubmit }: RegisterPageProps) {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [loadedCourses, setLoadedCourses] = useState<Course[]>([]);
   const [coursesError, setCoursesError] = useState<string | null>(null);
   const availableCourses = courses ?? loadedCourses;
@@ -44,7 +47,20 @@ export function RegisterPage({ courses, onSubmit }: RegisterPageProps) {
     } else {
       await register(data);
     }
-    navigate('/entrar', { state: { registrationSuccess: true } });
+    let session: AuthSession;
+    try {
+      session = await login({
+        email: data.email,
+        password: data.password,
+      });
+    } catch {
+      navigate('/entrar', {
+        replace: true,
+        state: { registrationSuccess: true },
+      });
+      return;
+    }
+    navigate(homePathByProfile[session.user.profile], { replace: true });
   }
 
   return (
