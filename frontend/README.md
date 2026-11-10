@@ -2,7 +2,7 @@
 
 Interface web do **Libee**, sistema de gestão de biblioteca acadêmica desenvolvido inicialmente para a biblioteca da Fatec Cotia.
 
-Esta etapa cobre apenas o front-end, seguindo o wireframe do projeto. Não há back-end, banco de dados nem chamadas a APIs externas. Quando uma tela precisar exibir informações, são usados dados locais fictícios apenas para representar o wireframe.
+O front-end segue o wireframe do projeto. O login já usa a API do back-end; as demais telas ainda podem usar dados locais fictícios para representar o wireframe.
 
 ## Tecnologias
 
@@ -10,9 +10,10 @@ Esta etapa cobre apenas o front-end, seguindo o wireframe do projeto. Não há b
 - [Vite](https://vite.dev/)
 - [Tailwind CSS](https://tailwindcss.com/)
 - [React Router](https://reactrouter.com/) para navegação
-- [Axios](https://axios-http.com/) para futuras integrações com o back-end
+- [Axios](https://axios-http.com/) para chamadas ao back-end
 - [Zod](https://zod.dev/) para validação de formulários
 - [Lucide React](https://lucide.dev/) para ícones
+- [Vitest](https://vitest.dev/) e Testing Library para testes
 
 ## Pré-requisitos
 
@@ -48,6 +49,7 @@ A aplicação fica disponível em `http://localhost:5173`.
 | `npm run lint:fix`     | Corrige automaticamente problemas corrigíveis pelo Oxlint |
 | `npm run format`       | Formata os arquivos-fonte e de configuração com Prettier  |
 | `npm run format:check` | Verifica a formatação sem alterar arquivos                |
+| `npm test`             | Executa os testes do frontend                             |
 | `npm run typecheck`    | Verifica os tipos TypeScript sem gerar build              |
 
 ## Estrutura de pastas
@@ -81,15 +83,34 @@ Testes específicos de uma feature ou componente devem ficar próximos do códig
 
 ## Rotas e layouts
 
-As rotas da aplicação ficam em `src/app/routes/AppRoutes.tsx`. O único layout
-definido é o `MainLayout`, que reúne o header, o conteúdo da rota e o footer. O
-perfil informado pela rota (`public`, `reader` ou `librarian`) configura os
-links exibidos no header; isso ainda não representa autenticação nem protege o
-acesso às páginas. A página institucional usa o `MainLayout` com perfil
-`public`; acervo, empréstimos e detalhe do livro usam perfil `reader`; e as
-rotas de gerenciamento usam perfil `librarian`. Login e cadastro usam o layout
-de autenticação próprio, e a página 404 é exibida sem layout. Telas ainda não
-implementadas usam páginas provisórias.
+As rotas da aplicação ficam em `src/app/routes/AppRoutes.tsx`. O `AuthProvider`
+inicializa a sessão pelo `session-storage` e expõe `session`, `login` e `logout`
+por `useAuth()`. O `ProtectedRoute` exige sessão e, quando informado, valida o
+perfil; visitantes são enviados para `/entrar` com o destino original salvo, e
+um perfil sem permissão é redirecionado para a própria home. Use
+`PublicOnlyRoute` em login e cadastro: se a sessão já existir, ele redireciona
+para a home correspondente ao perfil. O mapa `homePathByProfile` centraliza os
+destinos de leitor, bibliotecário e administrador.
+
+O botão **Sair** do cabeçalho encerra a sessão no frontend: remove o token do
+storage, atualiza o estado de autenticação e volta para `/entrar`. O backend não
+revoga o token.
+
+Após o autocadastro, o frontend autentica o leitor com as credenciais recém
+cadastradas e o encaminha para a home correspondente ao perfil retornado.
+
+A página institucional e a galeria são públicas. Acervo e empréstimos exigem o perfil leitor; o detalhe do livro pode ser aberto por leitor e bibliotecário. As rotas de gerenciamento exigem
+bibliotecário. Login e cadastro usam o layout de autenticação próprio, e a
+página 404 é exibida para caminhos desconhecidos. **Enquanto a home do
+administrador (`/administracao/leitores`) não existe, o login de um
+administrador leva à página “Página não encontrada” (404).** O fallback impede
+que esse destino planejado gere um loop de redirecionamento.
+
+Os testes de guards usam uma árvore de rotas isolada, não o `AppRoutes` real;
+por isso, a associação de cada rota aos perfis permitidos também deve ser
+conferida ao alterar `AppRoutes`. Quando a página de administrador for criada,
+atualize o cenário correspondente em `src/app/routes/guards.test.tsx` para
+montar essa rota e verificar a home real, em vez da 404.
 
 ## Mocks e services
 
