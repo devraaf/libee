@@ -68,6 +68,7 @@ export function RegisterForm({ courses = [], onSubmit }: RegisterFormProps) {
         maxLength={15}
         value={formData.phone}
         onChange={(e) => handleFieldChange('phone', e.target.value)}
+        error={errors.phone}
       />
       <RadioGroup
         legend="Tipo de vínculo"
