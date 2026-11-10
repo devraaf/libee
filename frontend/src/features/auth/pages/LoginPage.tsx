@@ -3,25 +3,25 @@ import { Logo } from '../../../shared/components/branding/Logo';
 import { AuthLayout } from '../components/AuthLayout';
 import { LoginForm } from '../components/LoginForm';
 import type { LoginFormData } from '../schemas/auth.schema';
-import { login, type AuthSession } from '../services/auth.service';
+import { useAuth } from '@/app/providers/auth/useAuth';
+import { homePathByProfile } from '@/app/routes/homePathByProfile';
 
-interface LoginPageProps {
-  onSubmit?: (data: LoginFormData) => AuthSession | Promise<AuthSession>;
-}
-
-export function LoginPage({ onSubmit }: LoginPageProps) {
+export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { login } = useAuth();
   const registrationSuccess = location.state?.registrationSuccess === true;
+  const redirect = (
+    location.state as {
+      from?: { pathname: string; search: string; hash: string };
+    } | null
+  )?.from;
 
   async function handleLogin(data: LoginFormData) {
-    const session = onSubmit ? await onSubmit(data) : await login(data);
-    const homePath =
-      session.user.profile === 'LIBRARIAN'
-        ? '/gerenciamento/acervo'
-        : '/acervo';
-
-    navigate(homePath);
+    const session = await login(data);
+    navigate(redirect ?? homePathByProfile[session.user.profile], {
+      replace: true,
+    });
   }
   return (
     <AuthLayout>

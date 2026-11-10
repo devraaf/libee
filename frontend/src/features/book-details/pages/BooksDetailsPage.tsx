@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '@/app/providers/auth/useAuth';
+import { homePathByProfile } from '@/app/routes/homePathByProfile';
 import { Button } from '@/shared/components/ui/Button';
 import { EmptyState } from '@/shared/components/ui/EmptyState';
 import { Loader } from '@/shared/components/ui/loader/Loader';
@@ -20,6 +22,10 @@ type BookDetailsState =
 export function BookDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { session } = useAuth();
+  const returnPath = session
+    ? homePathByProfile[session.user.profile]
+    : '/acervo';
   const [retryCount, setRetryCount] = useState(0);
   const [state, setState] = useState<BookDetailsState>({
     status: 'loading',
@@ -71,7 +77,7 @@ export function BookDetailsPage() {
             title="Livro não encontrado"
             description="O endereço do livro está incorreto."
             action={
-              <Button onClick={() => navigate('/acervo')} variant="outline">
+              <Button onClick={() => navigate(returnPath)} variant="outline">
                 Voltar para o acervo
               </Button>
             }
@@ -98,7 +104,7 @@ export function BookDetailsPage() {
           title="Livro não encontrado"
           description="O livro pode ter sido removido do acervo ou o endereço está incorreto."
           action={
-            <Button onClick={() => navigate('/acervo')} variant="outline">
+            <Button onClick={() => navigate(returnPath)} variant="outline">
               Voltar para o acervo
             </Button>
           }
