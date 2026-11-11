@@ -5,6 +5,10 @@ interface ProblemDetail {
   detail?: string;
   status?: number;
   traceId?: string;
+  errors?: Array<{ field: string; message: string }>;
+  accessionNumbers?: string[];
+  accessionNumber?: string;
+  bookId?: number;
 }
 
 const fallbackByStatus = (status: number): string => {
@@ -20,12 +24,28 @@ const fallbackByStatus = (status: number): string => {
 export class ApiError extends Error {
   readonly status?: number;
   readonly traceId?: string;
+  readonly errors: Array<{ field: string; message: string }>;
+  readonly accessionNumbers: string[];
+  readonly accessionNumber?: string;
+  readonly bookId?: number;
 
-  constructor(message: string, status?: number, traceId?: string) {
+  constructor(
+    message: string,
+    status?: number,
+    traceId?: string,
+    details: Pick<
+      ProblemDetail,
+      'errors' | 'accessionNumbers' | 'accessionNumber' | 'bookId'
+    > = {},
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.traceId = traceId;
+    this.errors = details.errors ?? [];
+    this.accessionNumbers = details.accessionNumbers ?? [];
+    this.accessionNumber = details.accessionNumber;
+    this.bookId = details.bookId;
   }
 
   static from(error: AxiosError<ProblemDetail>): ApiError {
@@ -39,6 +59,6 @@ export class ApiError extends Error {
     // 5xx: não expõe detalhe técnico ao usuário; o traceId fica para suporte
     const message =
       status < 500 && data?.detail ? data.detail : fallbackByStatus(status);
-    return new ApiError(message, status, data?.traceId);
+    return new ApiError(message, status, data?.traceId, data);
   }
 }
