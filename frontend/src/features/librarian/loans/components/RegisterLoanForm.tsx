@@ -1,24 +1,17 @@
-import { useEffect, useId, useMemo, useState } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
+import { useEffect, useId, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, Search } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Badge } from '../../../../shared/components/ui/Badge';
 import { Button } from '../../../../shared/components/ui/Button';
-import Modal from '../../../../shared/components/ui/Modal';
+import { IconButton } from '../../../../shared/components/ui/IconButton';
+import { dateFromToday } from '../../../../shared/utils/date';
+import RegisterReaderModal from '../../readers/components/RegisterReaderModal';
+import type { RegisteredReader } from '@/features/auth/services/auth.service';
 import {
-  getBook,
-  listActiveCopies,
-} from '../../../reader/catalog/mock-services/books.service';
-import { listCourses } from '../../../reader/catalog/mock-services/catalog.service';
-import {
-  createReader,
-  listReaders,
+  searchReadersForLoan,
+  type LoanReaderOption,
 } from '../../readers/services/readers.service';
-import CreateReaderForm from '../../readers/components/CreateReaderForm';
-import type { ReaderFormValues } from '../../readers/types/reader.model';
-import type { AffiliationType } from '../../../../shared/schemas/enums.schema';
-import type { Copy, Course, Reader } from '../../../../shared/types/library';
-import { dateFromToday } from '../../../../shared/mocks/dates';
 import {
   registerLoanSchema,
   type RegisterLoanFormData,
@@ -29,14 +22,10 @@ interface RegisterLoanFormProps {
   onConfirm: (data: RegisterLoanFormData) => Promise<void>;
 }
 
-interface AvailableCopy extends Copy {
-  title: string;
-}
-
 function getErrorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message
-    : 'Não foi possível carregar os dados para o empréstimo.';
+    : 'Não foi possível concluir a operação.';
 }
 
 const fieldClass =
@@ -44,30 +33,31 @@ const fieldClass =
 const labelClass = 'type-label mb-1 block text-fg';
 const errorClass = 'type-caption mt-1 block text-danger';
 
+const readerStatusLabel: Record<LoanReaderOption['status'], string> = {
+  REGULAR: 'Regular',
+  PENDING: 'Pendente',
+};
+
 export default function RegisterLoanForm({
   onCancel,
   onConfirm,
 }: RegisterLoanFormProps) {
   const formId = useId();
-  const [copies, setCopies] = useState<AvailableCopy[]>([]);
-  const [selectedReader, setSelectedReader] = useState<Reader | null>(null);
-  const [readerSuggestions, setReaderSuggestions] = useState<Reader[]>([]);
-  const [isLoadingOptions, setIsLoadingOptions] = useState(true);
+  const [readerSearch, setReaderSearch] = useState('');
+  const [selectedReader, setSelectedReader] = useState<LoanReaderOption | null>(
+    null,
+  );
+  const [readerSuggestions, setReaderSuggestions] = useState<
+    LoanReaderOption[]
+  >([]);
   const [isSearchingReader, setIsSearchingReader] = useState(false);
-  const [optionsError, setOptionsError] = useState<string | null>(null);
   const [readerSearchError, setReaderSearchError] = useState<string | null>(
     null,
   );
-  const [readerNotFound, setReaderNotFound] = useState(false);
-  const [copyError, setCopyError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [optionsRetry, setOptionsRetry] = useState(0);
-  const [isCreateReaderOpen, setIsCreateReaderOpen] = useState(false);
-  const [isLoadingCourses, setIsLoadingCourses] = useState(false);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [courseLoadError, setCourseLoadError] = useState<string | null>(null);
-  const [readerCreatedMessage, setReaderCreatedMessage] = useState<
+  const [isRegisterReaderOpen, setIsRegisterReaderOpen] = useState(false);
+  const [readerRegisteredMessage, setReaderRegisteredMessage] = useState<
     string | null
   >(null);
 
@@ -75,178 +65,76 @@ export default function RegisterLoanForm({
     register,
     handleSubmit,
     setValue,
-    control,
     formState: { errors },
   } = useForm<RegisterLoanFormData>({
     resolver: zodResolver(registerLoanSchema),
     defaultValues: {
-      readerId: '',
-      readerName: '',
-      copyCode: '',
+      readerId: 0,
+      accessionNumber: '',
       dueDate: dateFromToday(7),
     },
   });
 
-  const readerInput = useWatch({ control, name: 'readerName' }) ?? '';
-  const copyCode = useWatch({ control, name: 'copyCode' }) ?? '';
-  const selectedCopy = useMemo(
-    () =>
-      copies.find(
-        (copy) =>
-          copy.accessionNumber === copyCode.trim() ||
-          String(copy.id) === copyCode.trim(),
-      ),
-    [copies, copyCode],
-  );
-
   useEffect(() => {
-    if (!readerCreatedMessage) return;
-    const timeoutId = window.setTimeout(
-      () => setReaderCreatedMessage(null),
-      4000,
-    );
-    return () => window.clearTimeout(timeoutId);
-  }, [readerCreatedMessage]);
-
-  useEffect(() => {
+    const query = readerSearch.trim();
+    if (!query || selectedReader?.name === readerSearch) return;
     let active = true;
+    const timeoutId = window.setTimeout(() => {
+      void searchReadersForLoan(query)
+        .then((readers) => {
+          if (!active) return;
+          setReaderSuggestions(readers);
+        })
+        .catch((error: unknown) => {
+          if (!active) return;
+          setReaderSuggestions([]);
+          setReaderSearchError(getErrorMessage(error));
+        })
+        .finally(() => {
+          if (active) setIsSearchingReader(false);
+        });
+    }, 300);
 
-    async function loadOptions() {
-      setIsLoadingOptions(true);
-      setOptionsError(null);
-      try {
-        const copyRecords = await listActiveCopies();
-        const books = await Promise.all(
-          [...new Set(copyRecords.map(({ bookId }) => bookId))].map(getBook),
-        );
-        if (!active) return;
-
-        const booksById = new Map(books.map((book) => [book.id, book]));
-        setCopies(
-          copyRecords.map((copy) => {
-            const book = booksById.get(copy.bookId);
-            if (!book) {
-              throw new Error(
-                `O livro do exemplar ${copy.accessionNumber} não foi encontrado.`,
-              );
-            }
-            return { ...copy, title: book.title };
-          }),
-        );
-      } catch (error) {
-        if (active) setOptionsError(getErrorMessage(error));
-      } finally {
-        if (active) setIsLoadingOptions(false);
-      }
-    }
-
-    void loadOptions();
     return () => {
       active = false;
+      window.clearTimeout(timeoutId);
     };
-  }, [optionsRetry]);
+  }, [readerSearch, selectedReader]);
 
-  async function handleSearchReader() {
-    const query = readerInput.trim();
-    if (!query) {
-      setReaderSuggestions([]);
-      setReaderNotFound(false);
-      return;
-    }
-
-    setIsSearchingReader(true);
-    setReaderSearchError(null);
-    try {
-      const matches = await listReaders(query);
-      setReaderSuggestions(matches);
-      setReaderNotFound(matches.length === 0);
-    } catch (error) {
-      setReaderSuggestions([]);
-      setReaderNotFound(false);
-      setReaderSearchError(getErrorMessage(error));
-    } finally {
-      setIsSearchingReader(false);
-    }
-  }
-
-  function handleSelectReader(reader: Reader) {
-    setSelectedReader(reader);
-    setValue('readerId', String(reader.id), { shouldValidate: true });
-    setValue('readerName', reader.name, { shouldValidate: true });
-    setReaderSuggestions([]);
-    setReaderNotFound(false);
-    setReaderSearchError(null);
-  }
-
-  function handleReaderInputChange(value: string) {
-    setValue('readerName', value, { shouldValidate: true });
-    setValue('readerId', '', { shouldValidate: true });
+  function handleReaderSearchChange(value: string) {
+    setReaderSearch(value);
+    setReaderRegisteredMessage(null);
     setSelectedReader(null);
     setReaderSuggestions([]);
-    setReaderNotFound(false);
     setReaderSearchError(null);
+    setIsSearchingReader(Boolean(value.trim()));
+    setValue('readerId', 0, { shouldValidate: true });
   }
 
-  async function handleOpenCreateReader() {
-    setIsCreateReaderOpen(true);
-    setCourseLoadError(null);
-    setIsLoadingCourses(true);
-    try {
-      setCourses(await listCourses());
-    } catch (error) {
-      setCourseLoadError(getErrorMessage(error));
-    } finally {
-      setIsLoadingCourses(false);
-    }
+  function handleSelectReader(reader: LoanReaderOption) {
+    setSelectedReader(reader);
+    setReaderSearch(reader.name);
+    setReaderSuggestions([]);
+    setReaderSearchError(null);
+    setIsSearchingReader(false);
+    setValue('readerId', reader.id, { shouldValidate: true });
   }
 
-  async function handleCreateReader(values: ReaderFormValues) {
-    const affiliationType: AffiliationType =
-      values.bond === 'student'
-        ? 'STUDENT'
-        : values.bond === 'teacher'
-          ? 'PROFESSOR'
-          : 'EMPLOYEE';
-    const course = courses.find(({ name }) => name === values.course);
-    const reader = await createReader({
-      name: values.name.trim(),
-      email: values.email.trim(),
-      phone: values.phone.replace(/\D/g, ''),
-      affiliationType,
-      ...(affiliationType === 'STUDENT' && course
-        ? { courseId: course.id }
-        : {}),
-    });
-
-    handleSelectReader(reader);
-    setIsCreateReaderOpen(false);
-    setReaderCreatedMessage(`Leitor cadastrado com sucesso.`);
-  }
-
-  function handleCopyCodeChange(value: string) {
-    setValue('copyCode', value, { shouldValidate: true });
-    const trimmedCode = value.trim();
-    if (!trimmedCode) {
-      setCopyError(null);
-      return;
-    }
-    const copy = copies.find(
-      (item) =>
-        item.accessionNumber === trimmedCode || String(item.id) === trimmedCode,
+  function handleReaderRegistered(reader: RegisteredReader) {
+    const selected: LoanReaderOption = {
+      id: reader.id,
+      name: reader.name,
+      email: reader.email,
+      status: 'REGULAR',
+    };
+    handleSelectReader(selected);
+    setIsRegisterReaderOpen(false);
+    setReaderRegisteredMessage(
+      `Leitor "${reader.name}" cadastrado e selecionado.`,
     );
-    if (!copy) {
-      setCopyError('Exemplar inexistente no catálogo.');
-    } else if (copy.status !== 'AVAILABLE') {
-      setCopyError('Exemplar já se encontra emprestado.');
-    } else {
-      setCopyError(null);
-    }
   }
 
   async function handleFormSubmit(data: RegisterLoanFormData) {
-    if (copyError || !selectedCopy || selectedCopy.status !== 'AVAILABLE') {
-      return;
-    }
     setSubmitError(null);
     setIsSubmitting(true);
     try {
@@ -259,246 +147,197 @@ export default function RegisterLoanForm({
   }
 
   return (
-    <>
-      {readerCreatedMessage && (
-        <div
-          role="status"
-          className="fixed bottom-5 right-5 z-60 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg"
-        >
-          {readerCreatedMessage}
+    <form
+      onSubmit={handleSubmit(handleFormSubmit)}
+      className="flex flex-col gap-4"
+    >
+      <div>
+        <label htmlFor={`${formId}-reader`} className={labelClass}>
+          Leitor (nome ou e-mail)
+        </label>
+        <div className="relative">
+          <input
+            id={`${formId}-reader`}
+            type="text"
+            value={readerSearch}
+            onChange={(event) => handleReaderSearchChange(event.target.value)}
+            placeholder="Digite o nome ou e-mail do leitor"
+            autoComplete="off"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={readerSuggestions.length > 0}
+            aria-controls={`${formId}-reader-suggestions`}
+            className={`${fieldClass} ${readerSearch ? 'pr-11' : ''}`}
+          />
+          {readerSearch && (
+            <IconButton
+              label="Limpar leitor"
+              icon={<X size={16} aria-hidden="true" />}
+              size="sm"
+              onClick={() => handleReaderSearchChange('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-fg"
+            />
+          )}
         </div>
-      )}
-      <form
-        onSubmit={handleSubmit(handleFormSubmit)}
-        className="flex flex-col gap-4"
-      >
-        {optionsError && (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="type-small text-danger" role="alert">
-              {optionsError}
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOptionsRetry((current) => current + 1)}
-            >
-              Tentar novamente
-            </Button>
-          </div>
+        {errors.readerId && (
+          <span className={errorClass}>{errors.readerId.message}</span>
         )}
-
-        {isLoadingOptions && (
-          <p className="type-small text-muted" role="status">
-            Carregando exemplares...
+        {isSearchingReader && (
+          <p className="type-caption mt-1 text-muted" role="status">
+            Buscando leitores...
           </p>
         )}
+        {readerSearchError && (
+          <p className={errorClass} role="alert">
+            {readerSearchError}
+          </p>
+        )}
+      </div>
 
-        <input type="hidden" {...register('readerId')} />
-
-        <div>
-          <label htmlFor={`${formId}-reader-name`} className={labelClass}>
-            Leitor (nome ou e-mail)
-          </label>
-          <div className="flex gap-2">
-            <input
-              id={`${formId}-reader-name`}
-              {...register('readerName')}
-              value={readerInput}
-              onChange={(event) => handleReaderInputChange(event.target.value)}
-              type="text"
-              placeholder="Digite o nome ou e-mail do leitor"
-              autoComplete="off"
-              disabled={isSearchingReader}
-              role="combobox"
-              aria-autocomplete="list"
-              aria-expanded={readerSuggestions.length > 0}
-              aria-controls={`${formId}-reader-suggestions`}
-              className={fieldClass}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void handleSearchReader()}
-              disabled={isSearchingReader}
-              leftIcon={
-                isSearchingReader ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Search size={14} />
-                )
-              }
-            >
-              Buscar
-            </Button>
-          </div>
-          {(errors.readerName || errors.readerId) && (
-            <span className={errorClass}>
-              {errors.readerName?.message ?? errors.readerId?.message}
-            </span>
-          )}
-          {readerSearchError && (
-            <p className={errorClass} role="alert">
-              {readerSearchError}
-            </p>
-          )}
-        </div>
-
-        {readerSuggestions.length > 0 && (
-          <ul
-            id={`${formId}-reader-suggestions`}
-            role="listbox"
-            aria-label="Sugestões de leitores"
-            className="-mt-3 max-h-48 overflow-y-auto rounded-lg border border-line bg-surface"
-          >
-            {readerSuggestions.map((reader) => (
-              <li key={reader.id} role="option" aria-selected={false}>
-                <button
-                  type="button"
-                  onClick={() => handleSelectReader(reader)}
-                  className="flex w-full flex-col px-3 py-2 text-left hover:bg-surface-hover"
-                >
+      {readerSuggestions.length > 0 && (
+        <ul
+          id={`${formId}-reader-suggestions`}
+          role="listbox"
+          aria-label="Sugestões de leitores"
+          className="-mt-3 max-h-48 overflow-y-auto rounded-lg border border-line bg-surface"
+        >
+          {readerSuggestions.map((reader) => (
+            <li key={reader.id} role="option" aria-selected={false}>
+              <button
+                type="button"
+                onClick={() => handleSelectReader(reader)}
+                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-surface-hover"
+              >
+                <span className="flex min-w-0 flex-col">
                   <span className="type-small font-semibold text-fg">
                     {reader.name}
                   </span>
-                  <span className="type-caption text-muted">
+                  <span className="type-caption truncate text-muted">
                     {reader.email}
                   </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+                </span>
+                <Badge
+                  variant={reader.status === 'REGULAR' ? 'success' : 'neutral'}
+                >
+                  {readerStatusLabel[reader.status]}
+                </Badge>
+              </button>
+              {reader.status === 'PENDING' && (
+                <p className="px-3 pb-2 type-caption text-warn">
+                  Atenção: este leitor possui empréstimo em atraso.
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
 
-        {selectedReader && (
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface-warm p-3">
-            <div className="type-caption text-fg">
-              <p className="font-semibold">{selectedReader.name}</p>
-              <p className="text-muted">{selectedReader.email}</p>
-            </div>
-            <Badge variant="success">Leitor selecionado</Badge>
-          </div>
-        )}
-
-        {readerNotFound && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warn-line bg-warn-bg p-3">
-            <span className="type-small text-warn">
-              Leitor não encontrado no sistema.
-            </span>
+      {readerSearch.trim() &&
+        !selectedReader &&
+        !isSearchingReader &&
+        !readerSearchError &&
+        readerSuggestions.length === 0 && (
+          <div className="-mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-surface-warm p-3">
+            <p className="type-caption text-muted">Nenhum leitor encontrado.</p>
             <Button
               type="button"
               size="sm"
-              onClick={() => void handleOpenCreateReader()}
+              variant="outline"
+              onClick={() => setIsRegisterReaderOpen(true)}
             >
-              Cadastrar leitor
+              Leitor não encontrado? Cadastrar leitor
             </Button>
           </div>
         )}
 
-        <div>
-          <label htmlFor={`${formId}-copy-code`} className={labelClass}>
-            Tombo do exemplar (ex.: 0001, 0002)
-          </label>
-          <input
-            id={`${formId}-copy-code`}
-            {...register('copyCode')}
-            type="text"
-            placeholder="Digite o código do tombo"
-            onChange={(event) => handleCopyCodeChange(event.target.value)}
-            className={fieldClass}
-          />
-          {copyError && <span className={errorClass}>{copyError}</span>}
-          {errors.copyCode && (
-            <span className={errorClass}>{errors.copyCode.message}</span>
-          )}
-        </div>
+      {readerRegisteredMessage && (
+        <p className="-mt-3 type-caption text-ok" role="status">
+          {readerRegisteredMessage}
+        </p>
+      )}
 
-        {selectedCopy && !copyError && (
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface-warm p-3">
-            <span className="type-small font-semibold text-fg">
-              Título do livro: {selectedCopy.title}
-            </span>
-            <Badge variant="success">Disponível para empréstimo</Badge>
+      {selectedReader && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface-warm p-3">
+          <div className="type-caption text-fg">
+            <p className="font-semibold">{selectedReader.name}</p>
+            <p className="text-muted">{selectedReader.email}</p>
           </div>
-        )}
-
-        <div>
-          <label htmlFor={`${formId}-due-date`} className={labelClass}>
-            Devolução prevista
-          </label>
-          <input
-            id={`${formId}-due-date`}
-            {...register('dueDate')}
-            type="date"
-            min={dateFromToday(0)}
-            className={fieldClass}
-          />
-          {errors.dueDate && (
-            <span className={errorClass}>{errors.dueDate.message}</span>
-          )}
-        </div>
-
-        <p className="type-caption text-muted">Registrado por Bibliotecário</p>
-
-        {submitError && (
-          <p className="type-small text-danger" role="alert">
-            {submitError}
-          </p>
-        )}
-
-        <div className="mt-2 flex justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            disabled={isSubmitting}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            disabled={
-              isSubmitting ||
-              isLoadingOptions ||
-              Boolean(optionsError) ||
-              Boolean(copyError) ||
-              !selectedReader ||
-              !selectedCopy
+          <Badge
+            variant={
+              selectedReader.status === 'REGULAR' ? 'success' : 'neutral'
             }
           >
-            {isSubmitting ? 'Registrando...' : 'Confirmar'}
-          </Button>
+            {readerStatusLabel[selectedReader.status]}
+          </Badge>
         </div>
-      </form>
-      <Modal
-        isOpen={isCreateReaderOpen}
-        onClose={() => setIsCreateReaderOpen(false)}
-        title="Cadastrar leitor"
-      >
-        {isLoadingCourses ? (
-          <p className="type-small text-muted" role="status">
-            Carregando cursos...
-          </p>
-        ) : courseLoadError ? (
-          <div className="flex flex-col gap-3">
-            <p className="type-small text-danger" role="alert">
-              {courseLoadError}
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void handleOpenCreateReader()}
-            >
-              Tentar novamente
-            </Button>
-          </div>
-        ) : (
-          <CreateReaderForm
-            onCancel={() => setIsCreateReaderOpen(false)}
-            courseOptions={courses.map((course) => course.name)}
-            onSubmit={handleCreateReader}
-          />
+      )}
+      {selectedReader?.status === 'PENDING' && (
+        <div
+          className="-mt-3 rounded-lg border border-warn-line bg-warn-bg p-3 type-small text-warn"
+          role="alert"
+        >
+          <strong>Atenção:</strong> este leitor possui empréstimo em atraso.
+          Confira a situação antes de registrar um novo empréstimo.
+        </div>
+      )}
+
+      <div>
+        <label htmlFor={`${formId}-accession-number`} className={labelClass}>
+          Tombo do exemplar
+        </label>
+        <input
+          id={`${formId}-accession-number`}
+          {...register('accessionNumber')}
+          type="text"
+          placeholder="Digite o tombo do exemplar"
+          className={fieldClass}
+        />
+        {errors.accessionNumber && (
+          <span className={errorClass}>{errors.accessionNumber.message}</span>
         )}
-      </Modal>
-    </>
+      </div>
+
+      <div>
+        <label htmlFor={`${formId}-due-date`} className={labelClass}>
+          Devolução prevista
+        </label>
+        <input
+          id={`${formId}-due-date`}
+          {...register('dueDate')}
+          type="date"
+          min={dateFromToday(1)}
+          className={fieldClass}
+        />
+        {errors.dueDate && (
+          <span className={errorClass}>{errors.dueDate.message}</span>
+        )}
+      </div>
+
+      {submitError && (
+        <p className="type-small text-danger" role="alert">
+          {submitError}
+        </p>
+      )}
+
+      <div className="mt-2 flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={isSubmitting}
+        >
+          Cancelar
+        </Button>
+        <Button type="submit" disabled={isSubmitting || !selectedReader}>
+          {isSubmitting ? 'Registrando...' : 'Confirmar'}
+        </Button>
+      </div>
+      <RegisterReaderModal
+        open={isRegisterReaderOpen}
+        onClose={() => setIsRegisterReaderOpen(false)}
+        onSuccess={handleReaderRegistered}
+        initialValue={readerSearch}
+      />
+    </form>
   );
 }

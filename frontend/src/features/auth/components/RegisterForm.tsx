@@ -31,9 +31,25 @@ const affiliationTypeLabels: Record<AffiliationType, string> = {
 interface RegisterFormProps {
   courses?: Course[];
   onSubmit?: (data: RegisterFormData) => void | Promise<void>;
+  initialName?: string;
+  initialEmail?: string;
+  submitLabel?: string;
+  autoFocusName?: boolean;
 }
 
-export function RegisterForm({ courses = [], onSubmit }: RegisterFormProps) {
+export function RegisterForm({
+  courses = [],
+  onSubmit,
+  initialName = '',
+  initialEmail = '',
+  submitLabel = 'Cadastrar',
+  autoFocusName = false,
+}: RegisterFormProps) {
+  const formInitialValues = {
+    ...initialValues,
+    name: initialName,
+    email: initialEmail,
+  };
   const {
     formData,
     errors,
@@ -41,7 +57,7 @@ export function RegisterForm({ courses = [], onSubmit }: RegisterFormProps) {
     isLoading,
     handleFieldChange,
     handleSubmit,
-  } = useAuthForm(initialValues, registerSchema, onSubmit);
+  } = useAuthForm(formInitialValues, registerSchema, onSubmit);
 
   return (
     <form
@@ -54,6 +70,7 @@ export function RegisterForm({ courses = [], onSubmit }: RegisterFormProps) {
         label="Nome completo"
         placeholder="ex. Maria da Silva"
         autoComplete="name"
+        autoFocus={autoFocusName}
         maxLength={254}
         value={formData.name}
         onChange={(e) => handleFieldChange('name', e.target.value)}
@@ -140,7 +157,7 @@ export function RegisterForm({ courses = [], onSubmit }: RegisterFormProps) {
         className="mt-2"
         disabled={isLoading}
       >
-        {isLoading ? 'Cadastrando...' : 'Cadastrar'}
+        {isLoading ? 'Cadastrando...' : submitLabel}
       </Button>
     </form>
   );
