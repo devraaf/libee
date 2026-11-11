@@ -1,233 +1,140 @@
 import { useEffect, useState } from 'react';
-import { useFieldArray, useForm, useWatch } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Trash2 } from 'lucide-react';
-import { Button } from '../../../../shared/components/ui/Button';
-import Modal from '../../../../shared/components/ui/Modal';
-import {
-  getBook,
-  listCopies,
-  updateBookWithCopies,
-  type RegisteredBook,
-} from '../../../reader/catalog/mock-services/books.service';
-import { listCategories } from '../../../../shared/services/categories.service';
-import { formatLibraryDate } from '../../../../shared/utils/format-date';
-import { MockServiceError } from '../../../../shared/mocks/service-utils';
-import type { Category } from '../../../../shared/types/library';
-import {
-  registerBookSchema,
-  type RegisterBookFormData,
-  type RegisterBookFormInput,
-} from '../schemas/book.schema';
+import { getBookDetails } from '@/features/book-details/services/books.service';
+import type { Category, Copy } from '@/shared/types/library';
+import { ApiError } from '@/shared/api/api-error';
+import { Badge } from '@/shared/components/ui/Badge';
+import { Button } from '@/shared/components/ui/Button';
+import { EmptyState } from '@/shared/components/ui/EmptyState';
+import { Input } from '@/shared/components/ui/Input';
+import { Loader } from '@/shared/components/ui/loader/Loader';
+import Modal from '@/shared/components/ui/Modal';
+import { Select } from '@/shared/components/ui/Select';
+import { deleteManagedCopy } from '../services/book-management.service';
 
 interface EditBookModalProps {
   open: boolean;
   bookId: number | null;
+  categories: Category[];
   onClose: () => void;
-  onSuccess: (updatedBook: RegisteredBook) => void;
+  onCopyDeleted: () => void;
 }
 
-function toFormDate(date: string | null): string {
-  return formatLibraryDate(date, undefined, '');
-}
-
-function toServiceDate(date: string | null): string | null {
-  if (!date) return null;
-  const [day, month, year] = date.split('/');
-  return `${year}-${month}-${day}`;
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : 'Não foi possível carregar os dados do livro.';
 }
 
 export default function EditBookModal({
   open,
   bookId,
+  categories,
   onClose,
-  onSuccess,
+  onCopyDeleted,
 }: EditBookModalProps) {
-  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
-  const [authorInput, setAuthorInput] = useState('');
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [book, setBook] = useState<
+    Awaited<ReturnType<typeof getBookDetails>>['book'] | null
+  >(null);
+  const [copies, setCopies] = useState<Copy[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [loanedCopyIds, setLoanedCopyIds] = useState<Set<number>>(new Set());
-
-  const {
-    register,
-    handleSubmit,
-    control,
-    reset,
-    setValue,
-    setError,
-    clearErrors,
-    trigger,
-    formState: { errors },
-  } = useForm<RegisterBookFormInput, unknown, RegisterBookFormData>({
-    resolver: zodResolver(registerBookSchema),
-    defaultValues: {
-      isbn: '',
-      title: '',
-      authors: [],
-      categoryId: 0,
-      publisher: '',
-      publicationPlace: '',
-      edition: '',
-      publicationDate: '',
-      pageCount: undefined,
-      coverImageUrl: '',
-      summary: '',
-      copies: [],
-    },
-  });
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: 'copies',
-  });
-  const authorsList = useWatch({ control, name: 'authors' }) ?? [];
-  const copyValues = useWatch({ control, name: 'copies' });
+  const [loadedBookId, setLoadedBookId] = useState<number | null>(null);
+  const [copyToDelete, setCopyToDelete] = useState<Copy | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [blockedAccessionNumbers, setBlockedAccessionNumbers] = useState<
+    string[]
+  >([]);
+  const [isDeletingCopy, setIsDeletingCopy] = useState(false);
+  const [authorInput, setAuthorInput] = useState('');
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
 
   useEffect(() => {
     if (!open || bookId === null) return;
-    const currentBookId = bookId;
     let active = true;
 
-    async function loadBookForEditing() {
-      setIsLoading(true);
-      setLoadError(null);
-      try {
-        const [book, copies, nextCategories] = await Promise.all([
-          getBook(currentBookId),
-          listCopies(currentBookId),
-          listCategories(),
-        ]);
+    getBookDetails(bookId)
+      .then(({ book: bookDetails, copies: bookCopies }) => {
         if (!active) return;
-        setCategories(nextCategories);
+        setBook(bookDetails);
+        setCopies(bookCopies);
         setAuthorInput('');
-        setLoanedCopyIds(
-          new Set(
-            copies
-              .filter(({ status }) => status === 'ON_LOAN')
-              .map(({ id }) => id),
-          ),
-        );
-        reset({
-          isbn: book.isbn,
-          title: book.title,
-          authors: book.authors.map(({ name }) => name),
-          categoryId: book.category.id,
-          publisher: book.publisher ?? '',
-          publicationPlace: book.publicationPlace ?? '',
-          edition: book.edition ?? '',
-          publicationDate: toFormDate(book.publicationDate),
-          pageCount: book.pageCount ?? undefined,
-          coverImageUrl: book.coverImageUrl ?? '',
-          summary: book.summary ?? '',
-          copies: copies.map(
-            ({ id: copyId, accessionNumber, physicalLocation }) => ({
-              copyId,
-              accessionNumber,
-              physicalLocation: physicalLocation ?? '',
-            }),
-          ),
-        });
         setCurrentStep(1);
-      } catch (error) {
+        setLoadError(null);
+        setLoadedBookId(bookId);
+      })
+      .catch((error: unknown) => {
         if (active) {
-          setLoadError(
-            error instanceof Error
-              ? error.message
-              : 'Não foi possível carregar os dados do livro.',
-          );
+          setLoadError(getErrorMessage(error));
+          setLoadedBookId(bookId);
         }
-      } finally {
+      })
+      .finally(() => {
         if (active) setIsLoading(false);
-      }
-    }
+      });
 
-    void loadBookForEditing();
     return () => {
       active = false;
     };
-  }, [bookId, open, reset]);
+  }, [bookId, open]);
 
-  const handleDateMask = (event: React.ChangeEvent<HTMLInputElement>) => {
-    let value = event.target.value.replace(/\D/g, '').slice(0, 8);
-    if (value.length > 4) {
-      value = `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`;
-    } else if (value.length > 2) {
-      value = `${value.slice(0, 2)}/${value.slice(2)}`;
-    }
-    event.target.value = value;
-  };
+  const isLoadingBook = isLoading || loadedBookId !== bookId;
+  const visibleLoadError = loadedBookId === bookId ? loadError : null;
+  const visibleBook = loadedBookId === bookId ? book : null;
 
-  const handleNext = async () => {
-    const valid = await trigger([
-      'isbn',
-      'title',
-      'authors',
-      'categoryId',
-      'publisher',
-      'publicationPlace',
-      'edition',
-      'publicationDate',
-      'pageCount',
-    ]);
-    if (valid) setCurrentStep(2);
-  };
+  function updateBook<K extends keyof NonNullable<typeof visibleBook>>(
+    field: K,
+    value: NonNullable<typeof visibleBook>[K],
+  ) {
+    setBook((current) => (current ? { ...current, [field]: value } : current));
+  }
 
-  const handleAddAuthor = () => {
+  function handleAddAuthor() {
     const author = authorInput.trim();
+    if (!author || !visibleBook) return;
     if (
-      !author ||
-      authorsList.some(
+      visibleBook.authors.some(
         (existing) =>
           existing.toLocaleLowerCase() === author.toLocaleLowerCase(),
       )
     ) {
       return;
     }
-    setValue('authors', [...authorsList, author], { shouldValidate: true });
+
+    updateBook('authors', [...visibleBook.authors, author]);
     setAuthorInput('');
-    clearErrors('authors');
-  };
+  }
 
-  const handleRemoveAuthor = (indexToRemove: number) => {
-    setValue(
-      'authors',
-      authorsList.filter((_, index) => index !== indexToRemove),
-      { shouldValidate: true },
-    );
-  };
+  async function handleDeleteCopy() {
+    if (!book || !copyToDelete) return;
+    if (copyToDelete.status === 'ON_LOAN') return;
+    if (copyToDelete.id < 0) {
+      setCopies((current) =>
+        current.filter((copy) => copy.id !== copyToDelete.id),
+      );
+      setCopyToDelete(null);
+      return;
+    }
 
-  const onSubmit = async (data: RegisterBookFormData) => {
-    if (currentStep !== 2 || bookId === null) return;
-    setIsSaving(true);
-    clearErrors('root.server');
+    setIsDeletingCopy(true);
+    setDeleteError(null);
+    setBlockedAccessionNumbers([]);
     try {
-      const updatedBook = await updateBookWithCopies(bookId, {
-        ...data,
-        isbn: data.isbn.replace(/[\s-]/g, '').toUpperCase(),
-        publicationDate: toServiceDate(data.publicationDate),
-      });
-      onSuccess(updatedBook);
-      onClose();
+      await deleteManagedCopy(book.id, copyToDelete.id);
+      setCopies((current) =>
+        current.filter((copy) => copy.id !== copyToDelete.id),
+      );
+      setCopyToDelete(null);
+      onCopyDeleted();
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível atualizar o livro.';
-      if (
-        error instanceof MockServiceError &&
-        error.code === 'ISBN_ALREADY_REGISTERED'
-      ) {
-        setError('isbn', { type: 'manual', message });
-        setCurrentStep(1);
-      } else {
-        setError('root.server', { type: 'server', message });
+      setDeleteError(getErrorMessage(error));
+      if (error instanceof ApiError) {
+        setBlockedAccessionNumbers(error.accessionNumbers);
       }
     } finally {
-      setIsSaving(false);
+      setIsDeletingCopy(false);
     }
-  };
+  }
 
   return (
     <Modal
@@ -260,83 +167,86 @@ export default function EditBookModal({
           {currentStep === 1 ? (
             <Button
               type="button"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                void handleNext();
-              }}
-              disabled={isLoading || isSaving}
+              onClick={() => setCurrentStep(2)}
+              disabled={isLoadingBook || Boolean(visibleLoadError)}
             >
               Continuar
             </Button>
           ) : (
-            <Button
-              type="submit"
-              form="edit-book-form"
-              disabled={isLoading || isSaving}
-            >
-              {isSaving ? 'Salvando...' : 'Salvar alterações'}
+            <Button type="button" disabled>
+              Salvar alterações
             </Button>
           )}
         </div>
       }
     >
-      {loadError ? (
-        <div className="flex flex-col gap-3" role="alert">
-          <p className="type-small text-danger">{loadError}</p>
-          <Button type="button" variant="outline" onClick={onClose}>
-            Fechar
-          </Button>
-        </div>
-      ) : isLoading ? (
-        <p className="type-small text-muted" role="status">
-          Carregando dados do livro...
-        </p>
-      ) : (
-        <form
-          id="edit-book-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (currentStep === 2) void handleSubmit(onSubmit)(event);
-          }}
-          className="flex flex-col gap-4"
+      {isLoadingBook ? (
+        <div
+          className="flex min-h-48 items-center justify-center"
+          role="status"
+          aria-label="Carregando dados do livro"
         >
-          {errors.root?.server && (
-            <p className="text-sm text-danger" role="alert">
-              {errors.root.server.message}
-            </p>
-          )}
+          <Loader />
+        </div>
+      ) : visibleLoadError ? (
+        <EmptyState
+          title="Não foi possível carregar o livro."
+          description={visibleLoadError}
+        />
+      ) : visibleBook ? (
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
           {currentStep === 1 ? (
             <>
-              <label className="flex flex-col gap-1 text-sm">
-                ISBN *
-                <input
-                  {...register('isbn')}
-                  className="rounded-lg border border-line p-2"
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  label="Título"
+                  value={visibleBook.title}
+                  onChange={(event) => updateBook('title', event.target.value)}
                 />
-                {errors.isbn && (
-                  <span className="text-xs text-danger">
-                    {errors.isbn.message}
-                  </span>
-                )}
-              </label>
-              <label className="flex flex-col gap-1 text-sm">
-                Título *
-                <input
-                  {...register('title')}
-                  className="rounded-lg border border-line p-2"
+                <Input
+                  label="ISBN"
+                  value={visibleBook.isbn}
+                  onChange={(event) => updateBook('isbn', event.target.value)}
                 />
-                {errors.title && (
-                  <span className="text-xs text-danger">
-                    {errors.title.message}
-                  </span>
-                )}
-              </label>
-              <div className="flex flex-col gap-2 text-sm">
+                <Select
+                  label="Categoria"
+                  value={
+                    visibleBook.category.id
+                      ? String(visibleBook.category.id)
+                      : 'current-category'
+                  }
+                  onChange={(event) => {
+                    const category = categories.find(
+                      ({ id }) => String(id) === event.target.value,
+                    );
+                    if (category) updateBook('category', category);
+                  }}
+                  options={[
+                    ...(!visibleBook.category.id
+                      ? [
+                          {
+                            value: 'current-category',
+                            label: visibleBook.category.name,
+                          },
+                        ]
+                      : []),
+                    ...categories.map(({ id, name }) => ({
+                      value: String(id),
+                      label: name,
+                    })),
+                  ]}
+                  placeholder="Selecione uma categoria"
+                />
+              </div>
+
+              <section
+                aria-label="Autores do livro"
+                className="flex flex-col gap-2 text-sm"
+              >
                 <span>Autores</span>
-                <div className="flex flex-wrap gap-2">
-                  {authorsList.map((author, index) => (
-                    <span
+                <ul className="flex flex-wrap gap-2">
+                  {visibleBook.authors.map((author, index) => (
+                    <li
                       key={`${author}-${index}`}
                       className="inline-flex items-center gap-2 rounded-md bg-chip px-2.5 py-1 text-xs"
                     >
@@ -344,235 +254,283 @@ export default function EditBookModal({
                       <button
                         type="button"
                         aria-label={`Remover autor ${author}`}
-                        onClick={() => handleRemoveAuthor(index)}
+                        onClick={() =>
+                          updateBook(
+                            'authors',
+                            visibleBook.authors.filter(
+                              (_, authorIndex) => authorIndex !== index,
+                            ),
+                          )
+                        }
                         className="text-muted hover:text-danger"
                       >
                         ×
                       </button>
-                    </span>
+                    </li>
                   ))}
-                </div>
+                </ul>
                 <div className="flex gap-2">
-                  <input
+                  <Input
+                    aria-label="Nome do autor"
+                    placeholder="Nome do autor"
                     value={authorInput}
                     onChange={(event) => setAuthorInput(event.target.value)}
+                    containerClassName="min-w-0 flex-1"
                     onKeyDown={(event) => {
                       if (event.key === 'Enter') {
                         event.preventDefault();
                         handleAddAuthor();
                       }
                     }}
-                    className="min-w-0 flex-1 rounded-lg border border-line p-2"
-                    aria-label="Nome do autor"
                   />
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
                     onClick={handleAddAuthor}
+                    disabled={!authorInput.trim()}
                   >
                     Adicionar
                   </Button>
                 </div>
-                {errors.authors && (
-                  <span className="text-xs text-danger">
-                    {errors.authors.message}
-                  </span>
-                )}
-              </div>
-              <label className="flex flex-col gap-1 text-sm">
-                Categoria *
-                <select
-                  {...register('categoryId', { valueAsNumber: true })}
-                  className="rounded-lg border border-line p-2"
-                >
-                  <option value={0}>Selecione uma categoria</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-                {errors.categoryId && (
-                  <span className="text-xs text-danger">
-                    {errors.categoryId.message}
-                  </span>
-                )}
-              </label>
+              </section>
+
               <div className="grid gap-4 sm:grid-cols-2">
-                <label className="flex flex-col gap-1 text-sm">
-                  Editora
-                  <input
-                    {...register('publisher')}
-                    className="rounded-lg border border-line p-2"
-                  />
-                  {errors.publisher && (
-                    <span className="text-xs text-danger">
-                      {errors.publisher.message}
-                    </span>
-                  )}
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  Local
-                  <input
-                    {...register('publicationPlace')}
-                    className="rounded-lg border border-line p-2"
-                  />
-                  {errors.publicationPlace && (
-                    <span className="text-xs text-danger">
-                      {errors.publicationPlace.message}
-                    </span>
-                  )}
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  Edição
-                  <input
-                    {...register('edition')}
-                    className="rounded-lg border border-line p-2"
-                  />
-                  {errors.edition && (
-                    <span className="text-xs text-danger">
-                      {errors.edition.message}
-                    </span>
-                  )}
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  Publicação
-                  <input
-                    {...register('publicationDate')}
-                    onChange={(event) => {
-                      handleDateMask(event);
-                      setValue('publicationDate', event.target.value, {
-                        shouldValidate: true,
-                      });
-                    }}
-                    placeholder="DD/MM/AAAA"
-                    maxLength={10}
-                    className="rounded-lg border border-line p-2"
-                  />
-                  {errors.publicationDate && (
-                    <span className="text-xs text-danger">
-                      {errors.publicationDate.message}
-                    </span>
-                  )}
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  Número de páginas
-                  <input
-                    {...register('pageCount')}
-                    type="number"
-                    className="rounded-lg border border-line p-2"
-                  />
-                  {errors.pageCount && (
-                    <span className="text-xs text-danger">
-                      {errors.pageCount.message}
-                    </span>
-                  )}
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  Capa
-                  <input
-                    {...register('coverImageUrl')}
-                    className="rounded-lg border border-line p-2"
-                  />
-                </label>
+                <Input
+                  label="Editora"
+                  value={visibleBook.publisher ?? ''}
+                  onChange={(event) =>
+                    updateBook('publisher', event.target.value || null)
+                  }
+                />
+                <Input
+                  label="Local de publicação"
+                  value={visibleBook.publicationPlace ?? ''}
+                  onChange={(event) =>
+                    updateBook('publicationPlace', event.target.value || null)
+                  }
+                />
+                <Input
+                  label="Edição"
+                  value={visibleBook.edition ?? ''}
+                  onChange={(event) =>
+                    updateBook('edition', event.target.value || null)
+                  }
+                />
+                <Input
+                  label="Ano de publicação"
+                  type="number"
+                  value={visibleBook.publicationDate ?? ''}
+                  onChange={(event) =>
+                    updateBook('publicationDate', event.target.value || null)
+                  }
+                />
+                <Input
+                  label="Número de páginas"
+                  type="number"
+                  min="1"
+                  value={visibleBook.pageCount ?? ''}
+                  onChange={(event) =>
+                    updateBook(
+                      'pageCount',
+                      event.target.value ? Number(event.target.value) : null,
+                    )
+                  }
+                />
+                <Input
+                  label="Capa"
+                  type="url"
+                  value={visibleBook.coverImageUrl ?? ''}
+                  onChange={(event) =>
+                    updateBook('coverImageUrl', event.target.value || null)
+                  }
+                />
               </div>
-              <label className="flex flex-col gap-1 text-sm">
+
+              <label className="type-label flex flex-col gap-1.5 text-fg">
                 Resumo
                 <textarea
-                  {...register('summary')}
-                  rows={3}
-                  className="rounded-lg border border-line p-2"
+                  rows={4}
+                  value={visibleBook.summary ?? ''}
+                  onChange={(event) =>
+                    updateBook('summary', event.target.value || null)
+                  }
+                  className="w-full rounded-xl border border-line bg-surface px-4 py-3 text-sm text-fg focus:border-line-strong focus:outline-none focus:ring-1 focus:ring-line-strong"
                 />
               </label>
             </>
           ) : (
-            <>
+            <section
+              aria-label="Exemplares do livro"
+              className="flex flex-col gap-3"
+            >
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">Exemplares</h3>
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  leftIcon={<Plus size={14} />}
                   onClick={() =>
-                    append({ accessionNumber: '', physicalLocation: '' })
+                    setCopies((current) => [
+                      ...current,
+                      {
+                        id: Math.min(0, ...current.map(({ id }) => id)) - 1,
+                        bookId: visibleBook.id,
+                        accessionNumber: '',
+                        physicalLocation: '',
+                        status: 'AVAILABLE',
+                      },
+                    ])
                   }
+                  leftIcon={<Plus size={14} />}
                 >
                   Adicionar exemplar
                 </Button>
               </div>
-              {fields.length === 0 && (
+              {copies.length === 0 && (
                 <p className="text-sm text-muted">
                   Nenhum exemplar cadastrado. Adicione um exemplar se
                   necessário.
                 </p>
               )}
-              {fields.map((field, index) => {
-                const copyId = copyValues?.[index]?.copyId;
-                const isOnLoan =
-                  typeof copyId === 'number' && loanedCopyIds.has(copyId);
-                return (
-                  <div
-                    key={field.id}
-                    className="grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-[1fr_1fr_auto]"
-                  >
-                    {typeof copyId === 'number' && (
-                      <input
-                        type="hidden"
-                        {...register(`copies.${index}.copyId`, {
-                          valueAsNumber: true,
-                        })}
-                      />
-                    )}
-                    <label className="flex flex-col gap-1 text-sm">
-                      <span>
-                        Tombo *{' '}
-                        {isOnLoan && (
-                          <span className="text-muted">(emprestado)</span>
-                        )}
-                      </span>
-                      <input
-                        {...register(`copies.${index}.accessionNumber`)}
-                        readOnly={isOnLoan}
-                        className="rounded-lg border border-line p-2"
-                      />
-                      {errors.copies?.[index]?.accessionNumber && (
-                        <span className="text-xs text-danger">
-                          {errors.copies[index]?.accessionNumber?.message}
-                        </span>
+              {copies.map((copy, index) => (
+                <div
+                  key={copy.id}
+                  className="grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-[1fr_1fr_auto]"
+                >
+                  <label className="flex flex-col gap-1 text-sm">
+                    <span>
+                      Tombo *{' '}
+                      {copy.status === 'ON_LOAN' && (
+                        <span className="text-muted">(emprestado)</span>
                       )}
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm">
-                      Localização física
-                      <input
-                        {...register(`copies.${index}.physicalLocation`)}
-                        readOnly={isOnLoan}
-                        className="rounded-lg border border-line p-2"
-                      />
-                      {errors.copies?.[index]?.physicalLocation && (
-                        <span className="text-xs text-danger">
-                          {errors.copies[index]?.physicalLocation?.message}
-                        </span>
-                      )}
-                    </label>
+                    </span>
+                    <input
+                      type="text"
+                      aria-label={`Tombo do exemplar ${index + 1}`}
+                      value={copy.accessionNumber}
+                      readOnly={copy.status === 'ON_LOAN'}
+                      onChange={(event) =>
+                        setCopies((current) =>
+                          current.map((item) =>
+                            item.id === copy.id
+                              ? {
+                                  ...item,
+                                  accessionNumber: event.target.value,
+                                }
+                              : item,
+                          ),
+                        )
+                      }
+                      className="rounded-lg border border-line p-2"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm">
+                    Localização física
+                    <input
+                      type="text"
+                      aria-label={`Localização física do exemplar ${index + 1}`}
+                      value={copy.physicalLocation ?? ''}
+                      readOnly={copy.status === 'ON_LOAN'}
+                      onChange={(event) =>
+                        setCopies((current) =>
+                          current.map((item) =>
+                            item.id === copy.id
+                              ? {
+                                  ...item,
+                                  physicalLocation: event.target.value,
+                                }
+                              : item,
+                          ),
+                        )
+                      }
+                      className="rounded-lg border border-line p-2"
+                    />
+                  </label>
+                  {copy.id < 0 ? (
                     <Button
                       type="button"
                       size="sm"
                       variant="ghost"
                       aria-label={`Remover exemplar ${index + 1}`}
-                      onClick={() => remove(index)}
-                      disabled={isOnLoan}
+                      onClick={() =>
+                        setCopies((current) =>
+                          current.filter(({ id }) => id !== copy.id),
+                        )
+                      }
                     >
                       <Trash2 size={16} />
                     </Button>
-                  </div>
-                );
-              })}
-            </>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      aria-label="Excluir exemplar"
+                      disabled={isDeletingCopy || copy.status === 'ON_LOAN'}
+                      title={
+                        copy.status === 'ON_LOAN'
+                          ? 'Exemplares com empréstimo ativo não podem ser excluídos.'
+                          : 'Excluir exemplar'
+                      }
+                      onClick={() => {
+                        if (copy.status === 'ON_LOAN') return;
+                        setCopyToDelete(copy);
+                        setDeleteError(null);
+                        setBlockedAccessionNumbers([]);
+                      }}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  )}
+                  {copy.status === 'ON_LOAN' && (
+                    <Badge variant="neutral">Emprestado</Badge>
+                  )}
+                </div>
+              ))}
+            </section>
           )}
-        </form>
-      )}
+
+          {copyToDelete && (
+            <div className="flex flex-col gap-3 rounded-lg border border-danger/30 bg-danger-bg p-4">
+              <p className="type-small text-fg">
+                Confirma a exclusão do exemplar{' '}
+                <strong className="font-mono">
+                  {copyToDelete.accessionNumber}
+                </strong>
+                ? Esta ação não pode ser desfeita.
+              </p>
+              {deleteError && (
+                <div className="type-small text-danger" role="alert">
+                  <p>{deleteError}</p>
+                  {blockedAccessionNumbers.length > 0 && (
+                    <p className="mt-1">
+                      Tombos bloqueados: {blockedAccessionNumbers.join(', ')}
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCopyToDelete(null)}
+                  disabled={isDeletingCopy}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => void handleDeleteCopy()}
+                  disabled={isDeletingCopy}
+                >
+                  {isDeletingCopy ? 'Excluindo...' : 'Confirmar exclusão'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : null}
     </Modal>
   );
 }

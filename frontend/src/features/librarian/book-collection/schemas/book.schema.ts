@@ -26,8 +26,8 @@ export const copyItemSchema = z.object({
   physicalLocation: z
     .string()
     .trim()
-    .max(100, 'A localização deve ter até 100 caracteres.')
-    .transform((value) => value || null),
+    .min(1, 'Informe a localização física do exemplar.')
+    .max(100, 'A localização deve ter até 100 caracteres.'),
 });
 
 const optionalText = (maxLength: number) =>
@@ -70,7 +70,7 @@ export const registerBookSchema = z
     ),
     coverImageUrl: optionalText(500),
     summary: optionalText(Number.MAX_SAFE_INTEGER),
-    copies: z.array(copyItemSchema),
+    copies: z.array(copyItemSchema).min(1, 'Informe ao menos um exemplar.'),
   })
   .superRefine((data, ctx) => {
     const accessionNumbers = data.copies.map((c) =>
