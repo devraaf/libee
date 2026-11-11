@@ -7,6 +7,7 @@ interface DeleteBookModalProps {
   bookTitle: string | null;
   isDeleting: boolean;
   error: string | null;
+  blockedAccessionNumbers?: string[];
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -16,6 +17,7 @@ export default function DeleteBookModal({
   bookTitle,
   isDeleting,
   error,
+  blockedAccessionNumbers = [],
   onClose,
   onConfirm,
 }: DeleteBookModalProps) {
@@ -51,7 +53,8 @@ export default function DeleteBookModal({
         <p className="type-body text-muted">
           Tem certeza que deseja remover a obra{' '}
           <strong className="text-fg">“{bookTitle}”</strong> do acervo? Os
-          exemplares e o histórico de empréstimos serão preservados.
+          exemplares também serão excluídos do acervo, e o histórico de
+          empréstimos será preservado.
         </p>
         <p className="type-small text-muted">
           A obra não aparecerá mais no acervo e não poderá receber novos
@@ -60,6 +63,12 @@ export default function DeleteBookModal({
         {error && (
           <p className="type-small text-danger" role="alert">
             {error}
+            {blockedAccessionNumbers.length > 0 && (
+              <>
+                <br />
+                Tombos bloqueados: {blockedAccessionNumbers.join(', ')}
+              </>
+            )}
           </p>
         )}
       </div>

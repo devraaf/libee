@@ -1,20 +1,22 @@
-import {
-  deleteBook,
-  listActiveCopies,
-  listAllBooks,
-  type RegisteredBook,
-} from '@/features/reader/catalog/mock-services/books.service';
-import { listLoans } from '@/features/loans/services/loans.service';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plus } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { EmptyState } from '@/shared/components/ui/EmptyState';
 import { Loader } from '@/shared/components/ui/loader/Loader';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
 import SearchFilterBar from '@/shared/components/ui/SearchFilterBar';
-import { useTableData } from '@/shared/hooks/useTableData';
-import type { BookListItem, Copy } from '@/shared/types/library';
-import { Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { ApiError } from '@/shared/api/api-error';
+import { listCategories } from '@/shared/services/categories.service';
+import {
+  deleteManagedBook,
+  getBookManagementSummary,
+  listManagedBooks,
+} from '../services/book-management.service';
+import type {
+  BookManagementSummaryDto,
+  RegisteredBookDto,
+} from '../types/book-management';
 import { BookCollectionStats } from '../components/BookCollectionStats';
 import {
   BookCollectionTable,
@@ -24,30 +26,7 @@ import DeleteBookModal from '../components/DeleteBookModal';
 import EditBookModal from '../components/EditBookModal';
 import RegisterBookModal from '../components/RegisterBookModal';
 
-interface BookCollectionStatsData {
-  totalBooks: number;
-  totalCopies: number;
-  availableCopies: number;
-  borrowedCopies: number;
-}
-
-function toBookCollectionItem(
-  book: BookListItem,
-  copies: Copy[],
-  activeCopyIds: Set<number>,
-): BookCollectionItem {
-  const bookCopies = copies.filter((copy) => copy.bookId === book.id);
-  return {
-    id: book.id,
-    title: book.title,
-    authors: book.authors.map(({ name }) => name).join(', '),
-    isbn: book.isbn,
-    category: book.category.name,
-    copies: bookCopies.length,
-    hasActiveLoan: bookCopies.some((copy) => activeCopyIds.has(copy.id)),
-    coverImageUrl: book.coverImageUrl,
-  };
-}
+const PAGE_SIZE = 10;
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error
@@ -59,12 +38,21 @@ export default function BookCollectionPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [books, setBooks] = useState<BookCollectionItem[]>([]);
+  const [categories, setCategories] = useState<
+    Array<{ id: number; name: string }>
+  >([]);
+  const [summary, setSummary] = useState<BookManagementSummaryDto | null>(null);
   const [isLoadingBooks, setIsLoadingBooks] = useState(true);
   const [booksError, setBooksError] = useState<string | null>(null);
-  const [booksRetry, setBooksRetry] = useState(0);
-  const [stats, setStats] = useState<BookCollectionStatsData>();
-
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [categoriesRetry, setCategoriesRetry] = useState(0);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [refresh, setRefresh] = useState(0);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [editingBookId, setEditingBookId] = useState<number | null>(null);
   const [bookToDelete, setBookToDelete] = useState<BookCollectionItem | null>(
@@ -72,105 +60,150 @@ export default function BookCollectionPage() {
   );
   const [isDeletingBook, setIsDeletingBook] = useState(false);
   const [deleteBookError, setDeleteBookError] = useState<string | null>(null);
+  const [blockedAccessionNumbers, setBlockedAccessionNumbers] = useState<
+    string[]
+  >([]);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
+    listCategories()
+      .then((result) => {
+        if (active) {
+          setCategories(result);
+          setCategoriesError(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) setCategoriesError(getErrorMessage(error));
+      })
+      .finally(() => {
+        if (active) setCategoriesLoading(false);
+      });
 
-    async function loadBooks() {
-      setIsLoadingBooks(true);
-      setBooksError(null);
-      try {
-        const [bookRecords, copies, loans] = await Promise.all([
-          listAllBooks(),
-          listActiveCopies(),
-          listLoans(),
-        ]);
-        if (!active) return;
-
-        const activeCopyIds = new Set(
-          loans
-            .filter((loan) => loan.returnDate === null)
-            .map((loan) => loan.copyId),
-        );
-        setBooks(
-          bookRecords.map((book) =>
-            toBookCollectionItem(book, copies, activeCopyIds),
-          ),
-        );
-        setStats({
-          totalBooks: bookRecords.length,
-          totalCopies: copies.length,
-          availableCopies: copies.filter((copy) => copy.status === 'AVAILABLE')
-            .length,
-          borrowedCopies: copies.filter((copy) => copy.status === 'ON_LOAN')
-            .length,
-        });
-      } catch (error) {
-        if (active) setBooksError(getErrorMessage(error));
-      } finally {
-        if (active) setIsLoadingBooks(false);
-      }
-    }
-
-    void loadBooks();
     return () => {
       active = false;
     };
-  }, [booksRetry]);
+  }, [categoriesRetry]);
 
-  const tableData = useTableData({
-    data: books,
-    search,
-    getSearchText: (book) => [book.title, book.authors, book.isbn],
-    filters: { category: categoryFilter },
-    matchesFilters: (book, filters) =>
-      !filters.category || book.category === filters.category,
-  });
+  useEffect(() => {
+    let active = true;
+    const timeoutId = window.setTimeout(() => {
+      async function loadBooks() {
+        setIsLoadingBooks(true);
+        setBooksError(null);
+        try {
+          const category = categories.find(
+            ({ name }) => name === categoryFilter,
+          );
+          const result = await listManagedBooks({
+            page,
+            size: PAGE_SIZE,
+            search,
+            categoryId: category?.id,
+          });
+          if (!active) return;
+          setBooks(
+            result.content.map((book) => ({
+              id: book.id,
+              title: book.title,
+              authors: book.authors.join(', '),
+              isbn: book.isbn,
+              category: book.category,
+              copies: book.totalCopies,
+              availableCopies: book.availableCopies,
+              coverImageUrl: book.coverImageUrl,
+            })),
+          );
+          setTotalItems(result.totalElements);
+          setTotalPages(Math.max(result.totalPages, 1));
+        } catch (error) {
+          if (active) setBooksError(getErrorMessage(error));
+        } finally {
+          if (active) setIsLoadingBooks(false);
+        }
+      }
 
-  const categories = [...new Set(books.map((book) => book.category))];
+      void loadBooks();
+    }, 250);
 
-  const handleBookRegisteredSuccess = (newBook: RegisteredBook) => {
+    return () => {
+      active = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [categories, categoryFilter, page, refresh, search]);
+
+  useEffect(() => {
+    let active = true;
+    getBookManagementSummary()
+      .then((result) => {
+        if (active) {
+          setSummary(result);
+          setSummaryError(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) setSummaryError(getErrorMessage(error));
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [refresh]);
+
+  function refreshCollection() {
+    setSummary(null);
+    setRefresh((current) => current + 1);
+  }
+
+  useEffect(() => {
+    if (!successToast) return;
+    const timeoutId = window.setTimeout(() => setSuccessToast(null), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [successToast]);
+
+  function handleBookRegisteredSuccess(newBook: RegisteredBookDto) {
     setIsRegisterModalOpen(false);
     setSearch('');
     setCategoryFilter('');
-    setBooksRetry((retry) => retry + 1);
-
+    setPage(1);
+    refreshCollection();
     setSuccessToast(`Livro "${newBook.title}" cadastrado com sucesso!`);
-    setTimeout(() => setSuccessToast(null), 4000);
-  };
+  }
 
-  const handleDeleteBook = async () => {
+  async function handleDeleteBook() {
     if (!bookToDelete) return;
     setIsDeletingBook(true);
     setDeleteBookError(null);
     try {
-      await deleteBook(bookToDelete.id);
+      await deleteManagedBook(bookToDelete.id);
       setBookToDelete(null);
-      setBooksRetry((retry) => retry + 1);
+      refreshCollection();
       setSuccessToast(`Livro "${bookToDelete.title}" excluído com sucesso.`);
-      setTimeout(() => setSuccessToast(null), 4000);
     } catch (error) {
-      setDeleteBookError(
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível excluir o livro.',
-      );
+      setDeleteBookError(getErrorMessage(error));
+      if (error instanceof ApiError) {
+        setBlockedAccessionNumbers(error.accessionNumbers);
+      }
     } finally {
       setIsDeletingBook(false);
     }
-  };
+  }
 
-  const handleCloseDeleteModal = () => {
+  function handleCloseDeleteModal() {
     if (isDeletingBook) return;
     setBookToDelete(null);
     setDeleteBookError(null);
-  };
+    setBlockedAccessionNumbers([]);
+  }
 
   return (
-    <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8 relative">
+    <section className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8">
       {successToast && (
-        <div className="fixed bottom-5 right-5 z-50 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg transition-all">
+        <div
+          role="status"
+          className="fixed bottom-5 right-5 z-50 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg transition-all"
+        >
           {successToast}
         </div>
       )}
@@ -189,29 +222,51 @@ export default function BookCollectionPage() {
         }
       />
 
-      <BookCollectionStats {...stats} />
+      <BookCollectionStats
+        totalBooks={summary?.totalBooks}
+        totalCopies={summary?.totalCopies}
+        availableCopies={summary?.availableCopies}
+        borrowedCopies={summary?.onLoanCopies}
+      />
+      {summaryError && (
+        <p className="type-small text-danger" role="alert">
+          Não foi possível carregar os cards: {summaryError}
+        </p>
+      )}
+
       <SearchFilterBar
         placeholder="Pesquise por título, autor ou ISBN..."
         value={search}
-        onChange={setSearch}
+        onChange={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
         filterContent={
           <label className="flex flex-col gap-2 text-sm text-fg">
             Categoria
             <select
               value={categoryFilter}
-              onChange={(event) => setCategoryFilter(event.target.value)}
+              onChange={(event) => {
+                setCategoryFilter(event.target.value);
+                setPage(1);
+              }}
               className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
             >
               <option value="">Todas as categorias</option>
               {categories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
+                <option key={category.id} value={category.name}>
+                  {category.name}
                 </option>
               ))}
             </select>
           </label>
         }
       />
+      {categoriesError && (
+        <p className="type-small text-danger" role="alert">
+          Não foi possível carregar as categorias: {categoriesError}
+        </p>
+      )}
 
       {isLoadingBooks ? (
         <div
@@ -226,27 +281,24 @@ export default function BookCollectionPage() {
           title="Não foi possível carregar o acervo."
           description={booksError}
           action={
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setBooksRetry((retry) => retry + 1)}
-            >
+            <Button type="button" variant="outline" onClick={refreshCollection}>
               Tentar novamente
             </Button>
           }
         />
       ) : (
         <BookCollectionTable
-          books={tableData.items}
-          page={tableData.page}
-          totalItems={tableData.totalItems}
-          totalPages={tableData.totalPages}
-          onPageChange={tableData.setPage}
+          books={books}
+          page={page}
+          totalItems={totalItems}
+          totalPages={totalPages}
+          onPageChange={setPage}
           onViewBook={(bookId) => navigate(`/livros/${bookId}`)}
           onEditBook={setEditingBookId}
           onDeleteBook={(book) => {
             setBookToDelete(book);
             setDeleteBookError(null);
+            setBlockedAccessionNumbers([]);
           }}
         />
       )}
@@ -255,21 +307,28 @@ export default function BookCollectionPage() {
         open={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
         onSuccess={handleBookRegisteredSuccess}
-        onOpenEditModal={setEditingBookId}
+        categories={categories}
+        categoriesLoading={categoriesLoading}
+        categoriesError={categoriesError}
+        onRetryCategories={() => {
+          setCategoriesLoading(true);
+          setCategoriesRetry((current) => current + 1);
+        }}
+        onCategoryCreated={(category) =>
+          setCategories((current) =>
+            current.some(({ id }) => id === category.id)
+              ? current
+              : [...current, category],
+          )
+        }
       />
 
       <EditBookModal
         open={editingBookId !== null}
         bookId={editingBookId}
+        categories={categories}
         onClose={() => setEditingBookId(null)}
-        onSuccess={(updatedBook) => {
-          setEditingBookId(null);
-          setBooksRetry((retry) => retry + 1);
-          setSuccessToast(
-            `Livro "${updatedBook.title}" atualizado com sucesso!`,
-          );
-          setTimeout(() => setSuccessToast(null), 4000);
-        }}
+        onCopyDeleted={refreshCollection}
       />
 
       <DeleteBookModal
@@ -277,6 +336,7 @@ export default function BookCollectionPage() {
         bookTitle={bookToDelete?.title ?? null}
         isDeleting={isDeletingBook}
         error={deleteBookError}
+        blockedAccessionNumbers={blockedAccessionNumbers}
         onClose={handleCloseDeleteModal}
         onConfirm={handleDeleteBook}
       />
