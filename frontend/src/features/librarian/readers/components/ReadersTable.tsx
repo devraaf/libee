@@ -1,5 +1,4 @@
 import type { AffiliationType } from '../../../../shared/schemas/enums.schema';
-import type { Course } from '../../../../shared/types/library';
 import type { ReaderStatus } from '../types/readerStatus';
 import {
   Badge,
@@ -17,7 +16,7 @@ export interface ReadersItem {
   name: string;
   email: string;
   affiliationType: AffiliationType;
-  course: Course | null;
+  course: { name: string } | null;
   activeLoans: number;
   status: ReaderStatus;
 }

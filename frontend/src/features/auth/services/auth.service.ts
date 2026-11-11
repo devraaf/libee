@@ -17,6 +17,13 @@ interface LoginResponse {
   profile: UserProfile;
 }
 
+export interface RegisteredReader {
+  id: number;
+  name: string;
+  email: string;
+  profile: UserProfile;
+}
+
 export async function login(data: LoginFormData): Promise<AuthSession> {
   try {
     const { data: response } = await httpClient.post<LoginResponse>(
@@ -37,18 +44,24 @@ export async function login(data: LoginFormData): Promise<AuthSession> {
   }
 }
 
-export async function register(data: RegisterFormData): Promise<void> {
+export async function register(
+  data: RegisterFormData,
+): Promise<RegisteredReader> {
   const phone = data.phone.replace(/\D/g, '');
 
-  await httpClient.post('/auth/register', {
-    name: data.name,
-    email: data.email,
-    password: data.password,
-    phone: phone || undefined,
-    affiliationType: data.affiliationType,
-    courseId:
-      data.affiliationType === 'STUDENT' ? Number(data.courseId) : undefined,
-  });
+  const { data: reader } = await httpClient.post<RegisteredReader>(
+    '/auth/register',
+    {
+      name: data.name,
+      email: data.email,
+      password: data.password,
+      phone: phone || undefined,
+      affiliationType: data.affiliationType,
+      courseId:
+        data.affiliationType === 'STUDENT' ? Number(data.courseId) : undefined,
+    },
+  );
+  return reader;
 }
 
 export async function getCurrentSession(): Promise<AuthSession | null> {

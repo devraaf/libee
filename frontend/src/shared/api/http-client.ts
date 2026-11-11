@@ -28,7 +28,9 @@ function isAuthRequest(url?: string): boolean {
 // Injeta o JWT em toda requisição, quando houver sessão
 httpClient.interceptors.request.use((config) => {
   const token = getToken();
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (token && !isAuthRequest(config.url)) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
   return config;
 });
 

@@ -6,15 +6,15 @@ import { Loader } from '../../../../shared/components/ui/loader/Loader';
 import { PageHeader } from '../../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../../shared/components/ui/SearchFilterBar';
 import Modal from '../../../../shared/components/ui/Modal';
-import { getCurrentSession } from '../../../auth/services/auth.service';
-import { listActiveCopies } from '../../../reader/catalog/mock-services/books.service';
 import {
   createLoan,
-  listLoans,
+  getLoanManagementSummary,
+  listManagementLoans,
   returnLoan,
-} from '../../../loans/services/loans.service';
-import { dateFromToday } from '../../../../shared/mocks/dates';
-import { useTableData } from '../../../../shared/hooks/useTableData';
+  type LoanSummaryDto,
+  type ManagementLoanStatus,
+} from '../services/loans.service';
+import { mapActiveLoan, type LoanRecordItem } from '../utils/loan.mapper';
 import RegisterReturnForm, {
   type ReturnLoanDetails,
 } from '../../returns/components/RegisterReturnForm';
@@ -22,94 +22,101 @@ import RegisterLoanForm from '../components/RegisterLoanForm';
 import { LoanStats } from '../components/LoanStats';
 import { LoanTable } from '../components/LoanTable';
 import type { RegisterLoanFormData } from '../schemas/loan.schema';
-import { mapLoanRecords, type LoanRecordItem } from '../utils/loan.mapper';
 
-interface LoanStatsData {
-  activeLoans: number;
-  onTimeLoans: number;
-  overdueLoans: number;
-}
+const PAGE_SIZE = 10;
 
-function getStats(loans: LoanRecordItem[]): LoanStatsData {
-  const activeLoans = loans.filter((loan) => loan.status !== 'RETURNED');
-  return {
-    activeLoans: activeLoans.length,
-    onTimeLoans: activeLoans.filter((loan) => loan.status === 'ON_TIME').length,
-    overdueLoans: activeLoans.filter((loan) => loan.status === 'OVERDUE')
-      .length,
-  };
-}
-
-async function getActiveLoanItems(): Promise<LoanRecordItem[]> {
-  const records = await listLoans();
-  const mappedRecords = await mapLoanRecords(records);
-  return mappedRecords.filter((loan) => !loan.returnDate);
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : 'Não foi possível carregar os empréstimos.';
 }
 
 export default function LoanPage() {
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'' | ManagementLoanStatus>(
+    '',
+  );
+  const [page, setPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loans, setLoans] = useState<LoanRecordItem[]>([]);
-  const [stats, setStats] = useState<LoanStatsData>({
-    activeLoans: 0,
-    onTimeLoans: 0,
-    overdueLoans: 0,
-  });
+  const [stats, setStats] = useState<LoanSummaryDto | null>(null);
   const [selectedLoanForReturn, setSelectedLoanForReturn] =
     useState<ReturnLoanDetails | null>(null);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [retry, setRetry] = useState(0);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [refresh, setRefresh] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-
-    async function loadLoans() {
-      setIsLoading(true);
-      setLoadError(null);
-      try {
-        const activeLoans = await getActiveLoanItems();
-        if (!active) return;
-        setLoans(activeLoans);
-        setStats(getStats(activeLoans));
-      } catch (error) {
-        if (active) {
-          setLoadError(
-            error instanceof Error
-              ? error.message
-              : 'Não foi possível carregar os empréstimos.',
-          );
+    const timeoutId = window.setTimeout(() => {
+      async function loadLoans() {
+        setIsLoading(true);
+        setLoadError(null);
+        try {
+          const result = await listManagementLoans({
+            page,
+            size: PAGE_SIZE,
+            search,
+            status: statusFilter || undefined,
+          });
+          if (!active) return;
+          setLoans(result.content.map(mapActiveLoan));
+          setTotalItems(result.totalElements);
+          setTotalPages(Math.max(1, result.totalPages));
+        } catch (error) {
+          if (active) setLoadError(getErrorMessage(error));
+        } finally {
+          if (active) setIsLoading(false);
         }
-      } finally {
-        if (active) setIsLoading(false);
       }
-    }
 
-    void loadLoans();
+      void loadLoans();
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeoutId);
+    };
+  }, [page, refresh, search, statusFilter]);
+
+  useEffect(() => {
+    let active = true;
+    getLoanManagementSummary()
+      .then((summary) => {
+        if (active) {
+          setStats(summary);
+          setSummaryError(null);
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) setSummaryError(getErrorMessage(error));
+      });
+
     return () => {
       active = false;
     };
-  }, [retry]);
+  }, [refresh]);
 
-  const tableData = useTableData({
-    data: loans,
-    search,
-    getSearchText: (loan) => [
-      loan.readerName,
-      loan.title,
-      loan.accessionNumber,
-    ],
-    filters: { status: statusFilter },
-    matchesFilters: (loan, filters) =>
-      !filters.status || loan.status === filters.status,
-  });
+  function refreshData() {
+    setStats(null);
+    setSummaryError(null);
+    setRefresh((current) => current + 1);
+  }
+
+  useEffect(() => {
+    if (!successToast) return;
+    const timeoutId = window.setTimeout(() => setSuccessToast(null), 4000);
+    return () => window.clearTimeout(timeoutId);
+  }, [successToast]);
 
   function handleOpenReturnModal(loanId: number) {
     const loan = loans.find((item) => item.id === loanId);
-    if (!loan || loan.returnDate !== null || loan.status === 'RETURNED') return;
+    if (!loan) return;
     setSelectedLoanForReturn({
       loanId: loan.id,
       copyCode: loan.accessionNumber,
@@ -119,59 +126,31 @@ export default function LoanPage() {
     setIsReturnModalOpen(true);
   }
 
-  async function handleConfirmReturn() {
-    if (!selectedLoanForReturn) return;
-    await returnLoan(selectedLoanForReturn.loanId);
-    const updatedLoans = loans.filter(
-      (loan) => loan.id !== selectedLoanForReturn.loanId,
-    );
-    setLoans(updatedLoans);
-    setStats(getStats(updatedLoans));
+  async function handleConfirmReturn(accessionNumber: string) {
+    await returnLoan(accessionNumber);
     setIsReturnModalOpen(false);
     setSelectedLoanForReturn(null);
     setSuccessToast(
-      `Devolução do tombo ${selectedLoanForReturn.copyCode} registrada com sucesso!`,
+      `Devolução do tombo ${accessionNumber} registrada com sucesso!`,
     );
-    setTimeout(() => setSuccessToast(null), 4000);
+    refreshData();
   }
 
   async function handleCreateLoanSubmit(data: RegisterLoanFormData) {
-    const session = await getCurrentSession();
-    if (session?.user.profile !== 'LIBRARIAN') {
-      throw new Error(
-        'É necessário estar autenticado como bibliotecário para registrar um empréstimo.',
-      );
-    }
-
-    const copyCode = data.copyCode.trim();
-    const copies = await listActiveCopies();
-    const copy = copies.find(
-      ({ id, accessionNumber }) =>
-        accessionNumber === copyCode || String(id) === copyCode,
-    );
-    if (!copy) {
-      throw new Error('O exemplar selecionado não foi encontrado.');
-    }
-
     await createLoan({
-      readerId: Number(data.readerId),
-      copyId: copy.id,
-      librarianId: session.user.id,
-      loanDate: dateFromToday(0),
+      readerId: data.readerId,
+      accessionNumber: data.accessionNumber.trim(),
       dueDate: data.dueDate,
     });
-    const updatedLoans = await getActiveLoanItems();
-    setLoans(updatedLoans);
-    setStats(getStats(updatedLoans));
     setIsCreateModalOpen(false);
     setSuccessToast(
-      `Empréstimo do tombo ${copy.accessionNumber} registrado com sucesso!`,
+      `Empréstimo do tombo ${data.accessionNumber.trim()} registrado com sucesso!`,
     );
-    setTimeout(() => setSuccessToast(null), 4000);
+    refreshData();
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8 relative">
+    <section className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8">
       {successToast && (
         <div
           role="status"
@@ -195,18 +174,31 @@ export default function LoanPage() {
         }
       />
 
-      <LoanStats {...stats} />
+      <LoanStats {...(stats ?? {})} />
+      {summaryError && (
+        <p className="type-small text-danger" role="alert">
+          Não foi possível carregar os cards: {summaryError}
+        </p>
+      )}
 
       <SearchFilterBar
         placeholder="Pesquise por leitor, livro ou tombo..."
         value={search}
-        onChange={setSearch}
+        onChange={(value) => {
+          setSearch(value);
+          setPage(1);
+        }}
         filterContent={
           <label className="flex flex-col gap-2 text-sm text-fg">
             Situação
             <select
               value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
+              onChange={(event) => {
+                setStatusFilter(
+                  event.target.value as '' | ManagementLoanStatus,
+                );
+                setPage(1);
+              }}
               className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
             >
               <option value="">Todas as situações</option>
@@ -230,24 +222,20 @@ export default function LoanPage() {
           title="Não foi possível carregar os empréstimos."
           description={loadError}
           action={
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setRetry((current) => current + 1)}
-            >
+            <Button type="button" variant="outline" onClick={refreshData}>
               Tentar novamente
             </Button>
           }
         />
       ) : (
         <LoanTable
-          loans={tableData.items}
-          page={tableData.page}
-          totalItems={tableData.totalItems}
-          totalPages={tableData.totalPages}
+          loans={loans}
+          page={page}
+          totalItems={totalItems}
+          totalPages={totalPages}
           returningLoanId={null}
-          onPageChange={tableData.setPage}
-          onReturn={(loanId) => handleOpenReturnModal(loanId)}
+          onPageChange={setPage}
+          onReturn={handleOpenReturnModal}
         />
       )}
 

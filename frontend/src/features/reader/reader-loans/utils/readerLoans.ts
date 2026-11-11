@@ -1,4 +1,4 @@
-import { dateFromToday } from '../../../../shared/mocks/dates';
+import { dateFromToday } from '../../../../shared/utils/date';
 import type { Loan, BookListItem } from '../../../../shared/types/library';
 import { formatLibraryDate } from '@/shared/utils/format-date';
 
