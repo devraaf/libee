@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom';
 import { Logo } from '../../shared/components/branding/Logo';
 import { Navbar } from '../../shared/components/navigation/Navbar';
 import { ThemeToggle } from '../../shared/components/navigation/ThemeToggle';
+import { Button } from '../../shared/components/ui/Button';
 import { IconButton } from '../../shared/components/ui/IconButton';
 import { useDisclosure } from '../../shared/hooks/useDisclosure';
 import type { NavLinkItem } from '../../shared/types/navigation';
@@ -47,6 +48,7 @@ const navigationByProfile: Record<HeaderProfile, NavLinkItem[]> = {
       to: '/gerenciamento/acervo',
       icon: Library,
       end: true,
+      activePaths: ['/livros/'],
     },
     {
       label: 'Empréstimos',
@@ -92,15 +94,12 @@ export function Header({ profile, onSignOut }: HeaderProps) {
           <span aria-hidden="true" className="mx-3 h-6 w-px bg-line" />
           <ThemeToggle />
           {canSignOut && (
-            <button
-              type="button"
+            <IconButton
+              label="Sair"
+              icon={<LogOut size={18} aria-hidden="true" />}
               onClick={onSignOut}
-              aria-label="Sair"
-              title="Sair"
-              className="inline-flex size-9 items-center justify-center rounded-lg text-fg transition-colors hover:bg-surface-hover"
-            >
-              <LogOut size={18} aria-hidden="true" />
-            </button>
+              className="text-fg"
+            />
           )}
         </div>
 
@@ -124,17 +123,19 @@ export function Header({ profile, onSignOut }: HeaderProps) {
           <div className="mx-auto max-w-7xl">
             <Navbar links={links} orientation="vertical" className="w-full" />
             {canSignOut && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="md"
+                leftIcon={<LogOut size={18} aria-hidden="true" />}
                 onClick={() => {
                   onSignOut();
                   menu.close();
                 }}
-                className="type-label mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-fg hover:bg-surface-hover"
+                className="mt-1 h-auto w-full justify-start rounded-lg px-3 py-2 text-left"
               >
-                <LogOut size={18} aria-hidden="true" />
                 Sair
-              </button>
+              </Button>
             )}
           </div>
         </div>
