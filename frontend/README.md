@@ -2,7 +2,7 @@
 
 Interface web do **Libee**, sistema de gestão de biblioteca acadêmica desenvolvido inicialmente para a biblioteca da Fatec Cotia.
 
-O front-end segue o wireframe do projeto. O login já usa a API do back-end; as demais telas ainda podem usar dados locais fictícios para representar o wireframe.
+O front-end segue o wireframe do projeto. Login, acervo, detalhes dos livros e empréstimos do leitor usam a API do back-end; outras telas ainda podem usar dados locais fictícios.
 
 ## Tecnologias
 
@@ -66,8 +66,7 @@ frontend/
     │   ├── App.tsx             # Composição e provedor de rotas
     │   ├── routes/             # Rotas globais quando houver páginas
     │   └── providers/          # Providers globais necessários
-    ├── features/               # Funcionalidades, criadas conforme forem desenvolvidas
-    ├── test/                   # Configurações, fixtures e utilitários compartilhados de teste
+    ├── features/               # Funcionalidades e testes em pastas __tests__ ou junto ao código
     ├── shared/
     │   ├── api/                # Cliente HTTP compartilhado
     │   ├── components/         # Componentes realmente reutilizados
@@ -79,7 +78,7 @@ frontend/
     └── main.tsx                # Ponto de entrada
 ```
 
-Testes específicos de uma feature ou componente devem ficar próximos do código testado; use `src/test/` para recursos compartilhados entre diferentes testes.
+Testes específicos de uma feature ou componente devem ficar em pastas próprias próximas ao código testado. Use `src/test/` apenas para configurações, fixtures e utilitários compartilhados entre testes.
 
 ## Rotas e layouts
 
@@ -118,7 +117,7 @@ Os dados de demonstração ficam em `src/shared/mocks/`; os contratos TypeScript
 
 As listagens usam os mesmos parâmetros e o mesmo formato paginado previsto para a API. Em livros, `available` é derivado dos exemplares. O status dos empréstimos é recalculado pelas datas em cada consulta. Para capas sem imagem, use o recurso local `public/images/book-cover-placeholder.svg` quando `coverImageUrl` for `null`. Para conferir estados de erro, busque por `simular erro`; na consulta de ISBN, os exemplos de sucesso, não encontrado, serviço indisponível e já cadastrado estão documentados em `isbn-lookup.service.ts`.
 
-A renovação de empréstimos ativos é simulada pelo service de empréstimos: cada renovação acrescenta 7 dias à devolução prevista e incrementa o contador, sem limite de renovações. A tela do leitor apresenta o carregamento e trata rejeições sem atualizar os dados exibidos.
+Os services e adaptadores em `src/features/reader/services/` integram as telas do leitor a `/books`, `/loans` e `/loans/upcoming-returns`, traduzindo as respostas do back-end para os tipos já usados pela interface. A consulta compartilhada de categorias fica em `src/shared/services/categories.service.ts` e é usada pelo leitor e pelo bibliotecário. Os filtros de empréstimo usam os status `ON_TIME`, `OVERDUE` e `RETURNED`; o backend identifica o leitor pelo token, portanto essas chamadas não enviam `readerId`. Os mocks continuam para fluxos ainda não integrados; não há fallback silencioso entre API e mock.
 
 ### Exemplo: listar leitores em uma tela
 
