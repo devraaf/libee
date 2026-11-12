@@ -61,6 +61,10 @@ export interface BookListItem extends Book {
   available: boolean;
 }
 
+export type BookDisplay = Omit<BookListItem, 'authors'> & {
+  authors: string[];
+};
+
 export interface Copy {
   id: number;
   bookId: number;

@@ -39,10 +39,7 @@ export function AppRoutes() {
       <Route element={<ProtectedRoute allowedProfiles={['READER']} />}>
         <Route element={<MainLayout profile="reader" />}>
           <Route path="/acervo" element={<CatalogPage />} />
-          <Route
-            path="/emprestimos"
-            element={<ReaderLoansPage readerId={4} />}
-          />
+          <Route path="/emprestimos" element={<ReaderLoansPage />} />
         </Route>
       </Route>
       <Route

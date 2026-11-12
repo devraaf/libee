@@ -5,6 +5,7 @@ import java.util.List;
 
 public record UpcomingReturnResponse(
         Integer id,
+        Integer bookId,
         String title,
         List<String> authors,
         Integer publicationYear,
