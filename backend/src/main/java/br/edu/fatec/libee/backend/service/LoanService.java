@@ -17,6 +17,7 @@ import br.edu.fatec.libee.backend.repository.LoanRepository;
 import br.edu.fatec.libee.backend.repository.UserRepository;
 import br.edu.fatec.libee.backend.specification.LoanSpecification;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,12 +30,15 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LoanService {
     private final LoanRepository loanRepository;
     private final CopyRepository copyRepository;
     private final UserRepository userRepository;
+    private final EmailService emailService;
+    private final EmailTemplateService emailTemplateService;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -183,6 +187,24 @@ public class LoanService {
         copy.setStatus(CopyStatus.ON_LOAN);
 
         Loan saved = loanRepository.saveAndFlush(loan);
+
+        // Disparo assíncrono do e-mail de confirmação
+        try {
+            String htmlContent = emailTemplateService.gerarTemplateConfirmacaoEmprestimo(
+                    reader.getName(),
+                    copy.getBook().getTitle(),
+                    saved.getDueDate()
+            );
+
+            emailService.enviarEmail(
+                    reader.getEmail(),
+                    "Confirmação de Empréstimo - Biblioteca Libee",
+                    htmlContent
+            );
+        } catch (Exception e) {
+            log.error("Erro ao processar o envio de e-mail para o empréstimo ID {}: {}", saved.getId(), e.getMessage());
+        }
+
         return toActiveResponse(saved, today);
     }
 
