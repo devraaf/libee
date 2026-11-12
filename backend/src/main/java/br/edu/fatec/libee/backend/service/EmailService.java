@@ -5,6 +5,7 @@ import br.edu.fatec.libee.backend.dto.response.BrevoEmailResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -32,6 +33,7 @@ public class EmailService {
                 .build();
     }
 
+    @Async
     public void enviarEmail(String destinatario, String assunto, String htmlContent) {
         if (!enabled) {
             log.warn("BREVO_API_KEY não configurada. E-mail para {} não enviado.", destinatario);
@@ -46,6 +48,8 @@ public class EmailService {
         );
 
         try {
+            log.info("Iniciando o envio assíncrono de e-mail para: {}", destinatario);
+
             BrevoEmailResponse response = restClient.post()
                     .uri("/smtp/email")
                     .contentType(MediaType.APPLICATION_JSON)
@@ -55,7 +59,7 @@ public class EmailService {
 
             log.info("E-mail enviado com sucesso via Brevo! Message ID: {}", response != null ? response.messageId() : "N/A");
         } catch (Exception e) {
-            log.error("Falha ao enviar e-mail via Brevo: {}", e.getMessage());
+            log.error("Falha ao enviar e-mail via Brevo para {}: {}", destinatario, e.getMessage(), e);
         }
     }
 }
