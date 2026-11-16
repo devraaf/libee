@@ -8,8 +8,8 @@ import Modal from '../../../../shared/components/ui/Modal';
 import {
   getBook,
   listActiveCopies,
-} from '../../../reader/catalog/services/books.service';
-import { listCourses } from '../../../reader/catalog/services/catalog.service';
+} from '../../../reader/catalog/mock-services/books.service';
+import { listCourses } from '../../../reader/catalog/mock-services/catalog.service';
 import {
   createReader,
   listReaders,

@@ -21,6 +21,7 @@ export interface TableProps<T> {
   getRowLabel?: (row: T) => string;
   className?: string;
   tableClassName?: string;
+  scrollableLabel?: string;
 }
 
 const alignClass = {
@@ -40,6 +41,7 @@ export function Table<T>({
   getRowLabel,
   className,
   tableClassName,
+  scrollableLabel,
 }: TableProps<T>) {
   return (
     <div
@@ -48,7 +50,16 @@ export function Table<T>({
         className,
       )}
     >
-      <div className="overflow-x-auto">
+      <div
+        className={cn(
+          'overflow-x-auto',
+          scrollableLabel &&
+            'focus-visible:outline focus-visible:outline-inset focus-visible:outline-primary',
+        )}
+        role={scrollableLabel ? 'region' : undefined}
+        aria-label={scrollableLabel}
+        tabIndex={scrollableLabel ? 0 : undefined}
+      >
         <table
           className={cn(
             'type-small w-full border-collapse text-fg',
@@ -82,7 +93,7 @@ export function Table<T>({
                 className={cn(
                   'border-b border-line last:border-b-0',
                   onRowClick &&
-                    'cursor-pointer hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-primary',
+                    'cursor-pointer hover:bg-surface-hover focus-visible:outline focus-visible:outline-inset focus-visible:outline-primary',
                 )}
                 onClick={(event) => {
                   if (

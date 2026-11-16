@@ -85,6 +85,7 @@ public class LoanService {
         return loanRepository.findAll(spec, pageable).getContent().stream()
                 .map(loan -> new UpcomingReturnResponse(
                         loan.getId(),
+                        loan.getCopy().getBook().getId(),
                         loan.getCopy().getBook().getTitle(),
                         loan.getCopy().getBook().getAuthors().stream().map(Author::getName).sorted().toList(),
                         loan.getCopy().getBook().getPublicationYear(),

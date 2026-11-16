@@ -1,28 +1,33 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '../../../../shared/components/ui/Button';
 import { EmptyState } from '../../../../shared/components/ui/EmptyState';
 import { PageHeader } from '../../../../shared/components/ui/PageHeader';
+import { Pagination } from '../../../../shared/components/ui/Pagination';
 import SearchFilterBar from '../../../../shared/components/ui/SearchFilterBar';
 import ReaderLoanCard from '../components/ReaderLoanCard';
-import ReaderLoanHistoryCard from '../components/ReaderLoanHistoryCard';
-import { useReaderLoans } from '../hooks/useReaderLoans';
+import {
+  useReaderLoans,
+  type ReaderLoanStatusFilter,
+} from '../hooks/useReaderLoans';
 import type { ReaderLoan } from '../utils/readerLoans';
 
-interface ReaderLoansPageProps {
-  readerId?: number;
-}
-
-type StatusFilter = 'all' | 'on_time' | 'overdue';
 type Toast = { type: 'success' | 'error'; message: string };
 
 const Skeleton = () => (
-  <div className="space-y-3" role="status" aria-label="Carregando empréstimos">
+  <div
+    className="space-y-3"
+    role="status"
+    aria-label="Carregando empréstimos"
+    aria-live="polite"
+    aria-busy="true"
+  >
     {[0, 1].map((item) => (
       <div
         key={item}
-        className="flex h-[106px] animate-pulse gap-3 rounded-lg border border-line bg-surface p-2.5"
+        aria-hidden="true"
+        className="flex min-h-28 animate-pulse gap-4 rounded-xl border border-line bg-surface p-4"
       >
-        <div className="h-[86px] w-14 rounded-md bg-surface-warm" />
+        <div className="h-24 w-16 shrink-0 rounded-md bg-surface-warm" />
         <div className="flex-1 space-y-2">
           <div className="h-3 w-1/3 rounded bg-surface-warm" />
           <div className="h-3 w-1/5 rounded bg-surface-warm" />
@@ -32,13 +37,21 @@ const Skeleton = () => (
   </div>
 );
 
-export default function ReaderLoansPage({ readerId }: ReaderLoansPageProps) {
-  const { isLoading, error, active, history, reload, renew } =
-    useReaderLoans(readerId);
+export default function ReaderLoansPage() {
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<StatusFilter>('all');
+  const [status, setStatus] = useState<ReaderLoanStatusFilter>('all');
+  const [activePage, setActivePage] = useState(1);
+  const [historyPage, setHistoryPage] = useState(1);
   const [renewingIds, setRenewingIds] = useState<Set<number>>(() => new Set());
   const [toast, setToast] = useState<Toast | null>(null);
+  const renewingRef = useRef(new Set<number>());
+  const retryingRef = useRef(false);
+  const { isLoading, error, active, history, reload, renew } = useReaderLoans(
+    search,
+    status,
+    activePage,
+    historyPage,
+  );
 
   useEffect(() => {
     if (!toast) return;
@@ -46,9 +59,13 @@ export default function ReaderLoansPage({ readerId }: ReaderLoansPageProps) {
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
-  const hasOverdueLoan = active.some((loan) => loan.status === 'overdue');
+  useEffect(() => {
+    if (!isLoading) retryingRef.current = false;
+  }, [isLoading]);
 
   const handleRenew = async (loan: ReaderLoan) => {
+    if (renewingRef.current.has(loan.id)) return;
+    renewingRef.current.add(loan.id);
     setRenewingIds((current) => new Set(current).add(loan.id));
     setToast(null);
     try {
@@ -66,6 +83,7 @@ export default function ReaderLoansPage({ readerId }: ReaderLoansPageProps) {
             : 'Não foi possível renovar o empréstimo.',
       });
     } finally {
+      renewingRef.current.delete(loan.id);
       setRenewingIds((current) => {
         const next = new Set(current);
         next.delete(loan.id);
@@ -74,24 +92,18 @@ export default function ReaderLoansPage({ readerId }: ReaderLoansPageProps) {
     }
   };
 
-  const filteredActive = useMemo(() => {
-    const term = search.trim().toLocaleLowerCase();
-    return active.filter((loan) => {
-      const matchesText =
-        !term ||
-        loan.title.toLocaleLowerCase().includes(term) ||
-        (loan.author ?? '').toLocaleLowerCase().includes(term);
-      const matchesStatus = status === 'all' || loan.status === status;
-      return matchesText && matchesStatus;
-    });
-  }, [active, search, status]);
+  const handleRetry = () => {
+    if (retryingRef.current) return;
+    retryingRef.current = true;
+    reload();
+  };
 
   return (
-    <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8">
+    <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-5 px-4 py-6 sm:gap-6 sm:px-6 sm:py-8 lg:px-8">
       <PageHeader title="Empréstimos" subtitle="Confira os seus empréstimos" />
       {toast && (
         <div
-          className={`fixed right-4 top-20 z-50 rounded-lg border px-4 py-3 text-sm shadow-lg ${
+          className={`fixed left-4 right-4 top-20 z-50 rounded-lg border px-4 py-3 text-sm shadow-lg sm:left-auto sm:max-w-sm ${
             toast.type === 'success'
               ? 'border-ok-line bg-ok-bg text-ok'
               : 'border-danger-line bg-danger-bg text-danger'
@@ -101,112 +113,141 @@ export default function ReaderLoansPage({ readerId }: ReaderLoansPageProps) {
           {toast.message}
         </div>
       )}
-      {readerId === undefined ? (
-        <EmptyState
-          title="Não foi possível identificar o leitor"
-          description="Entre novamente para consultar seus empréstimos."
+      <div className="flex w-full max-w-5xl flex-col gap-5 sm:gap-6">
+        <SearchFilterBar
+          placeholder="Pesquise por título, autor..."
+          value={search}
+          onChange={(value) => {
+            setSearch(value);
+            setActivePage(1);
+            setHistoryPage(1);
+          }}
+          filterContent={
+            <label className="flex flex-col gap-2 text-sm text-fg">
+              Situação
+              <select
+                value={status}
+                onChange={(event) => {
+                  setStatus(event.target.value as ReaderLoanStatusFilter);
+                  setActivePage(1);
+                }}
+                className="min-h-11 rounded-lg border border-line bg-surface px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                <option value="all">Todas as situações</option>
+                <option value="on_time">Em dia</option>
+                <option value="overdue">Atrasado</option>
+              </select>
+            </label>
+          }
         />
-      ) : (
-        <div className="flex w-full max-w-2xl flex-col gap-4">
-          <SearchFilterBar
-            placeholder="Pesquise por título, autor..."
-            value={search}
-            onChange={setSearch}
-            filterContent={
-              <label className="flex flex-col gap-2 text-sm text-fg">
-                Situação
-                <select
-                  value={status}
-                  onChange={(event) =>
-                    setStatus(event.target.value as StatusFilter)
-                  }
-                  className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
-                >
-                  <option value="all">Todas as situações</option>
-                  <option value="on_time">Em dia</option>
-                  <option value="overdue">Atrasado</option>
-                </select>
-              </label>
-            }
-          />
 
-          {isLoading ? (
-            <Skeleton />
-          ) : error ? (
+        {isLoading ? (
+          <Skeleton />
+        ) : error ? (
+          <div role="alert">
             <EmptyState
               title="Não foi possível carregar os empréstimos"
               description={error}
               action={
                 <Button
                   type="button"
-                  size="sm"
+                  size="md"
                   variant="outline"
-                  onClick={reload}
+                  onClick={handleRetry}
                 >
                   Tentar novamente
                 </Button>
               }
             />
-          ) : (
-            <>
-              <section aria-label="Empréstimos ativos" className="space-y-3">
-                {active.length === 0 ? (
-                  <EmptyState
-                    title="Você não possui empréstimos ativos"
-                    description="Seus empréstimos ativos aparecerão aqui."
+          </div>
+        ) : (
+          <>
+            <section
+              aria-labelledby="active-loans-title"
+              className="space-y-3 sm:space-y-4"
+            >
+              <div className="flex items-center gap-3 px-1">
+                <h2
+                  id="active-loans-title"
+                  className="type-h3 font-semibold text-fg"
+                >
+                  Empréstimos ativos
+                </h2>
+                <hr className="flex-1 border-line" />
+              </div>
+              {active.totalElements === 0 &&
+              !search.trim() &&
+              status === 'all' ? (
+                <EmptyState
+                  title="Você não possui empréstimos ativos"
+                  description="Seus empréstimos ativos aparecerão aqui."
+                />
+              ) : active.content.length === 0 ? (
+                <EmptyState
+                  title="Nenhum resultado encontrado"
+                  description="Tente alterar a busca ou o filtro selecionado."
+                />
+              ) : (
+                active.content.map((loan) => (
+                  <ReaderLoanCard
+                    key={loan.id}
+                    loan={loan}
+                    variant="active"
+                    onRenew={handleRenew}
+                    isRenewing={renewingIds.has(loan.id)}
                   />
-                ) : filteredActive.length === 0 ? (
-                  <EmptyState
-                    title="Nenhum resultado encontrado"
-                    description="Tente alterar a busca ou o filtro selecionado."
-                  />
-                ) : (
-                  filteredActive.map((loan) => (
-                    <ReaderLoanCard
-                      key={loan.id}
-                      loan={loan}
-                      onRenew={handleRenew}
-                      isRenewing={renewingIds.has(loan.id)}
-                      renewalDisabledReason={
-                        loan.status === 'overdue'
-                          ? 'Empréstimos atrasados não podem ser renovados.'
-                          : hasOverdueLoan
-                            ? 'Regularize seus empréstimos atrasados para renovar.'
-                            : undefined
-                      }
-                    />
-                  ))
-                )}
-              </section>
+                ))
+              )}
+              {active.totalPages > 1 && (
+                <Pagination
+                  page={active.page}
+                  totalPages={active.totalPages}
+                  onPageChange={setActivePage}
+                  summary={`Mostrando ${active.content.length} de ${active.totalElements} empréstimos`}
+                />
+              )}
+            </section>
 
-              <section
-                aria-labelledby="loan-history-title"
-                className="space-y-3 pt-3"
-              >
-                <div className="mb-3 flex items-center gap-3 px-1">
-                  <h2
-                    id="loan-history-title"
-                    className="whitespace-nowrap type-h3 font-semibold lg:type-h2"
-                  >
-                    Histórico
-                  </h2>
-                  <hr className="flex-1 border-line" />
-                </div>
-                {history.length === 0 ? (
-                  <EmptyState
-                    title="Ainda não existem empréstimos devolvidos"
-                    description="Os empréstimos devolvidos aparecerão aqui."
-                  />
-                ) : (
-                  history.map((loan) => (
-                    <ReaderLoanHistoryCard key={loan.id} loan={loan} />
-                  ))
-                )}
-              </section>
-            </>
-          )}
-        </div>
-      )}
+            <section
+              aria-labelledby="loan-history-title"
+              className="space-y-3 pt-3"
+            >
+              <div className="mb-3 flex items-center gap-3 px-1">
+                <h2
+                  id="loan-history-title"
+                  className="type-h3 font-semibold text-fg"
+                >
+                  Histórico
+                </h2>
+                <hr className="flex-1 border-line" />
+              </div>
+              {history.totalElements === 0 && !search.trim() ? (
+                <EmptyState
+                  title="Ainda não existem empréstimos devolvidos"
+                  description="Os empréstimos devolvidos aparecerão aqui."
+                />
+              ) : history.content.length === 0 ? (
+                <EmptyState
+                  title="Nenhum resultado encontrado"
+                  description="Tente alterar a busca para encontrar um empréstimo."
+                />
+              ) : (
+                history.content.map((loan) => (
+                  <ReaderLoanCard key={loan.id} loan={loan} variant="history" />
+                ))
+              )}
+              {history.totalPages > 1 && (
+                <Pagination
+                  page={history.page}
+                  totalPages={history.totalPages}
+                  onPageChange={setHistoryPage}
+                  summary={`Mostrando ${history.content.length} de ${history.totalElements} empréstimos`}
+                />
+              )}
+            </section>
+          </>
+        )}
+      </div>
     </section>
   );
 }

@@ -9,8 +9,9 @@ import {
   listCopies,
   updateBookWithCopies,
   type RegisteredBook,
-} from '../../../reader/catalog/services/books.service';
-import { listCategories } from '../../../reader/catalog/services/catalog.service';
+} from '../../../reader/catalog/mock-services/books.service';
+import { listCategories } from '../../../../shared/services/categories.service';
+import { formatLibraryDate } from '../../../../shared/utils/format-date';
 import { MockServiceError } from '../../../../shared/mocks/service-utils';
 import type { Category } from '../../../../shared/types/library';
 import {
@@ -27,11 +28,7 @@ interface EditBookModalProps {
 }
 
 function toFormDate(date: string | null): string {
-  if (!date) return '';
-  const parsed = new Date(`${date}T00:00:00`);
-  return Number.isNaN(parsed.getTime())
-    ? ''
-    : new Intl.DateTimeFormat('pt-BR').format(parsed);
+  return formatLibraryDate(date, undefined, '');
 }
 
 function toServiceDate(date: string | null): string | null {
