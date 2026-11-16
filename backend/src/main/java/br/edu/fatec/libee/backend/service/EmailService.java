@@ -5,10 +5,12 @@ import br.edu.fatec.libee.backend.dto.response.BrevoEmailResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.util.List;
 
 @Slf4j
@@ -23,12 +25,18 @@ public class EmailService {
     public EmailService(
             @Value("${brevo.api-key:}") String apiKey,
             @Value("${brevo.from-email:contato.libee@gmail.com}") String fromEmail,
-            @Value("${brevo.from-name: Libee}") String fromName) {
+            @Value("${brevo.from-name:Libee}") String fromName) {
         this.fromEmail = fromEmail;
         this.fromName = fromName;
         this.enabled = apiKey != null && !apiKey.isBlank();
+
+        var factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofSeconds(5));
+        factory.setReadTimeout(Duration.ofSeconds(10));
+
         this.restClient = RestClient.builder()
                 .baseUrl("https://api.brevo.com/v3")
+                .requestFactory(factory)
                 .defaultHeader("api-key", apiKey)
                 .build();
     }
