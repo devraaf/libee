@@ -18,7 +18,6 @@ import br.edu.fatec.libee.backend.repository.LoanRepository;
 import br.edu.fatec.libee.backend.repository.UserRepository;
 import br.edu.fatec.libee.backend.specification.LoanSpecification;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -32,15 +31,12 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LoanService {
     private final LoanRepository loanRepository;
     private final CopyRepository copyRepository;
     private final UserRepository userRepository;
-    private final EmailService emailService;
-    private final EmailTemplateService emailTemplateService;
     private final Clock clock;
     private final ApplicationEventPublisher publisher;
 
@@ -191,16 +187,18 @@ public class LoanService {
 
         Loan saved = loanRepository.saveAndFlush(loan);
 
+        ActiveLoanResponse response = toActiveResponse(saved, today);
+
         publisher.publishEvent(
                 new LoanRegisteredEvent(
-                        loan.getId(),
+                        saved.getId(),
                         reader.getName(),
                         reader.getEmail(),
                         copy.getBook().getTitle(),
                         saved.getDueDate()
                 )
         );
-        return toActiveResponse(saved, today);
+        return response;
     }
 
     @Transactional
