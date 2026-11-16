@@ -8,6 +8,7 @@ import br.edu.fatec.libee.backend.enums.ActiveLoanStatus;
 import br.edu.fatec.libee.backend.enums.CopyStatus;
 import br.edu.fatec.libee.backend.enums.LoanStatus;
 import br.edu.fatec.libee.backend.enums.UserProfile;
+import br.edu.fatec.libee.backend.event.LoanRegisteredEvent;
 import br.edu.fatec.libee.backend.exception.CopyAlreadyOnLoanException;
 import br.edu.fatec.libee.backend.exception.CopyNotOnLoanException;
 import br.edu.fatec.libee.backend.exception.LoanNotRenewableException;
@@ -18,6 +19,7 @@ import br.edu.fatec.libee.backend.repository.UserRepository;
 import br.edu.fatec.libee.backend.specification.LoanSpecification;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -40,6 +42,7 @@ public class LoanService {
     private final EmailService emailService;
     private final EmailTemplateService emailTemplateService;
     private final Clock clock;
+    private final ApplicationEventPublisher publisher;
 
     @Transactional(readOnly = true)
     public PageResponse<ReaderLoanResponse> listByReader(
@@ -188,23 +191,15 @@ public class LoanService {
 
         Loan saved = loanRepository.saveAndFlush(loan);
 
-        // Disparo assíncrono do e-mail de confirmação
-        try {
-            String htmlContent = emailTemplateService.gerarTemplateConfirmacaoEmprestimo(
-                    reader.getName(),
-                    copy.getBook().getTitle(),
-                    saved.getDueDate()
-            );
-
-            emailService.enviarEmail(
-                    reader.getEmail(),
-                    "Confirmação de Empréstimo - Biblioteca Libee",
-                    htmlContent
-            );
-        } catch (Exception e) {
-            log.error("Erro ao processar o envio de e-mail para o empréstimo ID {}: {}", saved.getId(), e.getMessage());
-        }
-
+        publisher.publishEvent(
+                new LoanRegisteredEvent(
+                        loan.getId(),
+                        reader.getName(),
+                        reader.getEmail(),
+                        copy.getBook().getTitle(),
+                        saved.getDueDate()
+                )
+        );
         return toActiveResponse(saved, today);
     }
 
