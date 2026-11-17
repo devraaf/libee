@@ -28,7 +28,7 @@ export default function SearchFilterBar({
         className="sm:max-w-sm"
       />
       {filterContent && (
-        <div className="relative sm:ml-auto">
+        <div className="relative w-fit self-end sm:ml-auto sm:self-auto">
           <FilterButton
             expanded={isFilterOpen}
             aria-controls={filterContentId}
@@ -38,7 +38,9 @@ export default function SearchFilterBar({
           {isFilterOpen && (
             <div
               id={filterContentId}
-              className="absolute right-0 z-20 mt-2 w-64 rounded-xl border border-line bg-surface p-4 shadow-card"
+              role="group"
+              aria-label="Opções de filtro"
+              className="absolute right-0 z-20 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-line bg-surface p-4 shadow-card"
             >
               {filterContent}
             </div>

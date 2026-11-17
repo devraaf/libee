@@ -8,6 +8,7 @@ import br.edu.fatec.libee.backend.enums.ActiveLoanStatus;
 import br.edu.fatec.libee.backend.enums.CopyStatus;
 import br.edu.fatec.libee.backend.enums.LoanStatus;
 import br.edu.fatec.libee.backend.enums.UserProfile;
+import br.edu.fatec.libee.backend.event.LoanRegisteredEvent;
 import br.edu.fatec.libee.backend.exception.CopyAlreadyOnLoanException;
 import br.edu.fatec.libee.backend.exception.CopyNotOnLoanException;
 import br.edu.fatec.libee.backend.exception.LoanNotRenewableException;
@@ -17,6 +18,7 @@ import br.edu.fatec.libee.backend.repository.LoanRepository;
 import br.edu.fatec.libee.backend.repository.UserRepository;
 import br.edu.fatec.libee.backend.specification.LoanSpecification;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -36,6 +38,7 @@ public class LoanService {
     private final CopyRepository copyRepository;
     private final UserRepository userRepository;
     private final Clock clock;
+    private final ApplicationEventPublisher publisher;
 
     @Transactional(readOnly = true)
     public PageResponse<ReaderLoanResponse> listByReader(
@@ -85,6 +88,7 @@ public class LoanService {
         return loanRepository.findAll(spec, pageable).getContent().stream()
                 .map(loan -> new UpcomingReturnResponse(
                         loan.getId(),
+                        loan.getCopy().getBook().getId(),
                         loan.getCopy().getBook().getTitle(),
                         loan.getCopy().getBook().getAuthors().stream().map(Author::getName).sorted().toList(),
                         loan.getCopy().getBook().getPublicationYear(),
@@ -182,7 +186,19 @@ public class LoanService {
         copy.setStatus(CopyStatus.ON_LOAN);
 
         Loan saved = loanRepository.saveAndFlush(loan);
-        return toActiveResponse(saved, today);
+
+        ActiveLoanResponse response = toActiveResponse(saved, today);
+
+        publisher.publishEvent(
+                new LoanRegisteredEvent(
+                        saved.getId(),
+                        reader.getName(),
+                        reader.getEmail(),
+                        copy.getBook().getTitle(),
+                        saved.getDueDate()
+                )
+        );
+        return response;
     }
 
     @Transactional

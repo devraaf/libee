@@ -295,6 +295,7 @@ public class LoanControllerIT extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").exists())
+                .andExpect(jsonPath("$[0].bookId").value(cleanCode.getId()))
                 .andExpect(jsonPath("$[0].title").value("Clean Code"))
                 .andExpect(jsonPath("$[0].authors[0]").value("Robert C. Martin"))
                 .andExpect(jsonPath("$[0].publicationYear").value(2008))

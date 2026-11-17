@@ -1,5 +1,6 @@
 import { dateFromToday } from '../../../../shared/mocks/dates';
 import type { Loan, BookListItem } from '../../../../shared/types/library';
+import { formatLibraryDate } from '@/shared/utils/format-date';
 
 export type LoanStatus = 'on_time' | 'overdue' | 'returned';
 
@@ -42,8 +43,7 @@ export function getLoanStatus(loan: Loan): LoanStatus {
 }
 
 export function formatDate(value: string | null): string {
-  const match = value ? /^(\d{4})-(\d{2})-(\d{2})/.exec(value) : null;
-  return match ? `${match[3]}/${match[2]}/${match[1]}` : '—';
+  return formatLibraryDate(value);
 }
 
 const compareDates = (a: string | null, b: string | null): number => {

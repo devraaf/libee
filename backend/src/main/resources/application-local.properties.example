@@ -3,5 +3,10 @@
 spring.datasource.username=postgres
 spring.datasource.password=change_me
 
+# Brevo
+brevo.api-key=xkeysib-sua-chave-api-aqui
+brevo.from-email=contato.libee@gmail.com
+brevo.from-name=Biblioteca Libee
+
 # API Google books
 libee.integrations.google-books.api-key=sua_chave_aqui

@@ -3,7 +3,7 @@ import {
   listActiveCopies,
   listAllBooks,
   type RegisteredBook,
-} from '@/features/reader/catalog/services/books.service';
+} from '@/features/reader/catalog/mock-services/books.service';
 import { listLoans } from '@/features/loans/services/loans.service';
 import { Button } from '@/shared/components/ui/Button';
 import { EmptyState } from '@/shared/components/ui/EmptyState';

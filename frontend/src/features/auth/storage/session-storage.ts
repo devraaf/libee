@@ -8,7 +8,7 @@ export interface StoredSession {
   user: { id: number; profile: UserProfile };
 }
 
-const STORAGE_KEY = 'libee.session';
+export const SESSION_STORAGE_KEY = 'libee.session';
 
 function isStoredSession(value: unknown): value is StoredSession {
   if (typeof value !== 'object' || value === null) return false;
@@ -32,12 +32,12 @@ function isStoredSession(value: unknown): value is StoredSession {
 }
 
 export function saveSession(session: StoredSession): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+  localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
 }
 
 export function getSession(): StoredSession | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(SESSION_STORAGE_KEY);
     if (!raw) return null;
 
     const value: unknown = JSON.parse(raw);
@@ -52,5 +52,5 @@ export function getToken(): string | null {
 }
 
 export function clearSession(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(SESSION_STORAGE_KEY);
 }

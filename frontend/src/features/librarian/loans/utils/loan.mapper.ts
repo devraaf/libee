@@ -1,18 +1,15 @@
 import {
   getBook,
   listCopies,
-} from '@/features/reader/catalog/services/books.service';
+} from '@/features/reader/catalog/mock-services/books.service';
 
 import type { Loan } from '@/shared/types/library';
 import { listReaders } from '../../readers/services/readers.service';
 import type { LoanTableItem } from '../components/LoanTable';
+import { formatLibraryDate } from '@/shared/utils/format-date';
 
 export interface LoanRecordItem extends LoanTableItem {
   returnDate: string | null;
-}
-
-function formatDate(value: string): string {
-  return new Date(`${value}T12:00:00`).toLocaleDateString('pt-BR');
 }
 
 export async function mapLoanRecords(loans: Loan[]): Promise<LoanRecordItem[]> {
@@ -50,8 +47,8 @@ export async function mapLoanRecords(loans: Loan[]): Promise<LoanRecordItem[]> {
       title: book.title,
       accessionNumber: copy.accessionNumber,
       readerName: reader.name,
-      loanDate: formatDate(loan.loanDate),
-      dueDate: formatDate(loan.dueDate),
+      loanDate: formatLibraryDate(loan.loanDate),
+      dueDate: formatLibraryDate(loan.dueDate),
       status: loan.status,
       returnDate: loan.returnDate,
     };

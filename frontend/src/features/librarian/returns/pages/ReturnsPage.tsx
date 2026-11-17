@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
+import { formatLibraryDate } from '@/shared/utils/format-date';
 import { Button } from '../../../../shared/components/ui/Button';
 import { EmptyState } from '../../../../shared/components/ui/EmptyState';
 import { Loader } from '../../../../shared/components/ui/loader/Loader';
@@ -15,7 +16,10 @@ import { listLoans, returnLoan } from '../../../loans/services/loans.service';
 import RegisterReturnForm, {
   type ReturnLoanDetails,
 } from '../components/RegisterReturnForm';
-import { mapLoanRecords, type LoanRecordItem } from '../../loans/utils/loan.mapper';
+import {
+  mapLoanRecords,
+  type LoanRecordItem,
+} from '../../loans/utils/loan.mapper';
 
 interface ReturnTableItem {
   id: number;
@@ -88,9 +92,7 @@ export default function ReturnsPage() {
                 title: loan.title,
                 copyCode: loan.accessionNumber,
                 reader: loan.readerName,
-                returnDate: new Date(
-                  `${loan.returnDate}T12:00:00`,
-                ).toLocaleDateString('pt-BR'),
+                returnDate: formatLibraryDate(loan.returnDate),
               },
             ]
           : [],
