@@ -12,6 +12,8 @@ import ReturnsPage from '@/features/librarian/returns/pages/ReturnsPage';
 import ReaderLoansPage from '@/features/reader/reader-loans/pages/ReaderLoansPage';
 import { CatalogPage } from '@/features/reader/catalog/pages/CatalogPage';
 import BookCollectionPage from '@/features/librarian/book-collection/pages/BookCollectionPage';
+import CollaboratorsPage from '@/features/admin/collaborators/pages/CollaboratorsPage';
+import CoursesPage from '@/features/admin/courses/pages/CoursesPage';
 import { ProtectedRoute } from './ProtectedRoute';
 import { PublicOnlyRoute } from './PublicOnlyRoute';
 import { useAuth } from '../providers/auth/useAuth';
@@ -42,6 +44,7 @@ export function AppRoutes() {
           <Route path="/emprestimos" element={<ReaderLoansPage />} />
         </Route>
       </Route>
+
       <Route
         element={<ProtectedRoute allowedProfiles={['READER', 'LIBRARIAN']} />}
       >
@@ -49,15 +52,24 @@ export function AppRoutes() {
           <Route path="/livros/:id" element={<BookDetailsPage />} />
         </Route>
       </Route>
+
       <Route element={<ProtectedRoute allowedProfiles={['LIBRARIAN']} />}>
         <Route element={<MainLayout profile="librarian" />}>
-          <Route
-            path="/gerenciamento/acervo"
-            element={<BookCollectionPage />}
-          />
+          <Route path="/gerenciamento/acervo" element={<BookCollectionPage />} />
           <Route path="/gerenciamento/emprestimos" element={<LoansPage />} />
           <Route path="/gerenciamento/devolucoes" element={<ReturnsPage />} />
           <Route path="/gerenciamento/leitores" element={<ReadersPage />} />
+        </Route>
+      </Route>
+
+      <Route element={<ProtectedRoute allowedProfiles={['ADMINISTRATOR']} />}>
+        <Route element={<MainLayout profile="admin" />}>
+          <Route path="/administracao/leitores" element={<ReadersPage />} />
+          <Route
+            path="/administracao/colaboradores"
+            element={<CollaboratorsPage />}
+          />
+          <Route path="/administracao/cursos" element={<CoursesPage />} />
         </Route>
       </Route>
 
