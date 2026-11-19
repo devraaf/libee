@@ -1,5 +1,6 @@
 import {
   BookText,
+  GraduationCap,
   Home,
   Inbox,
   Library,
@@ -18,7 +19,7 @@ import { IconButton } from '../../shared/components/ui/IconButton';
 import { useDisclosure } from '../../shared/hooks/useDisclosure';
 import type { NavLinkItem } from '../../shared/types/navigation';
 
-export type HeaderProfile = 'public' | 'reader' | 'librarian';
+export type HeaderProfile = 'public' | 'reader' | 'librarian' | 'admin';
 
 const navigationByProfile: Record<HeaderProfile, NavLinkItem[]> = {
   public: [
@@ -64,6 +65,26 @@ const navigationByProfile: Record<HeaderProfile, NavLinkItem[]> = {
       label: 'Leitores',
       to: '/gerenciamento/leitores',
       icon: Users,
+      end: true,
+    },
+  ],
+  admin: [
+    {
+      label: 'Leitores',
+      to: '/administracao/leitores',
+      icon: Users,
+      end: true,
+    },
+    {
+      label: 'Colaboradores',
+      to: '/administracao/colaboradores',
+      icon: Users,
+      end: true,
+    },
+    {
+      label: 'Cursos',
+      to: '/administracao/cursos',
+      icon: GraduationCap,
       end: true,
     },
   ],

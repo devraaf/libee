@@ -24,7 +24,7 @@ export function Navbar({
         className={cn('flex gap-1', isHorizontal ? 'items-center' : 'flex-col')}
       >
         {links.map((item) => (
-          <li key={item.to}>
+          <li key={`${item.label}-${item.to}`}>
             <NavItem
               item={item}
               className={!isHorizontal ? 'w-full' : undefined}
