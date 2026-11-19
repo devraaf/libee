@@ -1,6 +1,7 @@
 package br.edu.fatec.libee.backend.service;
 
 import br.edu.fatec.libee.backend.dto.request.RegisterBookRequest;
+import br.edu.fatec.libee.backend.dto.request.UpdateBookRequest;
 import br.edu.fatec.libee.backend.dto.response.*;
 import br.edu.fatec.libee.backend.entity.Author;
 import br.edu.fatec.libee.backend.entity.Book;
@@ -267,5 +268,58 @@ public class BookService {
         if (isLastActiveCopy) {
             copy.getBook().setDeletedAt(now);
         }
+    }
+        @Transactional
+    public void updateBook(Integer id, UpdateBookRequest request) {
+        
+        Book book = bookRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Livro não encontrado"));
+
+        
+        if (request.isbn() != null && !request.isbn().isBlank()) {
+            String normalizedIsbn = IsbnNormalizer.normalize(request.isbn());
+            
+            bookRepository.findByIsbnAndDeletedAtIsNull(normalizedIsbn).ifPresent(existingBook -> {
+            
+                if (!existingBook.getId().equals(id)) {
+                    throw new BusinessRuleException("ISBN já cadastrado em outro livro");
+                }
+            });
+            book.setIsbn(normalizedIsbn);
+        }
+
+        
+        if (request.title() != null) book.setTitle(request.title().trim());
+        if (request.publisher() != null) book.setPublisher(clean(request.publisher()));
+        if (request.place() != null) book.setPublicationPlace(clean(request.place()));
+        if (request.edition() != null) book.setEdition(clean(request.edition()));
+        if (request.coverUrl() != null) book.setCoverImageUrl(clean(request.coverUrl()));
+        if (request.publicationYear() != null) book.setPublicationYear(request.publicationYear());
+        if (request.pageCount() != null) book.setPageCount(request.pageCount());
+        if (request.description() != null) book.setSummary(clean(request.description()));
+
+        Category category = categoryRepository.findById(request.categoryId())
+                .orElseThrow(() -> new BusinessRuleException("Categoria não encontrada"));
+        book.setCategory(category);
+
+    
+        if (request.authors() != null) {
+            List<Author> authors = resolveAuthors(request.authors());
+            book.setAuthors(new LinkedHashSet<>(authors));
+        }
+
+        if (request.copies() != null) {
+            for (UpdateBookRequest.UpdateCopyRequest copyReq : request.copies()) {
+                // Busca o exemplar que pertence a ESTE livro e não está excluído
+                Copy copy = copyRepository.findByIdAndBookIdAndDeletedAtIsNull(copyReq.id(), id)
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "Exemplar com ID " + copyReq.id() + " não encontrado neste livro"));
+
+                // Atualiza APENAS a localização física. O status permanece intacto.
+                copy.setPhysicalLocation(copyReq.physicalLocation());
+            }
+        }
+
+    
     }
 }
