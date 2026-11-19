@@ -1,4 +1,5 @@
 import { BookPlus, RefreshCcw, Search, BarChart3 } from 'lucide-react';
+import { SectionHeading } from './SectionHeading';
 
 const steps = [
   {
@@ -25,31 +26,24 @@ const steps = [
 
 export function HowItWorksSection() {
   return (
-    <section className="bg-bg py-20 sm:py-28">
-      <div className="mx-auto max-w-7xl px-4 sm:px-8">
-        <div className="mb-16 text-center">
-          <h2 className="type-overline mb-3 font-semibold uppercase tracking-wider text-primary">
-            Como Funciona
-          </h2>
-          <h3 className="type-headline font-bold text-fg">
-            Fluxo simples e eficiente
-          </h3>
-        </div>
+    <section id="como-funciona" className="bg-bg py-20 sm:py-24 lg:py-28" aria-label="Como funciona">
+      <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-10">
+        <SectionHeading eyebrow="Como funciona" title="Fluxo simples e eficiente" />
 
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-14 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {steps.map((step, index) => (
             <div key={index} className="relative flex flex-col items-center text-center">
-              <div className="mb-4 flex size-16 items-center justify-center rounded-full border border-line bg-surface text-primary">
-                <step.icon size={28} aria-hidden="true" />
-              </div>
-              <h4 className="type-title mb-2 font-semibold text-fg">
-                {step.title}
-              </h4>
-              <p className="type-small text-muted">
-                {step.description}
-              </p>
-            </div>
-          ))}
+               <div className="mb-4 flex size-16 items-center justify-center rounded-full border border-line bg-surface text-primary">
+                 <step.icon size={28} aria-hidden="true" />
+               </div>
+               <h4 className="type-title mb-2 font-semibold text-fg">
+                 {step.title}
+               </h4>
+               <p className="type-small text-muted">
+                 {step.description}
+               </p>
+             </div>
+           ))}
         </div>
       </div>
     </section>

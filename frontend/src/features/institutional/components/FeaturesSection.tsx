@@ -1,4 +1,5 @@
 import { Library, Settings, Users } from 'lucide-react';
+import { SectionHeading } from './SectionHeading';
 
 const features = [
   {
@@ -20,34 +21,26 @@ const features = [
 
 export function FeaturesSection() {
   return (
-    <section className="bg-surface py-20 sm:py-28">
-      <div className="mx-auto max-w-7xl px-4 sm:px-8">
-        <div className="mb-16 text-center">
-          <h2 className="type-overline mb-3 font-semibold uppercase tracking-wider text-primary">
-            Nossa Proposta
-          </h2>
-          <h3 className="type-headline font-bold text-fg">
-            O que o Libee oferece?
-          </h3>
-        </div>
-
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+    <section id="proposta" className="bg-bg-secondary py-20 sm:py-24 lg:py-28" aria-label="Nossa proposta">
+      <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-10">
+        <SectionHeading eyebrow="Nossa proposta" title="O que o Libee oferece?" />
+        <div className="mt-14 grid gap-10 md:grid-cols-3 md:gap-8 lg:mt-16 lg:gap-12">
           {features.map((feature, index) => (
-            <div
-              key={index}
-              className="group rounded-xl border border-line bg-bg p-8 transition-all hover:border-primary/50 hover:shadow-sm"
-            >
-              <div className="mb-6 inline-flex rounded-lg bg-primary/10 p-3 text-primary">
-                <feature.icon size={28} aria-hidden="true" />
-              </div>
-              <h4 className="type-title mb-3 font-semibold text-fg">
-                {feature.title}
-              </h4>
-              <p className="type-body text-muted">
-                {feature.description}
-              </p>
-            </div>
-          ))}
+             <article
+               key={index}
+               className="group rounded-xl border border-line bg-bg p-8 transition-all hover:border-primary/50 hover:shadow-sm"
+             >
+               <div className="mb-6 inline-flex rounded-lg bg-primary/10 p-3 text-primary">
+                 <feature.icon size={28} aria-hidden="true" />
+               </div>
+               <h4 className="type-title mb-3 font-semibold text-fg">
+                 {feature.title}
+               </h4>
+               <p className="type-body text-muted">
+                 {feature.description}
+               </p>
+             </article>
+           ))}
         </div>
       </div>
     </section>
