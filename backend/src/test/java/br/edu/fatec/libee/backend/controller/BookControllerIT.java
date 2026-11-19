@@ -12,6 +12,7 @@ import br.edu.fatec.libee.backend.enums.CopyStatus;
 import br.edu.fatec.libee.backend.exception.ExternalServiceException;
 import br.edu.fatec.libee.backend.repository.AuthorRepository;
 import br.edu.fatec.libee.backend.repository.BookRepository;
+import br.edu.fatec.libee.backend.repository.CopyRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,6 +33,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WithMockUser(roles = "LIBRARIAN")
@@ -43,6 +45,7 @@ public class BookControllerIT extends AbstractIntegrationTest {
     @Autowired BookRepository bookRepository;
     @Autowired AuthorRepository authorRepository;
     @Autowired EntityManager entityManager;
+    @Autowired CopyRepository copyRepository; 
 
     private static final int NON_EXISTENT_ID = 999_999;
     private static final String NEW_ISBN = "9780000000002";
@@ -752,6 +755,84 @@ public class BookControllerIT extends AbstractIntegrationTest {
                 .andExpect(status().isNoContent());
         deleteRequest("/books/{bookId}/copies/{copyId}", domCasmurro.getId(), copyId)
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("Atualiza dados do livro e localização do exemplar, mas PRESERVA o status")
+    void updatesBookAndCopyLocation_butPreservesStatus() throws Exception {
+        CopyStatus originalStatus = domCasmurroCopy.getStatus();
+
+        String json = """
+                {
+                  "title": "Dom Casmurro (Edição Revisada)",
+                  "isbn": "%s",
+                  "categoryId": %d,
+                  "authors": ["Machado de Assis"],
+                  "publisher": "Nova Editora",
+                  "copies": [
+                    {
+                      "id": %d,
+                      "physicalLocation": "Estante B-05 (Nova Localização)"
+                    }
+                  ]
+                }
+                """.formatted(DOM_CASMURRO_ISBN, romance.getId(), domCasmurroCopy.getId());
+
+        mockMvc.perform(put("/books/{id}", domCasmurro.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json))
+                .andExpect(status().isNoContent());
+
+        entityManager.flush();
+        entityManager.clear();
+
+        Book updatedBook = bookRepository.findById(domCasmurro.getId()).orElseThrow();
+        assertEquals("Dom Casmurro (Edição Revisada)", updatedBook.getTitle());
+        assertEquals("Nova Editora", updatedBook.getPublisher());
+
+        Copy updatedCopy = copyRepository.findByIdAndBookIdAndDeletedAtIsNull(
+                domCasmurroCopy.getId(), domCasmurro.getId()).orElseThrow();
+        assertEquals("Estante B-05 (Nova Localização)", updatedCopy.getPhysicalLocation());
+        
+        // CRITÉRIO DE ACEITE: O status NÃO pode ter sido alterado
+        assertEquals(originalStatus, updatedCopy.getStatus());
+    }
+
+    @Test
+    @DisplayName("Retorna 422 quando tenta alterar o ISBN para um já existente em outro livro")
+    void returnsUnprocessableEntity_whenIsbnAlreadyExistsInAnotherBook() throws Exception {
+        String json = """
+                {
+                  "title": "Tentando burlar o sistema",
+                  "isbn": "%s",
+                  "categoryId": %d,
+                  "authors": ["Machado de Assis"]
+                }
+                """.formatted(CLEAN_CODE_ISBN, romance.getId());
+
+        mockMvc.perform(put("/books/{id}", domCasmurro.getId())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json))
+                .andExpect(status().is(422))
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON));
+    }
+
+    @Test
+    @DisplayName("Retorna 404 quando o ID do livro não existe")
+    void returnsNotFound_whenBookIdDoesNotExist() throws Exception {
+        String json = """
+                {
+                  "title": "Livro Fantasma",
+                  "categoryId": %d,
+                  "authors": []
+                }
+                """.formatted(romance.getId());
+
+        mockMvc.perform(put("/books/{id}", NON_EXISTENT_ID)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON));
     }
 
     // MÉTODOS AUXILIARES
