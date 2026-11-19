@@ -214,6 +214,7 @@
 @layer base {
   html {
     background: var(--bg);
+    scroll-behavior: smooth;
   }
   body {
     margin: 0;
@@ -234,5 +235,118 @@
       animation-duration: 0.01ms !important;
       transition-duration: 0.01ms !important;
     }
+  }
+}
+
+.float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.float-delay {
+  animation-delay: -2.2s;
+}
+
+.float-delay-short {
+  animation-delay: -1s;
+}
+
+.about-orbit {
+  animation: about-orbit 32s linear infinite;
+}
+
+.about-orbit::after {
+  position: absolute;
+  top: 50%;
+  right: -0.3rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 0 0 0.3rem color-mix(in srgb, var(--primary) 12%, transparent);
+  content: '';
+}
+
+.orbit {
+  position: absolute;
+  border: 1px solid rgb(153 92 0 / 0.13);
+  border-radius: 999px;
+  transform: rotate(-22deg);
+}
+
+.orbit-one {
+  top: -15rem;
+  right: -8rem;
+  width: 38rem;
+  height: 38rem;
+}
+
+.orbit-two {
+  right: 10%;
+  bottom: -24rem;
+  width: 32rem;
+  height: 32rem;
+  border-color: rgb(153 92 0 / 0.08);
+}
+
+.dot {
+  position: absolute;
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: var(--primary);
+  opacity: 0.55;
+  animation: drift 8s ease-in-out infinite;
+}
+
+.dot-one {
+  top: 18%;
+  right: 43%;
+}
+
+.dot-two {
+  right: 7%;
+  bottom: 20%;
+  width: 0.4rem;
+  height: 0.4rem;
+  animation-delay: -4s;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-0.55rem);
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0.75rem, -0.7rem, 0);
+  }
+}
+
+@keyframes about-orbit {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (max-width: 640px) {
+  .orbit-one {
+    top: -10rem;
+    right: -18rem;
+    width: 30rem;
+    height: 30rem;
+  }
+
+  .orbit-two {
+    right: -10rem;
+    bottom: -16rem;
   }
 }
