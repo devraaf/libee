@@ -1,10 +1,10 @@
 import { useId, useState, type FormEvent } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Button } from '../../../../shared/components/ui/Button';
+import { maskPhone } from '@/shared/utils/format-phone';
 import {
   bondLabels,
   createReaderSchema,
-  maskPhone,
   type ReaderBond,
   type ReaderFormValues,
 } from '../types/reader.model';

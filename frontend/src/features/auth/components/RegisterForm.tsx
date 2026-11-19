@@ -11,6 +11,7 @@ import {
 } from '../../../shared/schemas/enums.schema';
 import type { Course } from '@/shared/types/library';
 import type { RegisterFormData } from '../schemas/auth.schema';
+import { maskPhone } from '@/shared/utils/format-phone';
 
 const initialValues = {
   name: '',
@@ -84,7 +85,9 @@ export function RegisterForm({
         autoComplete="tel"
         maxLength={15}
         value={formData.phone}
-        onChange={(e) => handleFieldChange('phone', e.target.value)}
+        onChange={(e) =>
+          handleFieldChange('phone', maskPhone(e.target.value))
+        }
         error={errors.phone}
       />
       <RadioGroup
