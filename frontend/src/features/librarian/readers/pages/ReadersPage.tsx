@@ -1,20 +1,21 @@
-import { useEffect, useState } from 'react';
+import type { RegisteredReader } from '@/features/auth/services/auth.service';
 import { Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Button } from '../../../../shared/components/ui/Button';
 import { EmptyState } from '../../../../shared/components/ui/EmptyState';
 import { Loader } from '../../../../shared/components/ui/loader/Loader';
 import { PageHeader } from '../../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../../shared/components/ui/SearchFilterBar';
+import type { AffiliationType } from '../../../../shared/schemas/enums.schema';
+import { ReaderStats } from '../components/ReadersStats';
+import { ReadersTable } from '../components/ReadersTable';
+import RegisterReaderModal from '../components/RegisterReaderModal';
 import {
-  listManagementReaders,
   getReaderManagementSummary,
+  listManagementReaders,
+  type ManagementReaderDto,
   type ManagementReaderStatus,
 } from '../services/readers.service';
-import { ReaderStats } from '../components/ReadersStats';
-import { ReadersTable, type ReadersItem } from '../components/ReadersTable';
-import type { AffiliationType } from '../../../../shared/schemas/enums.schema';
-import RegisterReaderModal from '../components/RegisterReaderModal';
-import type { RegisteredReader } from '@/features/auth/services/auth.service';
 
 const PAGE_SIZE = 10;
 
@@ -35,7 +36,7 @@ export default function ReadersPage() {
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [readers, setReaders] = useState<ReadersItem[]>([]);
+  const [readers, setReaders] = useState<ManagementReaderDto[]>([]);
   const [stats, setStats] = useState<{
     totalReaders: number;
     onLoan: number;
@@ -63,17 +64,7 @@ export default function ReadersPage() {
             status: statusFilter || undefined,
           });
           if (!active) return;
-          setReaders(
-            result.content.map((reader) => ({
-              id: reader.id,
-              name: reader.name,
-              email: reader.email,
-              affiliationType: reader.affiliationType,
-              course: reader.courseName ? { name: reader.courseName } : null,
-              activeLoans: reader.activeLoans,
-              status: reader.status === 'PENDING' ? 'PENDING' : 'OK',
-            })),
-          );
+          setReaders(result.content);
           setTotalItems(result.totalElements);
           setTotalPages(Math.max(result.totalPages, 1));
         } catch (error) {
