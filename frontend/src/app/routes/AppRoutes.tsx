@@ -2,7 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import { LoginPage } from '../../features/auth/pages/LoginPage';
 import { RegisterPage } from '../../features/auth/pages/RegisterPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
-import { InstitutionalPage } from '../pages/InstitutionalPage';
+import { InstitutionalPage } from '../../features/institutional/pages/InstitutionalPage';
 import { MainLayout } from '../layout/MainLayout';
 import { BookDetailsPage } from '@/features/book-details/pages/BooksDetailsPage';
 import { GalleryPage } from '../pages/GalleryPage';
@@ -60,7 +60,6 @@ export function AppRoutes() {
           <Route path="/gerenciamento/leitores" element={<ReadersPage />} />
         </Route>
       </Route>
-
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
