@@ -58,4 +58,7 @@ public interface CopyRepository extends JpaRepository<Copy, Integer> {
 
     // Exemplar excluído (exclusão lógica) não pode ser emprestado: para o empréstimo ele não existe
     Optional<Copy> findByAccessionNumberAndDeletedAtIsNull(String accessionNumber);
+
+    // Exemplares com esses tombos, ativos ou excluídos (a coluna é única): usado para reativar
+    List<Copy> findByAccessionNumberIn(Collection<String> accessionNumbers);
 }

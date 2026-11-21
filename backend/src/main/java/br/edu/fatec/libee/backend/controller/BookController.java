@@ -1,5 +1,7 @@
 package br.edu.fatec.libee.backend.controller;
 
+import br.edu.fatec.libee.backend.dto.request.AddCopiesRequest;
+import br.edu.fatec.libee.backend.dto.request.CopyRequest;
 import br.edu.fatec.libee.backend.dto.request.RegisterBookRequest;
 import br.edu.fatec.libee.backend.dto.response.*;
 import br.edu.fatec.libee.backend.service.BookLookupService;
@@ -8,10 +10,12 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.List;
 
 @RestController
 @RequestMapping("/books")
@@ -59,6 +63,13 @@ public class BookController {
         BookDetailsResponse body = bookService.getBookById(id);
         URI location = URI.create("/books/" + id);
         return ResponseEntity.created(location).body(body);
+    }
+
+    @PostMapping("/{bookId}/copies")
+    public ResponseEntity<AddCopiesResponse> createCopies(@PathVariable Integer bookId, @Valid @RequestBody AddCopiesRequest request) {
+        List<CopyConflictResponse> conflicts = bookService.createCopies(bookId, request);
+        BookDetailsResponse book = bookService.getBookById(bookId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(new AddCopiesResponse(book, conflicts));
     }
 
     @DeleteMapping("/{id}")
