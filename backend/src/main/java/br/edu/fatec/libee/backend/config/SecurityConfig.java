@@ -56,6 +56,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/books/management/**", "/loans/management/**").hasRole("LIBRARIAN")
                         .requestMatchers(HttpMethod.POST, "/books", "/loans", "/loans/returns", "/categories").hasRole("LIBRARIAN")
                         .requestMatchers(HttpMethod.DELETE, "/books/**").hasRole("LIBRARIAN")
+                        .requestMatchers(HttpMethod.PUT, "/books/**").hasRole("LIBRARIAN")
                         // Administrador e bibliotecário
                         .requestMatchers(HttpMethod.GET, "/readers/**").hasAnyRole(STAFF)
                         // Leitor
