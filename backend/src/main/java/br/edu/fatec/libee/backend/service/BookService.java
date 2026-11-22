@@ -1,5 +1,7 @@
 package br.edu.fatec.libee.backend.service;
 
+import br.edu.fatec.libee.backend.dto.request.AddCopiesRequest;
+import br.edu.fatec.libee.backend.dto.request.CopyRequest;
 import br.edu.fatec.libee.backend.dto.request.RegisterBookRequest;
 import br.edu.fatec.libee.backend.dto.response.*;
 import br.edu.fatec.libee.backend.entity.Author;
@@ -234,6 +236,72 @@ public class BookService {
     // Texto opcional em branco vira null
     private static String clean(String value) {
         return (value == null || value.isBlank()) ? null : value.trim();
+    }
+
+    @Transactional
+    public List<CopyConflictResponse> createCopies(Integer bookId, AddCopiesRequest request) {
+        Book book = bookRepository.findByIdAndDeletedAtIsNull(bookId)
+                .orElseThrow(() -> new ResourceNotFoundException("Livro não encontrado."));
+
+        List<CopyConflictResponse> conflicts = new ArrayList<>();
+
+        // Tombos informados; se um tombo se repete, vale a primeira ocorrência
+        Map<String, CopyRequest> requested = new LinkedHashMap<>();
+        for (CopyRequest copyRequest : request.copies()) {
+            String accessionNumber = copyRequest.accessionNumber().trim();
+            if (requested.putIfAbsent(accessionNumber, copyRequest) != null) {
+                conflicts.add(new CopyConflictResponse(accessionNumber,
+                        "Tombo repetido na requisição; só a primeira ocorrência foi considerada."));
+            }
+        }
+
+        // Exemplares que já existem no banco (ativos ou excluídos), por tombo
+        Map<String, Copy> existingByAccessionNumber = copyRepository
+                .findByAccessionNumberIn(requested.keySet()).stream()
+                .collect(Collectors.toMap(Copy::getAccessionNumber, Function.identity()));
+
+        List<Copy> newCopies = new ArrayList<>();
+        int reactivatedCount = 0;
+
+        for (Map.Entry<String, CopyRequest> entry : requested.entrySet()) {
+            String accessionNumber = entry.getKey();
+            String physicalLocation = entry.getValue().physicalLocation().trim();
+            Copy existingCopy = existingByAccessionNumber.get(accessionNumber);
+
+            if (existingCopy == null) {
+                Copy copy = new Copy();
+                copy.setBook(book);
+                copy.setAccessionNumber(accessionNumber);
+                copy.setPhysicalLocation(physicalLocation);
+                copy.setStatus(CopyStatus.AVAILABLE);
+                newCopies.add(copy);
+            } else if (canReactivate(existingCopy, bookId)) {
+                // Reativação
+                existingCopy.setDeletedAt(null);
+                existingCopy.setPhysicalLocation(physicalLocation);
+                existingCopy.setStatus(CopyStatus.AVAILABLE);
+                reactivatedCount++;
+            } else {
+                String reason = existingCopy.getDeletedAt() == null
+                        ? "Tombo já cadastrado."
+                        : "Tombo pertence a outro livro.";
+                conflicts.add(new CopyConflictResponse(accessionNumber, reason));
+            }
+        }
+
+        // Nada foi gravado nem alterado: a requisição inteira falhou por conflito
+        if (newCopies.isEmpty() && reactivatedCount == 0) {
+            throw new AccessionNumberAlreadyRegisteredException(
+                    conflicts.stream().map(CopyConflictResponse::accessionNumber).distinct().toList());
+        }
+
+        copyRepository.saveAllAndFlush(newCopies);
+        return conflicts;
+    }
+
+    // Só pode ser reativado o exemplar excluído que pertence a este livro
+    private static boolean canReactivate(Copy copy, Integer bookId) {
+        return copy.getDeletedAt() != null && copy.getBook().getId().equals(bookId);
     }
 
     @Transactional
