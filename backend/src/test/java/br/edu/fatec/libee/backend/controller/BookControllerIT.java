@@ -530,6 +530,89 @@ public class BookControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("Reativa o livro excluído com o mesmo id, substitui os dados e reativa o exemplar com o mesmo tombo")
+    void reactivatesBookAndCopy_whenIsbnAndAccessionNumberBelongToDeletedBook() throws Exception {
+        Integer bookId = domCasmurro.getId();
+        Integer copyId = domCasmurroCopy.getId();
+        markBookDeleted(domCasmurro);
+
+        postBook(registerBookJson(romance.getId(), DOM_CASMURRO_ISBN, DOM_CASMURRO_ACCESSION, "[\"Autor Novo\"]"))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", endsWith("/books/" + bookId)))
+                .andExpect(jsonPath("$.id").value(bookId))
+                // os dados do request substituem os antigos, inclusive os autores
+                .andExpect(jsonPath("$.title").value("Livro de teste"))
+                .andExpect(jsonPath("$.authors.length()").value(1))
+                .andExpect(jsonPath("$.authors[0].name").value("Autor Novo"))
+                .andExpect(jsonPath("$.totalCopies").value(1))
+                .andExpect(jsonPath("$.copies[0].status").value("AVAILABLE"));
+
+        // Nenhuma linha nova: livro e exemplar reaproveitados (mesmos ids, logo mesmo histórico)
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "select count(*) from books where isbn = ?", Integer.class, DOM_CASMURRO_ISBN));
+        assertEquals(1, countCopiesByAccessionNumber(DOM_CASMURRO_ACCESSION));
+        assertEquals(copyId, copyColumn("id", Integer.class, DOM_CASMURRO_ACCESSION));
+    }
+
+    @Test
+    @DisplayName("Mantém excluídos os exemplares antigos que não vieram no request ao reativar o livro")
+    void keepsOldCopiesDeleted_whenReactivatedBookReceivesNewAccessionNumber() throws Exception {
+        markBookDeleted(domCasmurro);
+
+        postBook(registerBookJson(romance.getId(), DOM_CASMURRO_ISBN, NEW_ACCESSION, "[]"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.totalCopies").value(1))
+                .andExpect(jsonPath("$.copies[0].accessionNumber").value(NEW_ACCESSION));
+
+        assertNotNull(copyColumn("deleted_at", OffsetDateTime.class, DOM_CASMURRO_ACCESSION));
+    }
+
+    @Test
+    @DisplayName("Volta a aparecer nas consultas e no resumo do acervo depois de reativado")
+    void showsReactivatedBook_inQueriesAndSummary() throws Exception {
+        markBookDeleted(domCasmurro);
+
+        postBook(registerBookJson(romance.getId(), DOM_CASMURRO_ISBN, DOM_CASMURRO_ACCESSION, "[]"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/books/management").param("q", "livro de teste"))
+                .andExpect(jsonPath("$.content.length()").value(1));
+        mockMvc.perform(get("/books/management/summary"))
+                .andExpect(jsonPath("$.totalBooks").value(2))
+                .andExpect(jsonPath("$.totalCopies").value(2));
+    }
+
+    @Test
+    @DisplayName("Retorna 409 e mantém o livro excluído quando o tombo pertence a exemplar ativo de outro livro")
+    void returnsConflictAndKeepsBookDeleted_whenAccessionNumberIsActiveInAnotherBook() throws Exception {
+        Integer bookId = domCasmurro.getId();
+        markBookDeleted(domCasmurro);
+
+        postBook(registerBookJson(romance.getId(), DOM_CASMURRO_ISBN, CLEAN_CODE_ACCESSION, "[]"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.accessionNumbers[0]").value(CLEAN_CODE_ACCESSION));
+
+        // O livro continua excluído: nada foi gravado
+        assertNotNull(jdbcTemplate.queryForObject(
+                "select deleted_at from books where id = ?", OffsetDateTime.class, bookId));
+    }
+
+    @Test
+    @DisplayName("Retorna 409 quando o tombo pertence a exemplar excluído de outro livro")
+    void returnsConflict_whenAccessionNumberBelongsToDeletedCopyOfAnotherBook_inRegistration() throws Exception {
+        Copy otherBookCopy = testData.saveCopy(cleanCode, "003", CopyStatus.AVAILABLE);
+        markCopyDeleted(otherBookCopy);
+        markBookDeleted(domCasmurro);
+
+        postBook(registerBookJson(romance.getId(), DOM_CASMURRO_ISBN, "003", "[]"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.accessionNumbers[0]").value("003"));
+
+        // O exemplar do outro livro não foi movido
+        assertEquals(cleanCode.getId(), copyColumn("book_id", Integer.class, "003"));
+    }
+
+    @Test
     @DisplayName("Retorna 422 e não grava livro nem autor quando a categoria não existe")
     void returnsUnprocessable_whenCategoryDoesNotExist() throws Exception {
         long authorsBefore = authorRepository.count();
@@ -539,6 +622,148 @@ public class BookControllerIT extends AbstractIntegrationTest {
 
         assertTrue(bookRepository.findByIsbnAndDeletedAtIsNull(NEW_ISBN).isEmpty());
         assertEquals(authorsBefore, authorRepository.count());
+    }
+
+    // TESTES DE POST /books/{bookId}/copies - Adição de exemplares a livro existente
+    @Test
+    @DisplayName("Retorna 201 com o livro atualizado e grava os exemplares novos como AVAILABLE")
+    void addsNewCopiesAndReturnsUpdatedBook_whenAccessionNumbersAreFree() throws Exception {
+        postCopies(domCasmurro.getId(), copiesJson(copyJson("003", "Estante A"), copyJson("004", "Estante A")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.conflicts.length()").value(0))
+                .andExpect(jsonPath("$.book.id").value(domCasmurro.getId()))
+                .andExpect(jsonPath("$.book.totalCopies").value(3))
+                // exemplares em ordem de tombo: 001 (já existia), 003 e 004
+                .andExpect(jsonPath("$.book.copies[1].accessionNumber").value("003"))
+                .andExpect(jsonPath("$.book.copies[1].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.book.copies[2].accessionNumber").value("004"));
+
+        // Os exemplares novos entram na contagem do acervo
+        mockMvc.perform(get("/books/management/summary"))
+                .andExpect(jsonPath("$.totalCopies").value(4))
+                .andExpect(jsonPath("$.availableCopies").value(3))
+                .andExpect(jsonPath("$.onLoanCopies").value(1));
+    }
+
+    @Test
+    @DisplayName("Reativa o exemplar excluído do mesmo livro, atualiza a localização e não cria linha nova")
+    void reactivatesCopy_whenCopyWasDeletedFromSameBook() throws Exception {
+        Copy deletedCopy = testData.saveCopy(domCasmurro, "003", CopyStatus.AVAILABLE);
+        markCopyDeleted(deletedCopy);
+
+        postCopies(domCasmurro.getId(), copiesJson(copyJson("003", "Estante B")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.conflicts.length()").value(0))
+                .andExpect(jsonPath("$.book.totalCopies").value(2));
+
+        entityManager.flush();
+        // Mesma linha reaproveitada, agora ativa
+        assertEquals(1, countCopiesByAccessionNumber("003"));
+        assertEquals(deletedCopy.getId(), copyColumn("id", Integer.class, "003"));
+        assertNull(copyColumn("deleted_at", OffsetDateTime.class, "003"));
+        assertEquals("AVAILABLE", copyColumn("status", String.class, "003"));
+        assertEquals("Estante B", copyColumn("physical_location", String.class, "003"));
+    }
+
+    @Test
+    @DisplayName("Retorna 201, grava os tombos livres e lista em conflicts o tombo que já está ativo")
+    void savesFreeCopiesAndListsConflict_whenSomeAccessionNumberIsActive() throws Exception {
+        postCopies(domCasmurro.getId(), copiesJson(
+                copyJson(DOM_CASMURRO_ACCESSION, "Estante A"), copyJson("003", "Estante A")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.conflicts.length()").value(1))
+                .andExpect(jsonPath("$.conflicts[0].accessionNumber").value(DOM_CASMURRO_ACCESSION))
+                .andExpect(jsonPath("$.conflicts[0].reason").value("Tombo já cadastrado."))
+                .andExpect(jsonPath("$.book.totalCopies").value(2));
+
+        // O tombo sem conflito foi gravado mesmo assim
+        assertEquals(1, countCopiesByAccessionNumber("003"));
+    }
+
+    @Test
+    @DisplayName("Informa que o tombo pertence a outro livro e mantém o exemplar excluído onde estava")
+    void listsConflict_whenAccessionNumberBelongsToDeletedCopyOfAnotherBook() throws Exception {
+        Copy otherBookCopy = testData.saveCopy(cleanCode, "900", CopyStatus.AVAILABLE);
+        markCopyDeleted(otherBookCopy);
+
+        postCopies(domCasmurro.getId(), copiesJson(copyJson("900", "Estante A"), copyJson("003", "Estante A")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.conflicts.length()").value(1))
+                .andExpect(jsonPath("$.conflicts[0].accessionNumber").value("900"))
+                .andExpect(jsonPath("$.conflicts[0].reason").value("Tombo pertence a outro livro."))
+                .andExpect(jsonPath("$.book.totalCopies").value(2));
+
+        // O exemplar do outro livro continua excluído e no outro livro
+        assertNotNull(copyColumn("deleted_at", OffsetDateTime.class, "900"));
+        assertEquals(cleanCode.getId(), copyColumn("book_id", Integer.class, "900"));
+    }
+
+    @Test
+    @DisplayName("Grava só a primeira ocorrência e lista a repetição em conflicts quando o tombo se repete na requisição")
+    void savesFirstOccurrence_whenAccessionNumberRepeatsInsideRequest() throws Exception {
+        postCopies(domCasmurro.getId(), copiesJson(copyJson("003", "Estante A"), copyJson(" 003 ", "Estante B")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.conflicts.length()").value(1))
+                .andExpect(jsonPath("$.conflicts[0].accessionNumber").value("003"));
+
+        assertEquals(1, countCopiesByAccessionNumber("003"));
+        assertEquals("Estante A", copyColumn("physical_location", String.class, "003"));
+    }
+
+    @Test
+    @DisplayName("Retorna 409 com os tombos e não altera nada quando todos os tombos conflitam")
+    void returnsConflictAndChangesNothing_whenAllAccessionNumbersConflict() throws Exception {
+        postCopies(domCasmurro.getId(), copiesJson(copyJson(DOM_CASMURRO_ACCESSION, "Estante A")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.accessionNumbers[0]").value(DOM_CASMURRO_ACCESSION));
+
+        mockMvc.perform(get("/books/{id}", domCasmurro.getId()))
+                .andExpect(jsonPath("$.totalCopies").value(1));
+    }
+
+    @Test
+    @DisplayName("Retorna 404 em formato ProblemDetail quando o livro não existe")
+    void returnsNotFound_whenBookDoesNotExist_inCopiesRegistration() throws Exception {
+        postCopies(NON_EXISTENT_ID, copiesJson(copyJson("003", "Estante A")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Recurso não encontrado"));
+    }
+
+    @Test
+    @DisplayName("Retorna 404 e não grava o exemplar quando o livro está excluído")
+    void returnsNotFound_whenBookIsDeleted_inCopiesRegistration() throws Exception {
+        markBookDeleted(domCasmurro);
+
+        postCopies(domCasmurro.getId(), copiesJson(copyJson("003", "Estante A")))
+                .andExpect(status().isNotFound());
+
+        assertEquals(0, countCopiesByAccessionNumber("003"));
+    }
+
+    @Test
+    @DisplayName("Retorna 400 apontando o campo copies quando a lista de exemplares está vazia")
+    void returnsBadRequest_whenCopiesListIsEmpty() throws Exception {
+        postCopies(domCasmurro.getId(), copiesJson())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field", hasItem("copies")));
+    }
+
+    @Test
+    @DisplayName("Retorna 400 com o caminho do campo e não grava nenhum exemplar quando um deles é inválido")
+    void returnsBadRequestAndSavesNothing_whenOneCopyIsInvalid() throws Exception {
+        postCopies(domCasmurro.getId(), copiesJson(copyJson("003", "Estante A"), copyJson("", "Estante A")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[*].field", hasItem("copies[1].accessionNumber")));
+
+        // Dado inválido rejeita a requisição inteira, inclusive o exemplar válido
+        assertEquals(0, countCopiesByAccessionNumber("003"));
+    }
+
+    @Test
+    @DisplayName("Retorna 400 quando o id do livro não é numérico")
+    void returnsBadRequest_whenBookIdIsNotNumeric_inCopiesRegistration() throws Exception {
+        mockMvc.perform(postJson("/books/abc/copies", copiesJson(copyJson("003", "Estante A"))))
+                .andExpect(status().isBadRequest());
     }
 
     // TESTES DE EXCLUSÃO LÓGICA - o que está excluído não aparece nas consultas do catálogo
@@ -877,13 +1102,42 @@ public class BookControllerIT extends AbstractIntegrationTest {
         return bookRepository.save(b);
     }
 
+    private ResultActions postCopies(Integer bookId, String json) throws Exception {
+        return mockMvc.perform(postJson("/books/" + bookId + "/copies", json));
+    }
+
+    private String copiesJson(String... copies) {
+        return "{\"copies\": [" + String.join(",", copies) + "]}";
+    }
+
+    private String copyJson(String accessionNumber, String physicalLocation) {
+        return "{\"accessionNumber\": \"%s\", \"physicalLocation\": \"%s\"}"
+                .formatted(accessionNumber, physicalLocation);
+    }
+
+    // Quantas linhas existem para o tombo, ativas ou excluídas
+    private int countCopiesByAccessionNumber(String accessionNumber) {
+        return jdbcTemplate.queryForObject(
+                "select count(*) from book_copies where accession_number = ?", Integer.class, accessionNumber);
+    }
+
+    // Lê uma coluna do exemplar direto do banco (só para testes)
+    private <T> T copyColumn(String column, Class<T> type, String accessionNumber) {
+        return jdbcTemplate.queryForObject(
+                "select " + column + " from book_copies where accession_number = ?", type, accessionNumber);
+    }
+
     // Exclusão lógica feita direto no banco, para testar só as consultas
     private void markBookDeleted(Book book) {
         jdbcTemplate.update("update book_copies set deleted_at = now() where book_id = ?", book.getId());
         jdbcTemplate.update("update books set deleted_at = now() where id = ?", book.getId());
+        entityManager.flush();
+        entityManager.clear();   // descarta as entidades em cache, que ainda achariam que estão ativas
     }
 
     private void markCopyDeleted(Copy copy) {
         jdbcTemplate.update("update book_copies set deleted_at = now() where id = ?", copy.getId());
+        entityManager.flush();
+        entityManager.clear();
     }
 }
