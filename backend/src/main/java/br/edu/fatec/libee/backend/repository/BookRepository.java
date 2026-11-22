@@ -20,4 +20,7 @@ public interface BookRepository extends JpaRepository<Book, Integer>, JpaSpecifi
     Optional<Book> findByIdAndDeletedAtIsNull(Integer id);
 
     long countByDeletedAtIsNull();
+
+    // Livro com esse ISBN, ativo ou excluído
+    Optional<Book> findByIsbn(String isbn);
 }

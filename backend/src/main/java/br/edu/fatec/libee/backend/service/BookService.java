@@ -134,19 +134,27 @@ public class BookService {
             throw new BusinessRuleException("Informe ao menos um exemplar.");
         }
         String isbn = IsbnNormalizer.normalize(request.isbn());
-        checkIsbnIsAvailable(isbn);
 
-        List<String> accessionNumbers = request.copies().stream()
-                .map(copy -> copy.accessionNumber().trim())
-                .toList();
-        checkAccessionNumbersAreAvailable(accessionNumbers);
+        // ISBN é único no banco: livro ativo é conflito; livro excluído é reativado
+        Optional<Book> existingBook = bookRepository.findByIsbn(isbn);
+        if (existingBook.isPresent() && existingBook.get().getDeletedAt() == null) {
+            throw new BookAlreadyRegisteredException(existingBook.get().getId());
+        }
+
+        // Com qualquer tombo em conflito, nada é gravado
+        CopyAnalysis analysis = analyzeCopies(existingBook.map(Book::getId).orElse(null), request.copies());
+        if (!analysis.conflicts().isEmpty()) {
+            throw new AccessionNumberAlreadyRegisteredException(conflictingAccessionNumbers(analysis.conflicts()));
+        }
 
         Category category = categoryRepository.findById(request.categoryId())
                 .orElseThrow(() -> new BusinessRuleException("Categoria não encontrada."));
 
         List<Author> authors = resolveAuthors(request.authors());
 
-        Book book = new Book();
+        // Reativa o livro excluído, ou cria um novo; os dados do request substituem os antigos
+        Book book = existingBook.orElseGet(Book::new);
+        book.setDeletedAt(null);
         book.setTitle(request.title().trim());
         book.setIsbn(isbn);
         book.setCategory(category);
@@ -160,43 +168,9 @@ public class BookService {
         book.setSummary(clean(request.description()));
 
         Book saved = bookRepository.saveAndFlush(book);
-
-        List<Copy> copies = request.copies().stream()
-                .map(copyRequest -> {
-                    Copy copy = new Copy();
-                    copy.setBook(saved);
-                    copy.setAccessionNumber(copyRequest.accessionNumber().trim());
-                    copy.setPhysicalLocation(copyRequest.physicalLocation().trim());
-                    copy.setStatus(CopyStatus.AVAILABLE);
-                    return copy;
-                })
-                .toList();
-        copyRepository.saveAllAndFlush(copies);
+        applyCopies(saved, analysis);
 
         return saved.getId();
-    }
-
-    private void checkIsbnIsAvailable(String isbn) {
-        bookRepository.findByIsbnAndDeletedAtIsNull(isbn).ifPresent(existing -> {
-            throw new BookAlreadyRegisteredException(existing.getId());
-        });
-    }
-
-    private void checkAccessionNumbersAreAvailable(List<String> accessionNumbers) {
-        Set<String> conflicts = new LinkedHashSet<>();
-
-        // Tombos repetidos dentro da própria requisição
-        Set<String> seen = new HashSet<>();
-        for (String accessionNumber : accessionNumbers) {
-            if (!seen.add(accessionNumber)) {
-                conflicts.add(accessionNumber);
-            }
-        }
-        // Tombos que já existem no banco
-        conflicts.addAll(copyRepository.findExistingAccessionNumbers(accessionNumbers));
-        if (!conflicts.isEmpty()) {
-            throw new AccessionNumberAlreadyRegisteredException(new ArrayList<>(conflicts));
-        }
     }
 
     private List<Author> resolveAuthors(List<String> rawNames) {
@@ -243,11 +217,29 @@ public class BookService {
         Book book = bookRepository.findByIdAndDeletedAtIsNull(bookId)
                 .orElseThrow(() -> new ResourceNotFoundException("Livro não encontrado."));
 
+        CopyAnalysis analysis = analyzeCopies(bookId, request.copies());
+        int savedCount = applyCopies(book, analysis);
+
+        // Nada foi gravado nem alterado: a requisição inteira falhou por conflito
+        if (savedCount == 0) {
+            throw new AccessionNumberAlreadyRegisteredException(conflictingAccessionNumbers(analysis.conflicts()));
+        }
+        return analysis.conflicts();
+    }
+
+    // Resultado da análise dos tombos de uma requisição: nada é gravado nem alterado nela
+    private record CopyAnalysis(Map<String, CopyRequest> requested,
+                                Map<String, Copy> existing,
+                                List<CopyConflictResponse> conflicts) {
+    }
+
+    // bookId é o livro que receberá os exemplares; null quando o livro ainda não existe
+    private CopyAnalysis analyzeCopies(Integer bookId, List<CopyRequest> copyRequests) {
         List<CopyConflictResponse> conflicts = new ArrayList<>();
 
         // Tombos informados; se um tombo se repete, vale a primeira ocorrência
         Map<String, CopyRequest> requested = new LinkedHashMap<>();
-        for (CopyRequest copyRequest : request.copies()) {
+        for (CopyRequest copyRequest : copyRequests) {
             String accessionNumber = copyRequest.accessionNumber().trim();
             if (requested.putIfAbsent(accessionNumber, copyRequest) != null) {
                 conflicts.add(new CopyConflictResponse(accessionNumber,
@@ -256,17 +248,32 @@ public class BookService {
         }
 
         // Exemplares que já existem no banco (ativos ou excluídos), por tombo
-        Map<String, Copy> existingByAccessionNumber = copyRepository
-                .findByAccessionNumberIn(requested.keySet()).stream()
+        Map<String, Copy> existing = copyRepository.findByAccessionNumberIn(requested.keySet()).stream()
                 .collect(Collectors.toMap(Copy::getAccessionNumber, Function.identity()));
 
+        // Mantém a ordem da requisição nos conflitos
+        for (String accessionNumber : requested.keySet()) {
+            Copy copy = existing.get(accessionNumber);
+            if (copy != null && !canReactivate(copy, bookId)) {
+                String reason = copy.getDeletedAt() == null
+                        ? "Tombo já cadastrado."
+                        : "Tombo pertence a outro livro.";
+                conflicts.add(new CopyConflictResponse(accessionNumber, reason));
+            }
+        }
+        return new CopyAnalysis(requested, existing, conflicts);
+    }
+
+    // Cria os exemplares novos e reativa os excluídos do mesmo livro; ignora os que conflitam.
+// Devolve quantos exemplares foram criados ou reativados.
+    private int applyCopies(Book book, CopyAnalysis analysis) {
         List<Copy> newCopies = new ArrayList<>();
         int reactivatedCount = 0;
 
-        for (Map.Entry<String, CopyRequest> entry : requested.entrySet()) {
+        for (Map.Entry<String, CopyRequest> entry : analysis.requested().entrySet()) {
             String accessionNumber = entry.getKey();
             String physicalLocation = entry.getValue().physicalLocation().trim();
-            Copy existingCopy = existingByAccessionNumber.get(accessionNumber);
+            Copy existingCopy = analysis.existing().get(accessionNumber);
 
             if (existingCopy == null) {
                 Copy copy = new Copy();
@@ -275,28 +282,22 @@ public class BookService {
                 copy.setPhysicalLocation(physicalLocation);
                 copy.setStatus(CopyStatus.AVAILABLE);
                 newCopies.add(copy);
-            } else if (canReactivate(existingCopy, bookId)) {
-                // Reativação
+            } else if (canReactivate(existingCopy, book.getId())) {
+                // Reativação: o Hibernate grava a mudança no commit
                 existingCopy.setDeletedAt(null);
                 existingCopy.setPhysicalLocation(physicalLocation);
                 existingCopy.setStatus(CopyStatus.AVAILABLE);
                 reactivatedCount++;
-            } else {
-                String reason = existingCopy.getDeletedAt() == null
-                        ? "Tombo já cadastrado."
-                        : "Tombo pertence a outro livro.";
-                conflicts.add(new CopyConflictResponse(accessionNumber, reason));
             }
-        }
-
-        // Nada foi gravado nem alterado: a requisição inteira falhou por conflito
-        if (newCopies.isEmpty() && reactivatedCount == 0) {
-            throw new AccessionNumberAlreadyRegisteredException(
-                    conflicts.stream().map(CopyConflictResponse::accessionNumber).distinct().toList());
+            // Qualquer outro caso é conflito, já registrado na análise
         }
 
         copyRepository.saveAllAndFlush(newCopies);
-        return conflicts;
+        return newCopies.size() + reactivatedCount;
+    }
+
+    private static List<String> conflictingAccessionNumbers(List<CopyConflictResponse> conflicts) {
+        return conflicts.stream().map(CopyConflictResponse::accessionNumber).distinct().toList();
     }
 
     // Só pode ser reativado o exemplar excluído que pertence a este livro
