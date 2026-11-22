@@ -527,6 +527,89 @@ public class BookControllerIT extends AbstractIntegrationTest {
     }
 
     @Test
+    @DisplayName("Reativa o livro excluído com o mesmo id, substitui os dados e reativa o exemplar com o mesmo tombo")
+    void reactivatesBookAndCopy_whenIsbnAndAccessionNumberBelongToDeletedBook() throws Exception {
+        Integer bookId = domCasmurro.getId();
+        Integer copyId = domCasmurroCopy.getId();
+        markBookDeleted(domCasmurro);
+
+        postBook(registerBookJson(romance.getId(), DOM_CASMURRO_ISBN, DOM_CASMURRO_ACCESSION, "[\"Autor Novo\"]"))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", endsWith("/books/" + bookId)))
+                .andExpect(jsonPath("$.id").value(bookId))
+                // os dados do request substituem os antigos, inclusive os autores
+                .andExpect(jsonPath("$.title").value("Livro de teste"))
+                .andExpect(jsonPath("$.authors.length()").value(1))
+                .andExpect(jsonPath("$.authors[0].name").value("Autor Novo"))
+                .andExpect(jsonPath("$.totalCopies").value(1))
+                .andExpect(jsonPath("$.copies[0].status").value("AVAILABLE"));
+
+        // Nenhuma linha nova: livro e exemplar reaproveitados (mesmos ids, logo mesmo histórico)
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "select count(*) from books where isbn = ?", Integer.class, DOM_CASMURRO_ISBN));
+        assertEquals(1, countCopiesByAccessionNumber(DOM_CASMURRO_ACCESSION));
+        assertEquals(copyId, copyColumn("id", Integer.class, DOM_CASMURRO_ACCESSION));
+    }
+
+    @Test
+    @DisplayName("Mantém excluídos os exemplares antigos que não vieram no request ao reativar o livro")
+    void keepsOldCopiesDeleted_whenReactivatedBookReceivesNewAccessionNumber() throws Exception {
+        markBookDeleted(domCasmurro);
+
+        postBook(registerBookJson(romance.getId(), DOM_CASMURRO_ISBN, NEW_ACCESSION, "[]"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.totalCopies").value(1))
+                .andExpect(jsonPath("$.copies[0].accessionNumber").value(NEW_ACCESSION));
+
+        assertNotNull(copyColumn("deleted_at", OffsetDateTime.class, DOM_CASMURRO_ACCESSION));
+    }
+
+    @Test
+    @DisplayName("Volta a aparecer nas consultas e no resumo do acervo depois de reativado")
+    void showsReactivatedBook_inQueriesAndSummary() throws Exception {
+        markBookDeleted(domCasmurro);
+
+        postBook(registerBookJson(romance.getId(), DOM_CASMURRO_ISBN, DOM_CASMURRO_ACCESSION, "[]"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/books/management").param("q", "livro de teste"))
+                .andExpect(jsonPath("$.content.length()").value(1));
+        mockMvc.perform(get("/books/management/summary"))
+                .andExpect(jsonPath("$.totalBooks").value(2))
+                .andExpect(jsonPath("$.totalCopies").value(2));
+    }
+
+    @Test
+    @DisplayName("Retorna 409 e mantém o livro excluído quando o tombo pertence a exemplar ativo de outro livro")
+    void returnsConflictAndKeepsBookDeleted_whenAccessionNumberIsActiveInAnotherBook() throws Exception {
+        Integer bookId = domCasmurro.getId();
+        markBookDeleted(domCasmurro);
+
+        postBook(registerBookJson(romance.getId(), DOM_CASMURRO_ISBN, CLEAN_CODE_ACCESSION, "[]"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.accessionNumbers[0]").value(CLEAN_CODE_ACCESSION));
+
+        // O livro continua excluído: nada foi gravado
+        assertNotNull(jdbcTemplate.queryForObject(
+                "select deleted_at from books where id = ?", OffsetDateTime.class, bookId));
+    }
+
+    @Test
+    @DisplayName("Retorna 409 quando o tombo pertence a exemplar excluído de outro livro")
+    void returnsConflict_whenAccessionNumberBelongsToDeletedCopyOfAnotherBook_inRegistration() throws Exception {
+        Copy otherBookCopy = testData.saveCopy(cleanCode, "003", CopyStatus.AVAILABLE);
+        markCopyDeleted(otherBookCopy);
+        markBookDeleted(domCasmurro);
+
+        postBook(registerBookJson(romance.getId(), DOM_CASMURRO_ISBN, "003", "[]"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.accessionNumbers[0]").value("003"));
+
+        // O exemplar do outro livro não foi movido
+        assertEquals(cleanCode.getId(), copyColumn("book_id", Integer.class, "003"));
+    }
+
+    @Test
     @DisplayName("Retorna 422 e não grava livro nem autor quando a categoria não existe")
     void returnsUnprocessable_whenCategoryDoesNotExist() throws Exception {
         long authorsBefore = authorRepository.count();
