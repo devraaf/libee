@@ -24,6 +24,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -163,8 +164,8 @@ class BookRegistrationServiceTest {
     @DisplayName("Deve lançar BookAlreadyRegisteredException com o id quando o ISBN já está cadastrado")
     void shouldThrowWhenIsbnAlreadyRegistered() {
         Book existing = new Book();
-        existing.setId(42);
-        when(bookRepository.findByIsbnAndDeletedAtIsNull(ISBN)).thenReturn(Optional.of(existing));
+        existing.setId(42);   // livro ativo: deletedAt nulo
+        when(bookRepository.findByIsbn(ISBN)).thenReturn(Optional.of(existing));
 
         BookAlreadyRegisteredException exception = assertThrows(BookAlreadyRegisteredException.class,
                 () -> service.register(request(ISBN, List.of(), copy("0001"))));
@@ -177,7 +178,9 @@ class BookRegistrationServiceTest {
     @Test
     @DisplayName("Deve lançar AccessionNumberAlreadyRegisteredException quando o tombo já existe no banco")
     void shouldThrowWhenAccessionNumberExistsInDatabase() {
-        when(copyRepository.findExistingAccessionNumbers(any())).thenReturn(List.of("0002"));
+        Copy existing = new Copy();
+        existing.setAccessionNumber("0002");   // exemplar ativo: deletedAt nulo
+        when(copyRepository.findByAccessionNumberIn(any())).thenReturn(List.of(existing));
 
         AccessionNumberAlreadyRegisteredException exception = assertThrows(
                 AccessionNumberAlreadyRegisteredException.class,
@@ -217,5 +220,82 @@ class BookRegistrationServiceTest {
                 () -> service.register(request("abc", List.of(), copy("0001"))));
 
         verifyNoInteractions(bookRepository, copyRepository, authorRepository, categoryRepository);
+    }
+
+    // ---------- recadastro de livro excluído ----------
+
+    @Test
+    @DisplayName("Deve reativar o livro excluído com o mesmo id e substituir os dados pelos do request")
+    void shouldReactivateDeletedBookAndReplaceItsData() {
+        Book deleted = new Book();
+        deleted.setId(42);
+        deleted.setIsbn(ISBN);
+        deleted.setTitle("Título antigo");
+        deleted.setDeletedAt(Instant.now());
+        when(bookRepository.findByIsbn(ISBN)).thenReturn(Optional.of(deleted));
+        givenCategoryExists();
+        givenSaveAssignsId(42);
+
+        Integer id = service.register(request(ISBN, List.of(), copy("0001")));
+
+        assertEquals(42, id);
+        verify(bookRepository).saveAndFlush(bookCaptor.capture());
+        // A mesma linha foi reaproveitada, agora ativa e com os dados do request
+        assertSame(deleted, bookCaptor.getValue());
+        assertNull(deleted.getDeletedAt());
+        assertEquals("Fantastic Mr. Fox", deleted.getTitle());
+    }
+
+    @Test
+    @DisplayName("Deve reativar o exemplar excluído do mesmo livro em vez de criar outro")
+    void shouldReactivateDeletedCopyOfSameBook() {
+        Book deleted = new Book();
+        deleted.setId(42);
+        deleted.setDeletedAt(Instant.now());
+        Copy deletedCopy = new Copy();
+        deletedCopy.setBook(deleted);
+        deletedCopy.setAccessionNumber("0001");
+        deletedCopy.setPhysicalLocation("Estante antiga");
+        deletedCopy.setStatus(CopyStatus.ON_LOAN);
+        deletedCopy.setDeletedAt(Instant.now());
+        when(bookRepository.findByIsbn(ISBN)).thenReturn(Optional.of(deleted));
+        when(copyRepository.findByAccessionNumberIn(any())).thenReturn(List.of(deletedCopy));
+        givenCategoryExists();
+        givenSaveAssignsId(42);
+
+        service.register(request(ISBN, List.of(), copy("0001")));
+
+        assertNull(deletedCopy.getDeletedAt());
+        assertEquals("Estante A1", deletedCopy.getPhysicalLocation());
+        assertEquals(CopyStatus.AVAILABLE, deletedCopy.getStatus());
+        verify(copyRepository).saveAllAndFlush(copiesCaptor.capture());
+        assertTrue(copiesCaptor.getValue().isEmpty());   // nenhum exemplar novo foi criado
+    }
+
+    @Test
+    @DisplayName("Deve lançar AccessionNumberAlreadyRegisteredException e manter o livro excluído quando o tombo é de exemplar excluído de outro livro")
+    void shouldThrowAndKeepBookDeleted_whenAccessionNumberBelongsToDeletedCopyOfAnotherBook() {
+        Book deleted = new Book();
+        deleted.setId(42);
+        deleted.setDeletedAt(Instant.now());
+        Book anotherBook = new Book();
+        anotherBook.setId(99);
+        Copy copyOfAnotherBook = new Copy();
+        copyOfAnotherBook.setBook(anotherBook);
+        copyOfAnotherBook.setAccessionNumber("0001");
+        copyOfAnotherBook.setDeletedAt(Instant.now());
+        when(bookRepository.findByIsbn(ISBN)).thenReturn(Optional.of(deleted));
+        when(copyRepository.findByAccessionNumberIn(any())).thenReturn(List.of(copyOfAnotherBook));
+
+        AccessionNumberAlreadyRegisteredException exception = assertThrows(
+                AccessionNumberAlreadyRegisteredException.class,
+                () -> service.register(request(ISBN, List.of(), copy("0001"))));
+
+        assertEquals(List.of("0001"), exception.getAccessionNumbers());
+        // Nada foi gravado: o livro continua excluído e o exemplar do outro livro, intocado
+        assertNotNull(deleted.getDeletedAt());
+        assertNotNull(copyOfAnotherBook.getDeletedAt());
+        verify(bookRepository, never()).saveAndFlush(any());
+        verifyNoInteractions(categoryRepository, authorRepository);
     }
 }
