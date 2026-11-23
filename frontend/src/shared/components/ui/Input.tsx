@@ -8,6 +8,7 @@ export interface InputProps extends Omit<
   label?: string;
   error?: string;
   hint?: string;
+  density?: 'default' | 'compact';
   /** Elemento exibido no fim do campo (ex.: botão de mostrar senha). */
   trailing?: ReactNode;
   containerClassName?: string;
@@ -21,6 +22,7 @@ export function Input({
   error,
   hint,
   trailing,
+  density = 'default',
   id,
   className,
   containerClassName,
@@ -45,7 +47,9 @@ export function Input({
           aria-describedby={hasMessage ? messageId : undefined}
           className={cn(
             fieldBase,
-            'h-11 px-4',
+            density === 'compact'
+              ? 'h-auto rounded-lg px-3 py-2 type-small'
+              : 'h-11 px-4',
             trailing ? 'pr-11' : undefined,
             error
               ? 'border-danger focus:border-danger focus:ring-danger'

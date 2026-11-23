@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '../../../../shared/components/ui/Button';
 import { EmptyState } from '../../../../shared/components/ui/EmptyState';
-import { Loader } from '../../../../shared/components/ui/loader/Loader';
 import { PageHeader } from '../../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../../shared/components/ui/SearchFilterBar';
+import { Select } from '../../../../shared/components/ui/Select';
 import Modal from '../../../../shared/components/ui/Modal';
 import {
   createLoan,
@@ -14,7 +14,7 @@ import {
   type LoanSummaryDto,
   type ManagementLoanStatus,
 } from '../services/loans.service';
-import { mapActiveLoan, type LoanRecordItem } from '../utils/loan.mapper';
+import { mapActiveLoan } from '../utils/loan.mapper';
 import RegisterReturnForm, {
   type ReturnLoanDetails,
 } from '../../returns/components/RegisterReturnForm';
@@ -22,14 +22,17 @@ import RegisterLoanForm from '../components/RegisterLoanForm';
 import { LoanStats } from '../components/LoanStats';
 import { LoanTable } from '../components/LoanTable';
 import type { RegisterLoanFormData } from '../schemas/loan.schema';
+import { loanStatusPresentation } from '../utils/loan-status';
+import { LoadingState } from '../../shared/components/LoadingState';
+import { SuccessToast } from '../../shared/components/SuccessToast';
+import {
+  usePaginatedManagementList,
+  type ManagementListParams,
+} from '../../shared/hooks/usePaginatedManagementList';
+import { useTransientMessage } from '../../shared/hooks/useTransientMessage';
+import { getErrorMessage } from '../../shared/utils/error-message';
 
 const PAGE_SIZE = 10;
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : 'Não foi possível carregar os empréstimos.';
-}
 
 export default function LoanPage() {
   const [search, setSearch] = useState('');
@@ -37,52 +40,42 @@ export default function LoanPage() {
     '',
   );
   const [page, setPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loans, setLoans] = useState<LoanRecordItem[]>([]);
   const [stats, setStats] = useState<LoanSummaryDto | null>(null);
   const [selectedLoanForReturn, setSelectedLoanForReturn] =
     useState<ReturnLoanDetails | null>(null);
   const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [successToast, setSuccessToast] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const { message: successToast, setMessage: setSuccessToast } =
+    useTransientMessage();
 
-  useEffect(() => {
-    let active = true;
-    const timeoutId = window.setTimeout(() => {
-      async function loadLoans() {
-        setIsLoading(true);
-        setLoadError(null);
-        try {
-          const result = await listManagementLoans({
-            page,
-            size: PAGE_SIZE,
-            search,
-            status: statusFilter || undefined,
-          });
-          if (!active) return;
-          setLoans(result.content.map(mapActiveLoan));
-          setTotalItems(result.totalElements);
-          setTotalPages(Math.max(1, result.totalPages));
-        } catch (error) {
-          if (active) setLoadError(getErrorMessage(error));
-        } finally {
-          if (active) setIsLoading(false);
-        }
-      }
-
-      void loadLoans();
-    }, 250);
-
-    return () => {
-      active = false;
-      window.clearTimeout(timeoutId);
-    };
-  }, [page, refresh, search, statusFilter]);
+  const loadLoans = useCallback(
+    async ({ page, size, search }: ManagementListParams) => {
+      const result = await listManagementLoans({
+        page,
+        size,
+        search,
+        status: statusFilter || undefined,
+      });
+      return { ...result, content: result.content.map(mapActiveLoan) };
+    },
+    [statusFilter],
+  );
+  const {
+    items: loans,
+    totalItems,
+    totalPages,
+    isLoading,
+    error: loadError,
+  } = usePaginatedManagementList({
+    page,
+    size: PAGE_SIZE,
+    search,
+    refreshKey: refresh,
+    loadPage: loadLoans,
+    errorFallback: 'Não foi possível carregar os empréstimos.',
+  });
 
   useEffect(() => {
     let active = true;
@@ -94,7 +87,11 @@ export default function LoanPage() {
         }
       })
       .catch((error: unknown) => {
-        if (active) setSummaryError(getErrorMessage(error));
+        if (active) {
+          setSummaryError(
+            getErrorMessage(error, 'Não foi possível carregar os empréstimos.'),
+          );
+        }
       });
 
     return () => {
@@ -107,12 +104,6 @@ export default function LoanPage() {
     setSummaryError(null);
     setRefresh((current) => current + 1);
   }
-
-  useEffect(() => {
-    if (!successToast) return;
-    const timeoutId = window.setTimeout(() => setSuccessToast(null), 4000);
-    return () => window.clearTimeout(timeoutId);
-  }, [successToast]);
 
   function handleOpenReturnModal(loanId: number) {
     const loan = loans.find((item) => item.id === loanId);
@@ -131,7 +122,7 @@ export default function LoanPage() {
     setIsReturnModalOpen(false);
     setSelectedLoanForReturn(null);
     setSuccessToast(
-      `Devolução do tombo ${accessionNumber} registrada com sucesso!`,
+      `Devolução do tombo ${accessionNumber} registrada com sucesso.`,
     );
     refreshData();
   }
@@ -144,21 +135,14 @@ export default function LoanPage() {
     });
     setIsCreateModalOpen(false);
     setSuccessToast(
-      `Empréstimo do tombo ${data.accessionNumber.trim()} registrado com sucesso!`,
+      `Empréstimo do tombo ${data.accessionNumber.trim()} registrado com sucesso.`,
     );
     refreshData();
   }
 
   return (
     <section className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8">
-      {successToast && (
-        <div
-          role="status"
-          className="fixed bottom-5 right-5 z-50 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg transition-all"
-        >
-          {successToast}
-        </div>
-      )}
+      <SuccessToast message={successToast} />
 
       <PageHeader
         title="Empréstimos"
@@ -189,34 +173,32 @@ export default function LoanPage() {
           setPage(1);
         }}
         filterContent={
-          <label className="flex flex-col gap-2 text-sm text-fg">
-            Situação
-            <select
-              value={statusFilter}
-              onChange={(event) => {
-                setStatusFilter(
-                  event.target.value as '' | ManagementLoanStatus,
-                );
-                setPage(1);
-              }}
-              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
-            >
-              <option value="">Todas as situações</option>
-              <option value="ON_TIME">Em dia</option>
-              <option value="OVERDUE">Atrasado</option>
-            </select>
-          </label>
+          <Select
+            density="compact"
+            label="Situação"
+            value={statusFilter}
+            onChange={(event) => {
+              setStatusFilter(event.target.value as '' | ManagementLoanStatus);
+              setPage(1);
+            }}
+            placeholder="Todas as situações"
+            placeholderDisabled={false}
+            options={[
+              {
+                value: 'ON_TIME',
+                label: loanStatusPresentation.ON_TIME.label,
+              },
+              {
+                value: 'OVERDUE',
+                label: loanStatusPresentation.OVERDUE.label,
+              },
+            ]}
+          />
         }
       />
 
       {isLoading ? (
-        <div
-          className="flex min-h-48 items-center justify-center"
-          role="status"
-          aria-label="Carregando empréstimos"
-        >
-          <Loader />
-        </div>
+        <LoadingState label="Carregando empréstimos" />
       ) : loadError ? (
         <EmptyState
           title="Não foi possível carregar os empréstimos."

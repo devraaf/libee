@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { Button } from '../../../../shared/components/ui/Button';
 import { EmptyState } from '../../../../shared/components/ui/EmptyState';
-import { Loader } from '../../../../shared/components/ui/loader/Loader';
 import Modal from '../../../../shared/components/ui/Modal';
 import { PageHeader } from '../../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../../shared/components/ui/SearchFilterBar';
@@ -20,64 +19,45 @@ import {
   type ReturnRecordItem,
 } from '../../loans/utils/loan.mapper';
 import RegisterReturnForm from '../components/RegisterReturnForm';
+import {
+  usePaginatedManagementList,
+  type ManagementListParams,
+} from '../../shared/hooks/usePaginatedManagementList';
+import { useTransientMessage } from '../../shared/hooks/useTransientMessage';
+import { LoadingState } from '../../shared/components/LoadingState';
+import { SuccessToast } from '../../shared/components/SuccessToast';
 
 const PAGE_SIZE = 10;
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : 'Não foi possível carregar as devoluções.';
-}
 
 export default function ReturnsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [returns, setReturns] = useState<ReturnRecordItem[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
+  const { message: successMessage, setMessage: setSuccessMessage } =
+    useTransientMessage();
 
-  useEffect(() => {
-    let active = true;
-    const timeoutId = window.setTimeout(() => {
-      async function loadReturnData() {
-        setIsLoading(true);
-        setLoadError(null);
-        try {
-          const result = await listReturnedLoans({
-            page,
-            size: PAGE_SIZE,
-            search,
-          });
-          if (!active) return;
-          setReturns(result.content.map(mapReturnedLoan));
-          setTotalItems(result.totalElements);
-          setTotalPages(Math.max(1, result.totalPages));
-        } catch (error) {
-          if (active) setLoadError(getErrorMessage(error));
-        } finally {
-          if (active) setIsLoading(false);
-        }
-      }
-
-      void loadReturnData();
-    }, 250);
-
-    return () => {
-      active = false;
-      window.clearTimeout(timeoutId);
-    };
-  }, [page, refresh, search]);
-
-  useEffect(() => {
-    if (!successMessage) return;
-    const timeoutId = window.setTimeout(() => setSuccessMessage(null), 4000);
-    return () => window.clearTimeout(timeoutId);
-  }, [successMessage]);
+  const loadReturns = useCallback(
+    async ({ page, size, search }: ManagementListParams) => {
+      const result = await listReturnedLoans({ page, size, search });
+      return { ...result, content: result.content.map(mapReturnedLoan) };
+    },
+    [],
+  );
+  const {
+    items: returns,
+    totalItems,
+    totalPages,
+    isLoading,
+    error: loadError,
+  } = usePaginatedManagementList({
+    page,
+    size: PAGE_SIZE,
+    search,
+    refreshKey: refresh,
+    loadPage: loadReturns,
+    errorFallback: 'Não foi possível carregar as devoluções.',
+  });
 
   function handleOpenForm() {
     setSuccessMessage(null);
@@ -126,6 +106,8 @@ export default function ReturnsPage() {
   return (
     <>
       <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8">
+        <SuccessToast message={successMessage} />
+
         <PageHeader
           title="Devoluções"
           subtitle="Registre e consulte as devoluções da biblioteca"
@@ -139,13 +121,6 @@ export default function ReturnsPage() {
             </Button>
           }
         />
-
-        {successMessage && (
-          <p className="type-small text-ok" role="status">
-            {successMessage}
-          </p>
-        )}
-
         <SearchFilterBar
           placeholder="Pesquise por leitor, livro ou tombo..."
           value={search}
@@ -156,13 +131,7 @@ export default function ReturnsPage() {
         />
 
         {isLoading ? (
-          <div
-            className="flex min-h-48 items-center justify-center"
-            role="status"
-            aria-label="Carregando devoluções"
-          >
-            <Loader />
-          </div>
+          <LoadingState label="Carregando devoluções" />
         ) : loadError ? (
           <EmptyState
             title="Não foi possível carregar as devoluções."

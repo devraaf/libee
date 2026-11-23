@@ -1,5 +1,12 @@
 import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
 import { Button } from '../../../../shared/components/ui/Button';
+import { Input } from '../../../../shared/components/ui/Input';
+import {
+  returnFormSchema,
+  type ReturnFormValues,
+} from '../schemas/return.schema';
 
 export interface ReturnLoanDetails {
   loanId: number;
@@ -19,21 +26,22 @@ export default function RegisterReturnForm({
   onCancel,
   onConfirm,
 }: RegisterReturnFormProps) {
-  const [accessionNumber, setAccessionNumber] = useState(loan?.copyCode ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ReturnFormValues>({
+    resolver: zodResolver(returnFormSchema),
+    defaultValues: { copyCode: loan?.copyCode ?? '' },
+  });
 
-  async function handleConfirm() {
-    const trimmedAccessionNumber = accessionNumber.trim();
-    if (!trimmedAccessionNumber) {
-      setSubmitError('Informe o tombo do exemplar.');
-      return;
-    }
-
+  async function handleConfirm({ copyCode }: ReturnFormValues) {
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      await onConfirm(trimmedAccessionNumber);
+      await onConfirm(copyCode);
     } catch (error) {
       setSubmitError(
         error instanceof Error
@@ -46,7 +54,11 @@ export default function RegisterReturnForm({
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <form
+      onSubmit={handleSubmit(handleConfirm)}
+      className="flex flex-col gap-6"
+      noValidate
+    >
       {loan ? (
         <p className="type-small text-fg">
           Devolver <strong className="font-semibold">"{loan.title}"</strong>{' '}
@@ -56,22 +68,15 @@ export default function RegisterReturnForm({
           O exemplar voltará a ficar disponível.
         </p>
       ) : (
-        <div>
-          <label
-            htmlFor="return-accession-number"
-            className="type-label mb-1 block text-fg"
-          >
-            Tombo do exemplar
-          </label>
-          <input
-            id="return-accession-number"
-            type="text"
-            value={accessionNumber}
-            onChange={(event) => setAccessionNumber(event.target.value)}
-            placeholder="Informe o tombo do exemplar"
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-subtle focus:border-primary focus:outline-none"
-          />
-        </div>
+        <Input
+          id="return-accession-number"
+          type="text"
+          {...register('copyCode')}
+          density="compact"
+          label="Tombo do exemplar"
+          placeholder="Informe o tombo do exemplar"
+          error={errors.copyCode?.message}
+        />
       )}
 
       {submitError && (
@@ -89,14 +94,10 @@ export default function RegisterReturnForm({
         >
           Cancelar
         </Button>
-        <Button
-          type="button"
-          onClick={() => void handleConfirm()}
-          disabled={isSubmitting}
-        >
+        <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? 'Registrando...' : 'Confirmar'}
         </Button>
       </div>
-    </div>
+    </form>
   );
 }

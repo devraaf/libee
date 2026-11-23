@@ -3,9 +3,17 @@ import type {
   ActiveLoanDto,
   ReturnedLoanDto,
 } from '@/features/librarian/loans/services/loans.service';
-import type { LoanTableItem } from '../components/LoanTable';
+import type { LoanStatus } from '@/shared/types/library';
 
-export interface LoanRecordItem extends LoanTableItem {}
+export interface LoanRecordItem {
+  id: number;
+  title: string;
+  accessionNumber: string;
+  readerName: string;
+  loanDate: string;
+  dueDate: string;
+  status: LoanStatus;
+}
 
 export interface ReturnRecordItem {
   id: number;

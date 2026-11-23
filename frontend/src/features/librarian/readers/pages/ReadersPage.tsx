@@ -1,29 +1,30 @@
 import type { RegisteredReader } from '@/features/auth/services/auth.service';
 import { Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '../../../../shared/components/ui/Button';
 import { EmptyState } from '../../../../shared/components/ui/EmptyState';
-import { Loader } from '../../../../shared/components/ui/loader/Loader';
 import { PageHeader } from '../../../../shared/components/ui/PageHeader';
 import SearchFilterBar from '../../../../shared/components/ui/SearchFilterBar';
+import { Select } from '../../../../shared/components/ui/Select';
 import type { AffiliationType } from '../../../../shared/schemas/enums.schema';
 import { ReaderStats } from '../components/ReadersStats';
 import { ReadersTable } from '../components/ReadersTable';
 import RegisterReaderModal from '../components/RegisterReaderModal';
+import { LoadingState } from '../../shared/components/LoadingState';
 import {
   getReaderManagementSummary,
   listManagementReaders,
-  type ManagementReaderDto,
   type ManagementReaderStatus,
 } from '../services/readers.service';
+import {
+  usePaginatedManagementList,
+  type ManagementListParams,
+} from '../../shared/hooks/usePaginatedManagementList';
+import { useTransientMessage } from '../../shared/hooks/useTransientMessage';
+import { getErrorMessage } from '../../shared/utils/error-message';
+import { SuccessToast } from '../../shared/components/SuccessToast';
 
 const PAGE_SIZE = 10;
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : 'Não foi possível carregar os leitores.';
-}
 
 export default function ReadersPage() {
   const [search, setSearch] = useState('');
@@ -34,54 +35,42 @@ export default function ReadersPage() {
     '',
   );
   const [page, setPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [readers, setReaders] = useState<ManagementReaderDto[]>([]);
   const [stats, setStats] = useState<{
     totalReaders: number;
     onLoan: number;
     pending: number;
   } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const { message: successMessage, setMessage: setSuccessMessage } =
+    useTransientMessage();
 
-  useEffect(() => {
-    let active = true;
-    const timeoutId = window.setTimeout(() => {
-      async function loadReaderData() {
-        setIsLoading(true);
-        setLoadError(null);
-        try {
-          const result = await listManagementReaders({
-            page,
-            size: PAGE_SIZE,
-            search,
-            affiliationType: affiliationFilter || undefined,
-            status: statusFilter || undefined,
-          });
-          if (!active) return;
-          setReaders(result.content);
-          setTotalItems(result.totalElements);
-          setTotalPages(Math.max(result.totalPages, 1));
-        } catch (error) {
-          if (active) setLoadError(getErrorMessage(error));
-        } finally {
-          if (active) setIsLoading(false);
-        }
-      }
-
-      void loadReaderData();
-    }, 250);
-
-    return () => {
-      active = false;
-      window.clearTimeout(timeoutId);
-    };
-  }, [affiliationFilter, page, refresh, search, statusFilter]);
+  const loadReaders = useCallback(
+    ({ page, size, search }: ManagementListParams) =>
+      listManagementReaders({
+        page,
+        size,
+        search,
+        affiliationType: affiliationFilter || undefined,
+        status: statusFilter || undefined,
+      }),
+    [affiliationFilter, statusFilter],
+  );
+  const {
+    items: readers,
+    totalItems,
+    totalPages,
+    isLoading,
+    error: loadError,
+  } = usePaginatedManagementList({
+    page,
+    size: PAGE_SIZE,
+    search,
+    refreshKey: refresh,
+    loadPage: loadReaders,
+    errorFallback: 'Não foi possível carregar os leitores.',
+  });
 
   useEffect(() => {
     let active = true;
@@ -97,7 +86,11 @@ export default function ReadersPage() {
         }
       })
       .catch((error: unknown) => {
-        if (active) setSummaryError(getErrorMessage(error));
+        if (active) {
+          setSummaryError(
+            getErrorMessage(error, 'Não foi possível carregar os leitores.'),
+          );
+        }
       });
 
     return () => {
@@ -121,14 +114,10 @@ export default function ReadersPage() {
     setSuccessMessage(`Leitor "${reader.name}" cadastrado com sucesso.`);
   }
 
-  useEffect(() => {
-    if (!successMessage) return;
-    const timeoutId = window.setTimeout(() => setSuccessMessage(null), 4000);
-    return () => window.clearTimeout(timeoutId);
-  }, [successMessage]);
-
   return (
     <section className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8">
+      <SuccessToast message={successMessage} />
+
       <PageHeader
         title="Leitores"
         subtitle="Consulte os leitores cadastrados"
@@ -142,13 +131,6 @@ export default function ReadersPage() {
           </Button>
         }
       />
-
-      {successMessage && (
-        <p className="type-small text-ok" role="status">
-          {successMessage}
-        </p>
-      )}
-
       <ReaderStats {...(stats ?? {})} />
       {summaryError && (
         <p className="type-small text-danger" role="alert">
@@ -165,53 +147,47 @@ export default function ReadersPage() {
         }}
         filterContent={
           <div className="flex flex-col gap-4">
-            <label className="flex flex-col gap-2 text-sm text-fg">
-              Vínculo
-              <select
-                value={affiliationFilter}
-                onChange={(event) => {
-                  setAffiliationFilter(
-                    event.target.value as '' | AffiliationType,
-                  );
-                  setPage(1);
-                }}
-                className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
-              >
-                <option value="">Todos os vínculos</option>
-                <option value="STUDENT">Estudante</option>
-                <option value="EMPLOYEE">Funcionário</option>
-                <option value="PROFESSOR">Professor</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-2 text-sm text-fg">
-              Situação
-              <select
-                value={statusFilter}
-                onChange={(event) => {
-                  setStatusFilter(
-                    event.target.value as '' | ManagementReaderStatus,
-                  );
-                  setPage(1);
-                }}
-                className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
-              >
-                <option value="">Todas as situações</option>
-                <option value="REGULAR">Em dia</option>
-                <option value="PENDING">Com pendência</option>
-              </select>
-            </label>
+            <Select
+              density="compact"
+              label="Vínculo"
+              value={affiliationFilter}
+              onChange={(event) => {
+                setAffiliationFilter(
+                  event.target.value as '' | AffiliationType,
+                );
+                setPage(1);
+              }}
+              placeholder="Todos os vínculos"
+              placeholderDisabled={false}
+              options={[
+                { value: 'STUDENT', label: 'Estudante' },
+                { value: 'EMPLOYEE', label: 'Funcionário' },
+                { value: 'PROFESSOR', label: 'Professor' },
+              ]}
+            />
+            <Select
+              density="compact"
+              label="Situação"
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(
+                  event.target.value as '' | ManagementReaderStatus,
+                );
+                setPage(1);
+              }}
+              placeholder="Todas as situações"
+              placeholderDisabled={false}
+              options={[
+                { value: 'REGULAR', label: 'Em dia' },
+                { value: 'PENDING', label: 'Com pendência' },
+              ]}
+            />
           </div>
         }
       />
 
       {isLoading ? (
-        <div
-          className="flex min-h-48 items-center justify-center"
-          role="status"
-          aria-label="Carregando leitores"
-        >
-          <Loader />
-        </div>
+        <LoadingState label="Carregando leitores" />
       ) : loadError ? (
         <EmptyState
           title="Não foi possível carregar os leitores."

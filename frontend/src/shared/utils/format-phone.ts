@@ -12,3 +12,7 @@ export function maskPhone(value: string): string {
   }
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
+
+export function normalizePhone(value: string): string {
+  return value.replace(/\D/g, '');
+}

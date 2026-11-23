@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { Badge } from '../../../../shared/components/ui/Badge';
 import { Button } from '../../../../shared/components/ui/Button';
 import { IconButton } from '../../../../shared/components/ui/IconButton';
+import { Input } from '../../../../shared/components/ui/Input';
 import { dateFromToday } from '../../../../shared/utils/date';
 import RegisterReaderModal from '../../readers/components/RegisterReaderModal';
 import type { RegisteredReader } from '@/features/auth/services/auth.service';
@@ -16,21 +17,13 @@ import {
   registerLoanSchema,
   type RegisterLoanFormData,
 } from '../schemas/loan.schema';
+import { getErrorMessage } from '../../shared/utils/error-message';
 
 interface RegisterLoanFormProps {
   onCancel: () => void;
   onConfirm: (data: RegisterLoanFormData) => Promise<void>;
 }
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : 'Não foi possível concluir a operação.';
-}
-
-const fieldClass =
-  'w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-subtle focus:border-primary focus:outline-none';
-const labelClass = 'type-label mb-1 block text-fg';
 const errorClass = 'type-caption mt-1 block text-danger';
 
 const readerStatusLabel: Record<LoanReaderOption['status'], string> = {
@@ -88,7 +81,9 @@ export default function RegisterLoanForm({
         .catch((error: unknown) => {
           if (!active) return;
           setReaderSuggestions([]);
-          setReaderSearchError(getErrorMessage(error));
+          setReaderSearchError(
+            getErrorMessage(error, 'Não foi possível concluir a operação.'),
+          );
         })
         .finally(() => {
           if (active) setIsSearchingReader(false);
@@ -140,7 +135,9 @@ export default function RegisterLoanForm({
     try {
       await onConfirm(data);
     } catch (error) {
-      setSubmitError(getErrorMessage(error));
+      setSubmitError(
+        getErrorMessage(error, 'Não foi possível concluir a operação.'),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -152,36 +149,32 @@ export default function RegisterLoanForm({
       className="flex flex-col gap-4"
     >
       <div>
-        <label htmlFor={`${formId}-reader`} className={labelClass}>
-          Leitor (nome ou e-mail)
-        </label>
-        <div className="relative">
-          <input
-            id={`${formId}-reader`}
-            type="text"
-            value={readerSearch}
-            onChange={(event) => handleReaderSearchChange(event.target.value)}
-            placeholder="Digite o nome ou e-mail do leitor"
-            autoComplete="off"
-            role="combobox"
-            aria-autocomplete="list"
-            aria-expanded={readerSuggestions.length > 0}
-            aria-controls={`${formId}-reader-suggestions`}
-            className={`${fieldClass} ${readerSearch ? 'pr-11' : ''}`}
-          />
-          {readerSearch && (
-            <IconButton
-              label="Limpar leitor"
-              icon={<X size={16} aria-hidden="true" />}
-              size="sm"
-              onClick={() => handleReaderSearchChange('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-fg"
-            />
-          )}
-        </div>
-        {errors.readerId && (
-          <span className={errorClass}>{errors.readerId.message}</span>
-        )}
+        <Input
+          id={`${formId}-reader`}
+          type="text"
+          density="compact"
+          label="Leitor (nome ou e-mail)"
+          value={readerSearch}
+          onChange={(event) => handleReaderSearchChange(event.target.value)}
+          placeholder="Digite o nome ou e-mail do leitor"
+          autoComplete="off"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={readerSuggestions.length > 0}
+          aria-controls={`${formId}-reader-suggestions`}
+          trailing={
+            readerSearch ? (
+              <IconButton
+                label="Limpar leitor"
+                icon={<X size={16} aria-hidden="true" />}
+                size="sm"
+                onClick={() => handleReaderSearchChange('')}
+                className="text-muted hover:text-fg"
+              />
+            ) : undefined
+          }
+          error={errors.readerId?.message}
+        />
         {isSearchingReader && (
           <p className="type-caption mt-1 text-muted" role="status">
             Buscando leitores...
@@ -282,35 +275,27 @@ export default function RegisterLoanForm({
       )}
 
       <div>
-        <label htmlFor={`${formId}-accession-number`} className={labelClass}>
-          Tombo do exemplar
-        </label>
-        <input
+        <Input
           id={`${formId}-accession-number`}
           {...register('accessionNumber')}
           type="text"
+          density="compact"
+          label="Tombo do exemplar"
           placeholder="Digite o tombo do exemplar"
-          className={fieldClass}
+          error={errors.accessionNumber?.message}
         />
-        {errors.accessionNumber && (
-          <span className={errorClass}>{errors.accessionNumber.message}</span>
-        )}
       </div>
 
       <div>
-        <label htmlFor={`${formId}-due-date`} className={labelClass}>
-          Devolução prevista
-        </label>
-        <input
+        <Input
           id={`${formId}-due-date`}
           {...register('dueDate')}
           type="date"
+          density="compact"
+          label="Devolução prevista"
           min={dateFromToday(1)}
-          className={fieldClass}
+          error={errors.dueDate?.message}
         />
-        {errors.dueDate && (
-          <span className={errorClass}>{errors.dueDate.message}</span>
-        )}
       </div>
 
       {submitError && (

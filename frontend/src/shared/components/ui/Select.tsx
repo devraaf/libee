@@ -14,8 +14,10 @@ export interface SelectProps extends Omit<
 > {
   label?: string;
   error?: string;
+  density?: 'default' | 'compact';
   options: SelectOption[];
   placeholder?: string;
+  placeholderDisabled?: boolean;
   containerClassName?: string;
 }
 
@@ -24,9 +26,11 @@ export function Select({
   error,
   options,
   placeholder = 'Selecione',
+  placeholderDisabled = true,
   id,
   className,
   containerClassName,
+  density = 'default',
   defaultValue,
   value,
   ...rest
@@ -48,14 +52,16 @@ export function Select({
           aria-invalid={error ? true : undefined}
           className={cn(
             fieldBase,
-            'h-11 cursor-pointer appearance-none pl-4 pr-10',
+            density === 'compact'
+              ? 'h-auto cursor-pointer appearance-none rounded-lg px-3 py-2 pr-9 type-small'
+              : 'h-11 cursor-pointer appearance-none pl-4 pr-10',
             error ? 'border-danger' : 'border-line',
             className,
           )}
           {...(controlled ? { value } : { defaultValue: defaultValue ?? '' })}
           {...rest}
         >
-          <option value="" disabled>
+          <option value="" disabled={placeholderDisabled}>
             {placeholder}
           </option>
           {options.map((option) => (

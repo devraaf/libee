@@ -11,18 +11,13 @@ import { Button } from '@/shared/components/ui/Button';
 import { EmptyState } from '@/shared/components/ui/EmptyState';
 import Modal from '@/shared/components/ui/Modal';
 import type { Course } from '@/shared/types/library';
+import { getErrorMessage } from '../../shared/utils/error-message';
 
 interface RegisterReaderModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: (reader: RegisteredReader) => void;
   initialValue?: string;
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : 'Não foi possível carregar os cursos.';
 }
 
 function compatibleEmail(value: string | undefined): string {
@@ -53,7 +48,11 @@ export default function RegisterReaderModal({
         }
       })
       .catch((error: unknown) => {
-        if (active) setCoursesError(getErrorMessage(error));
+        if (active) {
+          setCoursesError(
+            getErrorMessage(error, 'Não foi possível carregar os cursos.'),
+          );
+        }
       })
       .finally(() => {
         if (active) setIsLoadingCourses(false);

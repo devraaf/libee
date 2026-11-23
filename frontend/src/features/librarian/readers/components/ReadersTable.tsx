@@ -9,7 +9,10 @@ import {
   Table,
   type TableColumn,
 } from '../../../../shared/components/ui/Table';
-import type { ManagementReaderDto, ManagementReaderStatus } from '../services/readers.service';
+import type {
+  ManagementReaderDto,
+  ManagementReaderStatus,
+} from '../services/readers.service';
 import { maskPhone } from '@/shared/utils/format-phone';
 
 export interface ReaderTableProps {

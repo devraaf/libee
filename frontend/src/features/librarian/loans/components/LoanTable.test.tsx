@@ -30,6 +30,7 @@ describe('LoanTable', () => {
     expect(screen.getByText('Clean Code')).toBeTruthy();
     expect(screen.getByText('T-001')).toBeTruthy();
     expect(screen.getByText('Ana Silva')).toBeTruthy();
+    expect(screen.getByText('Em dia')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '2' }));
     expect(onPageChange).toHaveBeenCalledWith(2);
   });

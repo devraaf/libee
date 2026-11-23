@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizePhone } from '@/shared/utils/format-phone';
 
 export type ReaderBond = 'student' | 'teacher' | 'staff';
 
@@ -15,18 +16,16 @@ export const createReaderSchema = z
       .string()
       .min(1, 'Informe o e-mail.')
       .email('Informe um e-mail válido.'),
-    phone: z
-      .string()
-      .refine(
-        (val) => {
-          if (val.trim() === '') return true;
-          const numbersOnly = val.replace(/\D/g, '');
-          return numbersOnly.length === 10 || numbersOnly.length === 11;
-        },
-        {
-          message: 'Informe um telefone válido com DDD (10 ou 11 dígitos).',
-        },
-      ),
+    phone: z.string().refine(
+      (val) => {
+        if (val.trim() === '') return true;
+        const numbersOnly = normalizePhone(val);
+        return numbersOnly.length === 10 || numbersOnly.length === 11;
+      },
+      {
+        message: 'Informe um telefone válido com DDD (10 ou 11 dígitos).',
+      },
+    ),
     bond: z.enum(['student', 'teacher', 'staff'], {
       message: 'Selecione o tipo de vínculo.',
     }),
