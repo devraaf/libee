@@ -15,7 +15,7 @@ export interface BookCollectionItem {
   isbn: string;
   category: string;
   copies: number;
-  hasActiveLoan: boolean;
+  availableCopies: number;
   coverImageUrl: string | null;
 }
 
@@ -84,8 +84,14 @@ export function BookCollectionTable({
     {
       key: 'copies',
       header: 'Exemplares',
-      align: 'right',
+      align: 'center',
       render: (book) => book.copies,
+    },
+    {
+      key: 'availableCopies',
+      header: 'Disponíveis',
+      align: 'center',
+      render: (book) => book.availableCopies,
     },
     {
       key: 'actions',
@@ -105,13 +111,13 @@ export function BookCollectionTable({
             icon={<X size={14} aria-hidden="true" />}
             variant="table"
             size="table"
+            disabled={book.copies > book.availableCopies}
             onClick={() => onDeleteBook?.(book)}
             title={
-              book.hasActiveLoan
-                ? 'Não é possível excluir um livro com empréstimo ativo.'
+              book.copies > book.availableCopies
+                ? 'Não é possível excluir o livro enquanto houver exemplares emprestados.'
                 : `Excluir ${book.title}`
             }
-            disabled={book.hasActiveLoan}
           />
         </div>
       ),

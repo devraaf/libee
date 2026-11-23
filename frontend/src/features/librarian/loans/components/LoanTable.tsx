@@ -5,24 +5,12 @@ import {
   type TableColumn,
 } from '../../../../shared/components/ui/Table';
 import { Pagination } from '../../../../shared/components/ui/Pagination';
-import {
-  Badge,
-  type BadgeVariant,
-} from '../../../../shared/components/ui/Badge';
-import type { LoanStatus } from '../../../../shared/types/library';
-
-export interface LoanTableItem {
-  id: number;
-  title: string;
-  accessionNumber: string;
-  readerName: string;
-  loanDate: string;
-  dueDate: string;
-  status: LoanStatus;
-}
+import { Badge } from '../../../../shared/components/ui/Badge';
+import type { LoanRecordItem } from '../utils/loan.mapper';
+import { loanStatusPresentation } from '../utils/loan-status';
 
 export interface LoanTableProps {
-  loans: LoanTableItem[];
+  loans: LoanRecordItem[];
   page: number;
   totalItems: number;
   totalPages: number;
@@ -30,18 +18,6 @@ export interface LoanTableProps {
   onPageChange: (page: number) => void;
   onReturn: (loanId: number) => void;
 }
-
-const statusLabels: Record<LoanStatus, string> = {
-  ON_TIME: 'Em dia',
-  OVERDUE: 'Atrasado',
-  RETURNED: 'Devolvido',
-};
-
-const statusVariants: Record<LoanStatus, BadgeVariant> = {
-  ON_TIME: 'success',
-  OVERDUE: 'danger',
-  RETURNED: 'neutral',
-};
 
 export function LoanTable({
   loans,
@@ -55,7 +31,7 @@ export function LoanTable({
   const summary = `Mostrando ${loans.length} de ${totalItems} ${
     totalItems === 1 ? 'empréstimo' : 'empréstimos'
   }`;
-  const columns: TableColumn<LoanTableItem>[] = [
+  const columns: TableColumn<LoanRecordItem>[] = [
     {
       key: 'title',
       header: 'Título',
@@ -65,7 +41,9 @@ export function LoanTable({
     {
       key: 'accessionNumber',
       header: 'Tombo',
-      render: (loan) => loan.accessionNumber,
+      render: (loan) => (
+        <span className="font-mono">{loan.accessionNumber}</span>
+      ),
     },
     {
       key: 'reader',
@@ -87,8 +65,8 @@ export function LoanTable({
       key: 'status',
       header: 'Situação',
       render: (loan) => (
-        <Badge variant={statusVariants[loan.status]}>
-          {statusLabels[loan.status]}
+        <Badge variant={loanStatusPresentation[loan.status].variant}>
+          {loanStatusPresentation[loan.status].label}
         </Badge>
       ),
     },

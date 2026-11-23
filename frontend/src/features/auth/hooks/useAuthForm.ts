@@ -1,5 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { z } from 'zod';
+import { ApiError } from '@/shared/api/api-error';
 
 type StringFormValues = Record<string, string>;
 
@@ -57,11 +58,34 @@ export function useAuthForm<
         setErrors({});
         setFormError(null);
       } catch (error) {
-        setFormError(
-          error instanceof Error
-            ? error.message
-            : 'Não foi possível concluir a operação. Tente novamente.',
-        );
+        if (error instanceof ApiError && error.status === 400) {
+          const fieldErrors: Partial<Record<keyof TValues, string>> = {};
+          const unmappedErrors: string[] = [];
+
+          error.errors.forEach(({ field, message }) => {
+            if (Object.prototype.hasOwnProperty.call(initialValues, field)) {
+              const formField = field as keyof TValues;
+              fieldErrors[formField] ??= message;
+            } else {
+              unmappedErrors.push(message);
+            }
+          });
+
+          setErrors((previous) => ({ ...previous, ...fieldErrors }));
+          setFormError(
+            unmappedErrors.length > 0
+              ? unmappedErrors.join(' ')
+              : error.errors.length > 0
+                ? null
+                : error.message,
+          );
+        } else {
+          setFormError(
+            error instanceof Error
+              ? error.message
+              : 'Não foi possível concluir a operação. Tente novamente.',
+          );
+        }
       }
     } finally {
       isSubmitting.current = false;

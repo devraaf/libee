@@ -1,10 +1,11 @@
 import { useId, useState, type FormEvent } from 'react';
-import { ChevronDown } from 'lucide-react';
 import { Button } from '../../../../shared/components/ui/Button';
+import { Input } from '../../../../shared/components/ui/Input';
+import { Select } from '../../../../shared/components/ui/Select';
+import { maskPhone, normalizePhone } from '@/shared/utils/format-phone';
 import {
   bondLabels,
   createReaderSchema,
-  maskPhone,
   type ReaderBond,
   type ReaderFormValues,
 } from '../types/reader.model';
@@ -28,8 +29,6 @@ const initialValues: FormState = {
 
 const bondOptions = Object.keys(bondLabels) as ReaderBond[];
 
-const inputClass =
-  'w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-subtle focus:border-primary focus:outline-none';
 const labelClass = 'mb-1 block type-label text-fg';
 const errorClass = 'mt-1 type-caption text-danger';
 
@@ -77,7 +76,10 @@ export default function CreateReaderForm({
     setErrors({});
     setIsSubmitting(true);
     try {
-      await onSubmit?.(result.data);
+      await onSubmit?.({
+        ...result.data,
+        phone: normalizePhone(result.data.phone),
+      });
       onCancel();
     } catch (error) {
       setFormError(
@@ -92,49 +94,37 @@ export default function CreateReaderForm({
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-      <div>
-        <label htmlFor={`${id}-name`} className={labelClass}>
-          Nome
-        </label>
-        <input
-          id={`${id}-name`}
-          type="text"
-          autoFocus
-          value={values.name}
-          onChange={(e) => setField('name', e.target.value)}
-          className={inputClass}
-        />
-        {errors.name && <p className={errorClass}>{errors.name}</p>}
-      </div>
+      <Input
+        id={`${id}-name`}
+        type="text"
+        density="compact"
+        label="Nome"
+        autoFocus
+        value={values.name}
+        onChange={(e) => setField('name', e.target.value)}
+        error={errors.name}
+      />
 
-      <div>
-        <label htmlFor={`${id}-email`} className={labelClass}>
-          E-mail
-        </label>
-        <input
-          id={`${id}-email`}
-          type="email"
-          value={values.email}
-          onChange={(e) => setField('email', e.target.value)}
-          className={inputClass}
-        />
-        {errors.email && <p className={errorClass}>{errors.email}</p>}
-      </div>
+      <Input
+        id={`${id}-email`}
+        type="email"
+        density="compact"
+        label="E-mail"
+        value={values.email}
+        onChange={(e) => setField('email', e.target.value)}
+        error={errors.email}
+      />
 
-      <div>
-        <label htmlFor={`${id}-phone`} className={labelClass}>
-          Telefone
-        </label>
-        <input
-          id={`${id}-phone`}
-          type="tel"
-          placeholder="(11) 99999-9999"
-          value={values.phone}
-          onChange={(e) => setField('phone', maskPhone(e.target.value))}
-          className={inputClass}
-        />
-        {errors.phone && <p className={errorClass}>{errors.phone}</p>}
-      </div>
+      <Input
+        id={`${id}-phone`}
+        type="tel"
+        density="compact"
+        label="Telefone"
+        placeholder="(11) 99999-9999"
+        value={values.phone}
+        onChange={(e) => setField('phone', maskPhone(e.target.value))}
+        error={errors.phone}
+      />
 
       <fieldset>
         <legend className={labelClass}>Tipo vínculo</legend>
@@ -160,33 +150,19 @@ export default function CreateReaderForm({
       </fieldset>
 
       {isStudent && (
-        <div>
-          <label htmlFor={`${id}-course`} className={labelClass}>
-            Curso
-          </label>
-          <div className="relative">
-            <select
-              id={`${id}-course`}
-              value={values.course}
-              onChange={(e) => setField('course', e.target.value)}
-              className={`${inputClass} appearance-none pr-9 ${
-                values.course ? '' : 'text-subtle'
-              }`}
-            >
-              <option value="">Selecione</option>
-              {courseOptions.map((course) => (
-                <option key={course} value={course}>
-                  {course}
-                </option>
-              ))}
-            </select>
-            <ChevronDown
-              size={16}
-              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
-            />
-          </div>
-          {errors.course && <p className={errorClass}>{errors.course}</p>}
-        </div>
+        <Select
+          id={`${id}-course`}
+          label="Curso"
+          density="compact"
+          value={values.course}
+          onChange={(e) => setField('course', e.target.value)}
+          placeholder="Selecione"
+          options={courseOptions.map((course) => ({
+            value: course,
+            label: course,
+          }))}
+          error={errors.course}
+        />
       )}
 
       {formError && (

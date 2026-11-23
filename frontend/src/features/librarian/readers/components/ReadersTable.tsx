@@ -1,6 +1,4 @@
 import type { AffiliationType } from '../../../../shared/schemas/enums.schema';
-import type { Course } from '../../../../shared/types/library';
-import type { ReaderStatus } from '../types/readerStatus';
 import {
   Badge,
   type BadgeVariant,
@@ -11,19 +9,14 @@ import {
   Table,
   type TableColumn,
 } from '../../../../shared/components/ui/Table';
-
-export interface ReadersItem {
-  id: number;
-  name: string;
-  email: string;
-  affiliationType: AffiliationType;
-  course: Course | null;
-  activeLoans: number;
-  status: ReaderStatus;
-}
+import type {
+  ManagementReaderDto,
+  ManagementReaderStatus,
+} from '../services/readers.service';
+import { maskPhone } from '@/shared/utils/format-phone';
 
 export interface ReaderTableProps {
-  readers: ReadersItem[];
+  readers: ManagementReaderDto[];
   page: number;
   totalItems: number;
   totalPages: number;
@@ -36,13 +29,13 @@ const affiliationLabels: Record<AffiliationType, string> = {
   PROFESSOR: 'Professor',
 };
 
-const statusLabels: Record<ReaderStatus, string> = {
-  OK: 'Em dia',
+const statusLabels: Record<ManagementReaderStatus, string> = {
+  REGULAR: 'Em dia',
   PENDING: 'Com pendência',
 };
 
-const statusVariants: Record<ReaderStatus, BadgeVariant> = {
-  OK: 'success',
+const statusVariants: Record<ManagementReaderStatus, BadgeVariant> = {
+  REGULAR: 'success',
   PENDING: 'danger',
 };
 
@@ -56,12 +49,30 @@ export function ReadersTable({
   const summary = `Mostrando ${readers.length} de ${totalItems} ${
     totalItems === 1 ? 'leitor' : 'leitores'
   }`;
-  const columns: TableColumn<ReadersItem>[] = [
+  const columns: TableColumn<ManagementReaderDto>[] = [
     {
       key: 'name',
       header: 'Leitor',
       align: 'left',
-      render: (reader) => reader.name,
+      className: 'whitespace-nowrap',
+      render: (reader) => (
+        <span className="block max-w-55 truncate" title={reader.name}>
+          {reader.name}
+        </span>
+      ),
+    },
+    {
+      key: 'email',
+      header: 'E-mail',
+      align: 'left',
+      render: (reader) => reader.email,
+    },
+    {
+      key: 'phone',
+      header: 'Telefone',
+      align: 'left',
+      className: 'w-[145px] whitespace-nowrap',
+      render: (reader) => (reader.phone ? maskPhone(reader.phone) : '—'),
     },
     {
       key: 'affiliationType',
@@ -73,7 +84,7 @@ export function ReadersTable({
       key: 'course',
       header: 'Curso',
       align: 'left',
-      render: (reader) => reader.course?.name ?? '—',
+      render: (reader) => reader.courseName ?? '—',
     },
     {
       key: 'activeLoans',
@@ -112,7 +123,7 @@ export function ReadersTable({
         />
       }
       className="shadow-sm"
-      tableClassName="min-w-[760px]"
+      tableClassName="min-w-[760px] [&_th]:whitespace-nowrap"
     />
   );
 }

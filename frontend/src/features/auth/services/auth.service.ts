@@ -8,12 +8,20 @@ import {
 import type { LoginFormData, RegisterFormData } from '../schemas/auth.schema';
 import { httpClient } from '@/shared/api/http-client';
 import { ApiError } from '@/shared/api/api-error';
+import { normalizePhone } from '@/shared/utils/format-phone';
 
 export type AuthSession = StoredSession;
 
 interface LoginResponse {
   token: string;
   id: number;
+  profile: UserProfile;
+}
+
+export interface RegisteredReader {
+  id: number;
+  name: string;
+  email: string;
   profile: UserProfile;
 }
 
@@ -37,18 +45,24 @@ export async function login(data: LoginFormData): Promise<AuthSession> {
   }
 }
 
-export async function register(data: RegisterFormData): Promise<void> {
-  const phone = data.phone.replace(/\D/g, '');
+export async function register(
+  data: RegisterFormData,
+): Promise<RegisteredReader> {
+  const phone = normalizePhone(data.phone);
 
-  await httpClient.post('/auth/register', {
-    name: data.name,
-    email: data.email,
-    password: data.password,
-    phone: phone || undefined,
-    affiliationType: data.affiliationType,
-    courseId:
-      data.affiliationType === 'STUDENT' ? Number(data.courseId) : undefined,
-  });
+  const { data: reader } = await httpClient.post<RegisteredReader>(
+    '/auth/register',
+    {
+      name: data.name,
+      email: data.email,
+      password: data.password,
+      phone: phone || undefined,
+      affiliationType: data.affiliationType,
+      courseId:
+        data.affiliationType === 'STUDENT' ? Number(data.courseId) : undefined,
+    },
+  );
+  return reader;
 }
 
 export async function getCurrentSession(): Promise<AuthSession | null> {
