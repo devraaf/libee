@@ -4,6 +4,7 @@ import br.edu.fatec.libee.backend.dto.request.CreateCourseRequest;
 import br.edu.fatec.libee.backend.dto.response.CourseResponse;
 import br.edu.fatec.libee.backend.entity.Course;
 import br.edu.fatec.libee.backend.exception.ResourceAlreadyExistsException;
+import br.edu.fatec.libee.backend.exception.ResourceNotFoundException;
 import br.edu.fatec.libee.backend.repository.CourseRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -33,5 +34,12 @@ public class CourseService {
         return courseRepository.findAllByOrderByNameAsc().stream()
                 .map(CourseResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public void delete(Integer id) {
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Curso não encontrado."));
+        courseRepository.delete(course);
     }
 }

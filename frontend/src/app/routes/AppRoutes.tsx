@@ -4,6 +4,7 @@ import { RegisterPage } from '../../features/auth/pages/RegisterPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { InstitutionalPage } from '../../features/institutional/pages/InstitutionalPage';
 import { MainLayout } from '../layout/MainLayout';
+import { ProtectedRoute } from './ProtectedRoute';
 import { BookDetailsPage } from '@/features/book-details/pages/BooksDetailsPage';
 import { GalleryPage } from '../pages/GalleryPage';
 import LoansPage from '@/features/librarian/loans/pages/LoanPage';
@@ -12,14 +13,18 @@ import ReturnsPage from '@/features/librarian/returns/pages/ReturnsPage';
 import ReaderLoansPage from '@/features/reader/reader-loans/pages/ReaderLoansPage';
 import { CatalogPage } from '@/features/reader/catalog/pages/CatalogPage';
 import BookCollectionPage from '@/features/librarian/book-collection/pages/BookCollectionPage';
-import { ProtectedRoute } from './ProtectedRoute';
-import { PublicOnlyRoute } from './PublicOnlyRoute';
+import CollaboratorsPage from '@/features/admin/collaborators/pages/CollaboratorsPage';
+import CoursesPage from '@/features/admin/courses/pages/CoursesPage';
 import { useAuth } from '../providers/auth/useAuth';
 
 function BookDetailsLayout() {
   const { session } = useAuth();
   const profile =
-    session?.user.profile === 'LIBRARIAN' ? 'librarian' : 'reader';
+    session?.user.profile === 'LIBRARIAN'
+      ? 'librarian'
+      : session?.user.profile === 'ADMINISTRATOR'
+        ? 'admin'
+        : 'reader';
 
   return <MainLayout profile={profile} />;
 }
@@ -30,10 +35,9 @@ export function AppRoutes() {
       <Route element={<MainLayout profile="public" />}>
         <Route path="/" element={<InstitutionalPage />} />
       </Route>
-      <Route element={<PublicOnlyRoute />}>
-        <Route path="/entrar" element={<LoginPage />} />
-        <Route path="/cadastro" element={<RegisterPage />} />
-      </Route>
+
+      <Route path="/entrar" element={<LoginPage />} />
+      <Route path="/cadastro" element={<RegisterPage />} />
       <Route path="/galeria" element={<GalleryPage />} />
 
       <Route element={<ProtectedRoute allowedProfiles={['READER']} />}>
@@ -42,13 +46,19 @@ export function AppRoutes() {
           <Route path="/emprestimos" element={<ReaderLoansPage />} />
         </Route>
       </Route>
+
       <Route
-        element={<ProtectedRoute allowedProfiles={['READER', 'LIBRARIAN']} />}
+        element={
+          <ProtectedRoute
+            allowedProfiles={['READER', 'LIBRARIAN', 'ADMINISTRATOR']}
+          />
+        }
       >
         <Route element={<BookDetailsLayout />}>
           <Route path="/livros/:id" element={<BookDetailsPage />} />
         </Route>
       </Route>
+
       <Route element={<ProtectedRoute allowedProfiles={['LIBRARIAN']} />}>
         <Route element={<MainLayout profile="librarian" />}>
           <Route
@@ -58,6 +68,17 @@ export function AppRoutes() {
           <Route path="/gerenciamento/emprestimos" element={<LoansPage />} />
           <Route path="/gerenciamento/devolucoes" element={<ReturnsPage />} />
           <Route path="/gerenciamento/leitores" element={<ReadersPage />} />
+        </Route>
+      </Route>
+
+      <Route element={<ProtectedRoute allowedProfiles={['ADMINISTRATOR']} />}>
+        <Route element={<MainLayout profile="admin" />}>
+          <Route path="/administracao/leitores" element={<ReadersPage />} />
+          <Route
+            path="/administracao/colaboradores"
+            element={<CollaboratorsPage />}
+          />
+          <Route path="/administracao/cursos" element={<CoursesPage />} />
         </Route>
       </Route>
 

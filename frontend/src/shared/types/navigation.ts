@@ -1,5 +1,11 @@
 import type { LucideIcon } from 'lucide-react';
 
+export interface NavSubItem {
+  label: string;
+  to: string;
+  icon?: LucideIcon;
+}
+
 export interface NavLinkItem {
   label: string;
   to: string;
@@ -8,4 +14,6 @@ export interface NavLinkItem {
   end?: boolean;
   /** Rotas adicionais que também devem destacar este item no menu. */
   activePaths?: string[];
+  /** Subitens exibidos em dropdown ao clicar no item. */
+  children?: NavSubItem[];
 }
