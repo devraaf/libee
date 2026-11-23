@@ -2,7 +2,8 @@
 
 Interface web do **Libee**, sistema de gestão de biblioteca acadêmica desenvolvido inicialmente para a biblioteca da Fatec Cotia.
 
-O front-end segue o wireframe do projeto. Login, acervo, detalhes dos livros e empréstimos do leitor usam a API do back-end; outras telas ainda podem usar dados locais fictícios.
+O front-end segue o wireframe do projeto e está integrado ao back-end nas áreas
+de autenticação, acervo, livros, leitores, empréstimos e devoluções.
 
 ## Tecnologias
 
@@ -77,8 +78,48 @@ frontend/
     ├── index.css               # Estilos globais e entrada do Tailwind 4
     └── main.tsx                # Ponto de entrada
 ```
+Testes específicos de uma feature ou componente devem ficar próximos ao código testado, com o sufixo `.test.ts` ou `.test.tsx`. Use `src/test/` apenas para configurações, fixtures e utilitários compartilhados entre testes.
 
-Testes específicos de uma feature ou componente devem ficar em pastas próprias próximas ao código testado. Use `src/test/` apenas para configurações, fixtures e utilitários compartilhados entre testes.
+As pastas de cada funcionalidade em `src/features/` são criadas conforme as respectivas Issues forem desenvolvidas, seguindo este padrão:
+
+```text
+features/
+└── nome-da-feature/
+    ├── components/
+    ├── hooks/
+    ├── services/    # chamadas HTTP específicas da feature
+    ├── schemas/     # validações específicas da feature
+    └── types/
+```
+
+## Testes
+
+```bash
+npm test
+npm test -- src/features/librarian/book-collection
+npm run typecheck
+npm run lint
+```
+
+O Vitest usa o ambiente `jsdom`. A convenção é organizar os testes conforme a
+unidade responsável:
+
+| Tipo testado      | Localização                                                   |
+| ----------------- | ------------------------------------------------------------- |
+| Componente        | `components/<Nome>.test.tsx`, junto do componente             |
+| Página            | `pages/<Nome>.test.tsx`, junto da página                      |
+| Serviço HTTP      | `services/<nome>.test.ts`, junto do serviço                   |
+| Schema ou mapper  | `schemas/` ou `utils/`, com `.test.ts` junto da implementação |
+| Hook reutilizável | `hooks/<nome>.test.tsx`, junto do hook                        |
+| Cenário agregado  | `__tests__/` é reservado a testes que cruzam várias unidades  |
+
+Use mocks apenas nas fronteiras externas, como `httpClient`, serviços da
+feature e dados da API. Evite mocks que substituam a lógica que está sendo
+testada. Os nomes dos casos devem explicar o comportamento observado:
+`nomeDoComportamento_quandoCondicao` para funções internas ou nomes legíveis
+`describe`/`it` para componentes e fluxos. Testes novos devem ficar próximos
+ao código afetado e não ser agrupados em uma pasta genérica sem relação com a
+feature.
 
 ## Rotas e layouts
 
@@ -111,19 +152,10 @@ conferida ao alterar `AppRoutes`. Quando a página de administrador for criada,
 atualize o cenário correspondente em `src/app/routes/guards.test.tsx` para
 montar essa rota e verificar a home real, em vez da 404.
 
-Configure `VITE_API_BASE_URL` no ambiente local para apontar ao backend. Os testes unitários isolam a camada HTTP, mas a aplicação em execução usa os endpoints acima.
-
-As pastas de cada funcionalidade em `src/features/` são criadas conforme as respectivas Issues forem desenvolvidas, seguindo este padrão:
-
-```text
-features/
-└── nome-da-feature/
-    ├── components/
-    ├── hooks/
-    ├── services/    # chamadas HTTP específicas da feature
-    ├── schemas/     # validações específicas da feature
-    └── types/
-```
+Configure `VITE_API_BASE_URL` no ambiente local para apontar ao backend.
+Copie `frontend/.env.example` para `frontend/.env` e ajuste o valor quando
+necessário. Os testes unitários isolam a camada HTTP, mas a aplicação em
+execução usa os endpoints reais configurados pelos serviços das features.
 
 ## Convenções
 

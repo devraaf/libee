@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { affiliationTypeSchema } from '../../../shared/schemas/enums.schema';
+import { normalizePhone } from '../../../shared/utils/format-phone';
 
 export const loginSchema = z.object({
   email: z
@@ -31,7 +32,8 @@ export const registerSchema = z
         (value) =>
           value === '' || /^(?:\(\d{2}\)\s?|\d{2})\d{4,5}-?\d{4}$/.test(value),
         'Informe um telefone válido com DDD.',
-      ),
+      )
+      .transform(normalizePhone),
     affiliationType: affiliationTypeSchema,
     courseId: z.string(),
     email: z

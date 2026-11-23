@@ -8,6 +8,7 @@ import {
 import type { LoginFormData, RegisterFormData } from '../schemas/auth.schema';
 import { httpClient } from '@/shared/api/http-client';
 import { ApiError } from '@/shared/api/api-error';
+import { normalizePhone } from '@/shared/utils/format-phone';
 
 export type AuthSession = StoredSession;
 
@@ -47,7 +48,7 @@ export async function login(data: LoginFormData): Promise<AuthSession> {
 export async function register(
   data: RegisterFormData,
 ): Promise<RegisteredReader> {
-  const phone = data.phone.replace(/\D/g, '');
+  const phone = normalizePhone(data.phone);
 
   const { data: reader } = await httpClient.post<RegisteredReader>(
     '/auth/register',
