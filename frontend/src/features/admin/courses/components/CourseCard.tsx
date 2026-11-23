@@ -1,6 +1,5 @@
 import { GraduationCap, Pencil, Trash2 } from 'lucide-react';
-import { cn } from '../../../../shared/components/ui/cn';
-import { statusLabels, type Course } from '../types/course.model';
+import type { Course } from '../types/course.model';
 
 interface CourseCardProps {
   course: Course;
@@ -9,8 +8,6 @@ interface CourseCardProps {
 }
 
 export function CourseCard({ course, onEdit, onDelete }: CourseCardProps) {
-  const isActive = course.status === 'active';
-
   return (
     <article className="flex items-center justify-between gap-4 rounded-xl border border-line bg-surface p-4 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex min-w-0 items-center gap-3.5">
@@ -18,21 +15,10 @@ export function CourseCard({ course, onEdit, onDelete }: CourseCardProps) {
           <GraduationCap size={22} aria-hidden="true" />
         </div>
 
-        <div className="min-w-0 space-y-1">
-          <h2 className="font-semibold leading-snug text-fg">{course.name}</h2>
-
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span
-              className={cn(
-                'rounded-md px-2 py-0.5 font-semibold',
-                isActive
-                  ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-                  : 'bg-surface-hover text-muted',
-              )}
-            >
-              {statusLabels[course.status]}
-            </span>
-          </div>
+        <div className="min-w-0">
+          <h2 className="truncate font-semibold leading-snug text-fg">
+            {course.name}
+          </h2>
         </div>
       </div>
 

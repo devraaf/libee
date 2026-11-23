@@ -2,9 +2,7 @@ import { useEffect, useId, useState, type FormEvent } from 'react';
 import { Button } from '../../../../shared/components/ui/Button';
 import {
   createCourseSchema,
-  statusLabels,
   type CourseFormValues,
-  type CourseStatus,
 } from '../types/course.model';
 
 interface CreateCourseFormProps {
@@ -19,10 +17,7 @@ type FormErrors = Partial<Record<keyof CourseFormValues, string>>;
 
 const initialValues: CourseFormValues = {
   name: '',
-  status: 'active',
 };
-
-const statusOptions = Object.keys(statusLabels) as CourseStatus[];
 
 const inputClass =
   'w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-subtle focus:border-primary focus:outline-none';
@@ -102,31 +97,6 @@ export default function CreateCourseForm({
         />
         {errors.name && <p className={errorClass}>{errors.name}</p>}
       </div>
-
-      <fieldset>
-        <legend className={labelClass}>Status</legend>
-        <div className="flex flex-wrap items-center gap-4 type-small text-muted">
-          {statusOptions.map((status) => (
-            <label
-              key={status}
-              className="flex cursor-pointer items-center gap-1.5"
-            >
-              <input
-                type="radio"
-                name={`${id}-status`}
-                value={status}
-                checked={values.status === status}
-                onChange={() =>
-                  setValues((current) => ({ ...current, status }))
-                }
-                className="accent-primary"
-              />
-              {statusLabels[status]}
-            </label>
-          ))}
-        </div>
-        {errors.status && <p className={errorClass}>{errors.status}</p>}
-      </fieldset>
 
       {formError && (
         <p className={errorClass} role="alert">

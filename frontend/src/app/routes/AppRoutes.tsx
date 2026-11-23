@@ -4,6 +4,7 @@ import { RegisterPage } from '../../features/auth/pages/RegisterPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { InstitutionalPage } from '../pages/InstitutionalPage';
 import { MainLayout } from '../layout/MainLayout';
+import { ProtectedRoute } from './ProtectedRoute';
 import { BookDetailsPage } from '@/features/book-details/pages/BooksDetailsPage';
 import { GalleryPage } from '../pages/GalleryPage';
 import LoansPage from '@/features/librarian/loans/pages/LoanPage';
@@ -14,14 +15,16 @@ import { CatalogPage } from '@/features/reader/catalog/pages/CatalogPage';
 import BookCollectionPage from '@/features/librarian/book-collection/pages/BookCollectionPage';
 import CollaboratorsPage from '@/features/admin/collaborators/pages/CollaboratorsPage';
 import CoursesPage from '@/features/admin/courses/pages/CoursesPage';
-import { ProtectedRoute } from './ProtectedRoute';
-import { PublicOnlyRoute } from './PublicOnlyRoute';
 import { useAuth } from '../providers/auth/useAuth';
 
 function BookDetailsLayout() {
   const { session } = useAuth();
   const profile =
-    session?.user.profile === 'LIBRARIAN' ? 'librarian' : 'reader';
+    session?.user.profile === 'LIBRARIAN'
+      ? 'librarian'
+      : session?.user.profile === 'ADMINISTRATOR'
+        ? 'admin'
+        : 'reader';
 
   return <MainLayout profile={profile} />;
 }
@@ -32,10 +35,9 @@ export function AppRoutes() {
       <Route element={<MainLayout profile="public" />}>
         <Route path="/" element={<InstitutionalPage />} />
       </Route>
-      <Route element={<PublicOnlyRoute />}>
-        <Route path="/entrar" element={<LoginPage />} />
-        <Route path="/cadastro" element={<RegisterPage />} />
-      </Route>
+
+      <Route path="/entrar" element={<LoginPage />} />
+      <Route path="/cadastro" element={<RegisterPage />} />
       <Route path="/galeria" element={<GalleryPage />} />
 
       <Route element={<ProtectedRoute allowedProfiles={['READER']} />}>
@@ -46,7 +48,11 @@ export function AppRoutes() {
       </Route>
 
       <Route
-        element={<ProtectedRoute allowedProfiles={['READER', 'LIBRARIAN']} />}
+        element={
+          <ProtectedRoute
+            allowedProfiles={['READER', 'LIBRARIAN', 'ADMINISTRATOR']}
+          />
+        }
       >
         <Route element={<BookDetailsLayout />}>
           <Route path="/livros/:id" element={<BookDetailsPage />} />
@@ -55,7 +61,10 @@ export function AppRoutes() {
 
       <Route element={<ProtectedRoute allowedProfiles={['LIBRARIAN']} />}>
         <Route element={<MainLayout profile="librarian" />}>
-          <Route path="/gerenciamento/acervo" element={<BookCollectionPage />} />
+          <Route
+            path="/gerenciamento/acervo"
+            element={<BookCollectionPage />}
+          />
           <Route path="/gerenciamento/emprestimos" element={<LoansPage />} />
           <Route path="/gerenciamento/devolucoes" element={<ReturnsPage />} />
           <Route path="/gerenciamento/leitores" element={<ReadersPage />} />

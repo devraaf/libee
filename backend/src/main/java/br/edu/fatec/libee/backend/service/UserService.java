@@ -2,6 +2,7 @@ package br.edu.fatec.libee.backend.service;
 
 import br.edu.fatec.libee.backend.dto.request.RegisterLibrarianRequest;
 import br.edu.fatec.libee.backend.dto.request.RegisterReaderRequest;
+import br.edu.fatec.libee.backend.dto.request.UpdateCollaboratorRequest;
 import br.edu.fatec.libee.backend.dto.response.UserResponse;
 import br.edu.fatec.libee.backend.entity.Course;
 import br.edu.fatec.libee.backend.entity.Student;
@@ -19,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Locale;
 
 @Service
@@ -28,6 +30,18 @@ public class UserService {
     private final StudentRepository studentRepository;
     private final CourseRepository courseRepository;
     private final PasswordEncoder passwordEncoder;
+
+    @Transactional(readOnly = true)
+    public List<UserResponse> listCollaborators() {
+        List<UserProfile> staffProfiles = List.of(
+                UserProfile.ADMINISTRATOR,
+                UserProfile.LIBRARIAN
+        );
+        return userRepository.findByProfileInOrderByNameAsc(staffProfiles)
+                .stream()
+                .map(UserResponse::from)
+                .toList();
+    }
 
     @Transactional
     public UserResponse createReader(RegisterReaderRequest request) {
@@ -67,6 +81,53 @@ public class UserService {
         User user = saveUser(request.name(), request.email(), request.password(),
                 request.phone(), request.affiliationType(), UserProfile.LIBRARIAN);
         return UserResponse.from(user);
+    }
+
+    @Transactional
+    public UserResponse updateCollaborator(Integer id, UpdateCollaboratorRequest request) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado."));
+
+        if (user.getProfile() != UserProfile.ADMINISTRATOR && user.getProfile() != UserProfile.LIBRARIAN) {
+            throw new InvalidFieldException("id", "O usuário informado não é um colaborador.");
+        }
+
+        if (request.affiliationType() == AffiliationType.STUDENT) {
+            throw new InvalidFieldException("affiliationType",
+                    "O colaborador não pode ter vínculo de aluno.");
+        }
+
+        if (request.profile() == UserProfile.READER) {
+            throw new InvalidFieldException("profile",
+                    "O perfil do colaborador deve ser ADMINISTRATOR ou LIBRARIAN.");
+        }
+
+        String normalizedEmail = request.email().toLowerCase(Locale.ROOT);
+        userRepository.findByEmailIgnoreCase(normalizedEmail)
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new ResourceAlreadyExistsException("Já existe um usuário com este e-mail.");
+                });
+
+        user.setName(request.name().trim());
+        user.setEmail(normalizedEmail);
+        user.setPhone(request.phone());
+        user.setProfile(request.profile());
+        user.setAffiliationType(request.affiliationType());
+
+        return UserResponse.from(userRepository.save(user));
+    }
+
+    @Transactional
+    public void deleteCollaborator(Integer id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Colaborador não encontrado."));
+
+        if (user.getProfile() != UserProfile.ADMINISTRATOR && user.getProfile() != UserProfile.LIBRARIAN) {
+            throw new InvalidFieldException("id", "O usuário informado não é um colaborador.");
+        }
+
+        userRepository.delete(user);
     }
 
     private User saveUser(String name, String email, String password, String phone,

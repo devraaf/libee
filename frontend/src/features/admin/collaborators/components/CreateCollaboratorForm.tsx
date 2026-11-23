@@ -8,26 +8,34 @@ import {
   type CollaboratorRole,
 } from '../types/collaborator.model';
 
+export type CollaboratorSubmitValues = CollaboratorFormValues & {
+  password: string;
+};
+
 interface CreateCollaboratorFormProps {
   initialData?: CollaboratorFormValues;
   submitLabel?: string;
   submittingLabel?: string;
   onCancel: () => void;
-  onSubmit?: (values: CollaboratorFormValues) => void | Promise<void>;
+  onSubmit?: (values: CollaboratorSubmitValues) => void | Promise<void>;
 }
 
 type FormState = Omit<CollaboratorFormValues, 'role'> & {
   role: CollaboratorRole | '';
+  password: string;
 };
-type FormErrors = Partial<Record<keyof CollaboratorFormValues, string>>;
+
+type FormErrors = Partial<Record<keyof CollaboratorSubmitValues, string>>;
 
 const emptyValues: FormState = {
   name: '',
   email: '',
   phone: '',
+  password: '',
   role: '',
 };
 
+const PHONE_REGEX = /^[1-9]{2}(9[0-9]{8}|[2-5][0-9]{7})$/;
 const roleOptions = Object.keys(roleLabels) as CollaboratorRole[];
 
 const inputClass =
@@ -43,13 +51,16 @@ export default function CreateCollaboratorForm({
   onSubmit,
 }: CreateCollaboratorFormProps) {
   const id = useId();
-  const [values, setValues] = useState<FormState>(initialData ?? emptyValues);
+  const isEditing = Boolean(initialData);
+  const [values, setValues] = useState<FormState>(
+    initialData ? { ...initialData, password: '' } : emptyValues,
+  );
   const [errors, setErrors] = useState<FormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    setValues(initialData ?? emptyValues);
+    setValues(initialData ? { ...initialData, password: '' } : emptyValues);
     setErrors({});
     setFormError(null);
   }, [initialData]);
@@ -62,16 +73,34 @@ export default function CreateCollaboratorForm({
     setFormError(null);
 
     const result = createCollaboratorSchema.safeParse(values);
+    const formattedErrors: FormErrors = {};
 
     if (!result.success) {
-      const formattedErrors: FormErrors = {};
       result.error.issues.forEach((issue) => {
         const fieldName = issue.path[0] as
-          | keyof CollaboratorFormValues
+          | keyof CollaboratorSubmitValues
           | undefined;
         if (!fieldName || formattedErrors[fieldName]) return;
         formattedErrors[fieldName] = issue.message;
       });
+    }
+
+    const digitsPhone = values.phone.replace(/\D/g, '');
+    if (digitsPhone && !PHONE_REGEX.test(digitsPhone)) {
+      formattedErrors.phone =
+        'Telefone inválido. Use DDD válido + 9 dígitos (celular) ou 8 dígitos (fixo).';
+    }
+
+    if (!isEditing) {
+      if (!values.password.trim()) {
+        formattedErrors.password = 'Informe uma senha inicial.';
+      } else if (values.password.length < 8 || values.password.length > 72) {
+        formattedErrors.password =
+          'A senha deve ter entre 8 e 72 caracteres.';
+      }
+    }
+
+    if (!result.success || Object.keys(formattedErrors).length > 0) {
       setErrors(formattedErrors);
       return;
     }
@@ -79,7 +108,10 @@ export default function CreateCollaboratorForm({
     setErrors({});
     setIsSubmitting(true);
     try {
-      await onSubmit?.(result.data);
+      await onSubmit?.({
+        ...result.data,
+        password: values.password,
+      });
       onCancel();
     } catch (error) {
       setFormError(
@@ -139,6 +171,23 @@ export default function CreateCollaboratorForm({
         />
         {errors.phone && <p className={errorClass}>{errors.phone}</p>}
       </div>
+
+      {!isEditing && (
+        <div>
+          <label htmlFor={`${id}-password`} className={labelClass}>
+            Senha
+          </label>
+          <input
+            id={`${id}-password`}
+            type="password"
+            placeholder="Mínimo 8 caracteres"
+            value={values.password}
+            onChange={(e) => setField('password', e.target.value)}
+            className={inputClass}
+          />
+          {errors.password && <p className={errorClass}>{errors.password}</p>}
+        </div>
+      )}
 
       <fieldset>
         <legend className={labelClass}>Perfil de acesso</legend>

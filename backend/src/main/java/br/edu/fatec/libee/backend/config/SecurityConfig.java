@@ -50,8 +50,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/auth/login", "/auth/register").permitAll()
                         .requestMatchers(HttpMethod.GET, "/courses").permitAll()
                         // Somente administrador
+                        .requestMatchers(HttpMethod.GET, "/users/collaborators/**").hasRole("ADMINISTRATOR")
+                        .requestMatchers(HttpMethod.PUT, "/users/collaborators/**").hasRole("ADMINISTRATOR")
+                        .requestMatchers(HttpMethod.DELETE, "/users/collaborators/**").hasRole("ADMINISTRATOR")
                         .requestMatchers(HttpMethod.POST, "/users/librarians").hasRole("ADMINISTRATOR")
                         .requestMatchers(HttpMethod.POST, "/courses").hasRole("ADMINISTRATOR")
+                        .requestMatchers(HttpMethod.DELETE, "/courses/**").hasRole("ADMINISTRATOR")
                         // Bibliotecário
                         .requestMatchers(HttpMethod.GET, "/books/management/**", "/loans/management/**").hasRole("LIBRARIAN")
                         .requestMatchers(HttpMethod.POST, "/books", "/loans", "/loans/returns", "/categories").hasRole("LIBRARIAN")
@@ -69,7 +73,7 @@ public class SecurityConfig {
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint(problemHandler)
                         .accessDeniedHandler(problemHandler));
-       return http.build();
+        return http.build();
     }
 
     @Bean

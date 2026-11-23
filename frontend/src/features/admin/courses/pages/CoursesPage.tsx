@@ -1,48 +1,53 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Search, X } from 'lucide-react';
+import { ApiError } from '../../../../shared/api/api-error';
 import { Button } from '../../../../shared/components/ui/Button';
 import { CourseCard } from '../components/CourseCard';
 import CreateCourseForm from '../components/CreateCourseForm';
+import {
+  createCourse,
+  deleteCourse,
+  listCourses,
+} from '../services/courses.service';
 import type { Course, CourseFormValues } from '../types/course.model';
 
-const mockCourses: Course[] = [
-  {
-    id: '1',
-    name: 'Desenvolvimento de Software Multiplataforma',
-    status: 'active',
-  },
-  {
-    id: '2',
-    name: 'Ciência de Dados',
-    status: 'active',
-  },
-  {
-    id: '3',
-    name: 'Gestão Empresarial',
-    status: 'active',
-  },
-  {
-    id: '4',
-    name: 'Gestão da Produção Industrial',
-    status: 'active',
-  },
-  {
-    id: '5',
-    name: 'Comércio Exterior',
-    status: 'active',
-  },
-  {
-    id: '6',
-    name: 'Design de Produto',
-    status: 'inactive',
-  },
-];
-
 export default function CoursesPage() {
-  const [courses, setCourses] = useState<Course[]>(mockCourses);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [courseToDelete, setCourseToDelete] = useState<Course | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+
+  async function loadCourses() {
+    setIsLoading(true);
+    setPageError(null);
+
+    try {
+      const data = await listCourses();
+      setCourses(
+        data.map((course) => ({
+          id: String(course.id),
+          name: course.name,
+        })),
+      );
+    } catch (error) {
+      setPageError(
+        error instanceof ApiError
+          ? error.message
+          : 'Não foi possível carregar os cursos.',
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadCourses();
+  }, []);
 
   const filteredCourses = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -53,6 +58,7 @@ export default function CoursesPage() {
   }, [courses, search]);
 
   const handleOpenCreateModal = () => {
+    setActionNotice(null);
     setEditingCourse(null);
     setIsModalOpen(true);
   };
@@ -68,24 +74,56 @@ export default function CoursesPage() {
   };
 
   const handleSaveCourse = async (values: CourseFormValues) => {
+    setPageError(null);
+    setActionNotice(null);
+
     if (editingCourse) {
-      setCourses((prev) =>
-        prev.map((item) =>
-          item.id === editingCourse.id ? { ...item, ...values } : item,
-        ),
+      setActionNotice(
+        'A edição de cursos ainda não está disponível na API do backend.',
       );
       return;
     }
 
+    const created = await createCourse({ name: values.name.trim() });
     const newCourse: Course = {
-      id: crypto.randomUUID(),
-      ...values,
+      id: String(created.id),
+      name: created.name,
     };
     setCourses((prev) => [newCourse, ...prev]);
   };
 
-  const handleDeleteCourse = (target: Course) => {
-    setCourses((prev) => prev.filter((item) => item.id !== target.id));
+  const handleRequestDeleteCourse = (target: Course) => {
+    setPageError(null);
+    setActionNotice(null);
+    setCourseToDelete(target);
+  };
+
+  const handleCancelDelete = () => {
+    if (isDeleting) return;
+    setCourseToDelete(null);
+  };
+
+  const handleConfirmDeleteCourse = async () => {
+    if (!courseToDelete) return;
+
+    setPageError(null);
+    setActionNotice(null);
+    setIsDeleting(true);
+
+    try {
+      await deleteCourse(courseToDelete.id);
+      setCourses((prev) => prev.filter((course) => course.id !== courseToDelete.id));
+      setCourseToDelete(null);
+      setActionNotice('Curso excluído com sucesso.');
+    } catch (error) {
+      setPageError(
+        error instanceof ApiError
+          ? error.message
+          : 'Não foi possível excluir o curso.',
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const isEditing = Boolean(editingCourse);
@@ -126,7 +164,36 @@ export default function CoursesPage() {
         </div>
       </div>
 
-      {filteredCourses.length === 0 ? (
+      {pageError && (
+        <div
+          role="alert"
+          className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger"
+        >
+          <span>{pageError}</span>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void loadCourses()}
+          >
+            Tentar novamente
+          </Button>
+        </div>
+      )}
+
+      {actionNotice && (
+        <div
+          role="status"
+          className="mb-6 rounded-xl border border-line bg-surface px-4 py-3 text-sm text-muted"
+        >
+          {actionNotice}
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="rounded-xl border border-line bg-surface p-10 text-center text-sm text-muted">
+          Carregando cursos...
+        </div>
+      ) : filteredCourses.length === 0 ? (
         <div className="rounded-xl border border-line bg-surface p-10 text-center text-sm text-muted">
           Nenhum curso encontrado.
         </div>
@@ -137,7 +204,7 @@ export default function CoursesPage() {
               key={course.id}
               course={course}
               onEdit={handleOpenEditModal}
-              onDelete={handleDeleteCourse}
+              onDelete={handleRequestDeleteCourse}
             />
           ))}
         </div>
@@ -170,18 +237,67 @@ export default function CoursesPage() {
 
             <CreateCourseForm
               initialData={
-                editingCourse
-                  ? {
-                      name: editingCourse.name,
-                      status: editingCourse.status,
-                    }
-                  : undefined
+                editingCourse ? { name: editingCourse.name } : undefined
               }
               submitLabel={isEditing ? 'Salvar alterações' : 'Confirmar'}
               submittingLabel={isEditing ? 'Salvando...' : 'Cadastrando...'}
               onCancel={handleCloseModal}
               onSubmit={handleSaveCourse}
             />
+          </div>
+        </div>
+      )}
+
+      {courseToDelete && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-course-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-6 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h2
+                id="delete-course-title"
+                className="text-lg font-bold text-fg"
+              >
+                Confirmar exclusão
+              </h2>
+              <button
+                type="button"
+                onClick={handleCancelDelete}
+                disabled={isDeleting}
+                aria-label="Fechar confirmação"
+                className="rounded-lg p-1.5 text-muted hover:bg-surface-hover hover:text-fg disabled:opacity-50"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="text-sm text-muted">
+              Tem certeza que deseja excluir o curso{' '}
+              <strong className="text-fg">{courseToDelete.name}</strong>? Essa
+              ação não poderá ser desfeita.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCancelDelete}
+                disabled={isDeleting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirmDeleteCourse}
+                disabled={isDeleting}
+                className="bg-danger text-white hover:bg-danger/90"
+              >
+                {isDeleting ? 'Excluindo...' : 'Excluir'}
+              </Button>
+            </div>
           </div>
         </div>
       )}
