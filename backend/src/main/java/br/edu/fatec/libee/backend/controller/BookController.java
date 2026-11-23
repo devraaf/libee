@@ -3,6 +3,7 @@ package br.edu.fatec.libee.backend.controller;
 import br.edu.fatec.libee.backend.dto.request.AddCopiesRequest;
 import br.edu.fatec.libee.backend.dto.request.CopyRequest;
 import br.edu.fatec.libee.backend.dto.request.RegisterBookRequest;
+import br.edu.fatec.libee.backend.dto.request.UpdateBookRequest;
 import br.edu.fatec.libee.backend.dto.response.*;
 import br.edu.fatec.libee.backend.service.BookLookupService;
 import br.edu.fatec.libee.backend.service.BookService;
@@ -51,6 +52,7 @@ public class BookController {
     public ResponseEntity<BookManagementSummaryResponse> getManagementSummary() {
         return ResponseEntity.ok(bookService.getManagementSummary());
     }
+
     @GetMapping("/management/lookup")
     public BookLookupResponse lookupByIsbn(
             @RequestParam(required = false) String isbn){
@@ -63,6 +65,15 @@ public class BookController {
         BookDetailsResponse body = bookService.getBookById(id);
         URI location = URI.create("/books/" + id);
         return ResponseEntity.created(location).body(body);
+    }
+
+        @PutMapping("/{id}")
+    public ResponseEntity<Void> updateBook(
+            @PathVariable Integer id,
+            @Valid @RequestBody UpdateBookRequest request) {
+
+        bookService.updateBook(id, request);
+        return ResponseEntity.noContent().build(); // Retorna HTTP 204 No Content
     }
 
     @PostMapping("/{bookId}/copies")
