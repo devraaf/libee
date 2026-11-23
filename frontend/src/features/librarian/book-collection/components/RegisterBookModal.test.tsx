@@ -31,6 +31,9 @@ async function fillRequiredBookFields() {
   fireEvent.change(await screen.findByPlaceholderText('Título da obra'), {
     target: { value: 'Livro de teste' },
   });
+  expect(
+    screen.getAllByRole('heading', { name: 'Dados bibliográficos' }),
+  ).toHaveLength(1);
   fireEvent.change(screen.getByRole('combobox'), {
     target: { value: '3' },
   });

@@ -1,36 +1,130 @@
+import { useState } from 'react';
 import { useFieldArray, useFormContext } from 'react-hook-form';
-import { Plus, Trash2 } from 'lucide-react';
-import type {
-  RegisterBookFormData,
-  RegisterBookFormInput,
-} from '../schemas/book.schema';
+import { Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Button } from '@/shared/components/ui/Button';
+import { IconButton } from '@/shared/components/ui/IconButton';
+import { Input } from '@/shared/components/ui/Input';
+import type { BookFormData, BookFormInput } from '../schemas/book.schema';
+import { generateCopySuggestions } from '../utils/generate-copy-suggestions';
 
-export function BookCopiesFields() {
+interface BookCopiesFieldsProps {
+  lockedCopyIds?: number[];
+  removingCopyId?: number | null;
+  onRemoveExistingCopy?: (copyId: number) => void;
+}
+
+export function BookCopiesFields({
+  lockedCopyIds = [],
+  removingCopyId = null,
+  onRemoveExistingCopy,
+}: BookCopiesFieldsProps) {
   const {
     control,
+    getValues,
     register,
+    setValue,
     formState: { errors },
-  } = useFormContext<RegisterBookFormInput, unknown, RegisterBookFormData>();
+  } = useFormContext<BookFormInput, unknown, BookFormData>();
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'copies',
   });
+  const [copyQuantity, setCopyQuantity] = useState(fields.length || 1);
+  const [defaultLocation, setDefaultLocation] = useState('');
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
+  function handleGenerateCopySuggestions() {
+    const copies = getValues('copies');
+    const result = generateCopySuggestions(
+      copies,
+      copyQuantity,
+      defaultLocation,
+      fields.length,
+    );
+    if (typeof result === 'string') {
+      setGenerationError(result);
+      return;
+    }
+
+    const suggestions = [...result.suggestions];
+    for (const emptyCopyIndex of result.emptyCopyIndexes) {
+      const generatedCopy = suggestions.shift();
+      if (!generatedCopy) {
+        break;
+      }
+      setValue(
+        `copies.${emptyCopyIndex}.accessionNumber`,
+        generatedCopy.accessionNumber,
+        { shouldDirty: true, shouldValidate: true },
+      );
+      setValue(
+        `copies.${emptyCopyIndex}.physicalLocation`,
+        generatedCopy.physicalLocation,
+        { shouldDirty: true, shouldValidate: true },
+      );
+    }
+
+    if (suggestions.length > 0) {
+      append(suggestions);
+    }
+
+    setGenerationError(null);
+  }
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-fg">Exemplares da obra</h3>
-        <button
+        <h3 className="type-label text-fg">Exemplares da obra</h3>
+        <Button
           type="button"
+          size="sm"
+          variant="outline"
           onClick={() => append({ accessionNumber: '', physicalLocation: '' })}
-          className="flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary-hover"
+          leftIcon={<Plus size={14} aria-hidden="true" />}
         >
-          <Plus size={14} /> Adicionar exemplar
-        </button>
+          Adicionar exemplar
+        </Button>
+      </div>
+
+      <div className="rounded-lg border border-line bg-surface-warm p-3">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)_auto] sm:items-end">
+          <Input
+            id="copy-quantity"
+            type="number"
+            min={1}
+            label="Quantidade de cópias"
+            value={copyQuantity}
+            onChange={(event) => setCopyQuantity(Number(event.target.value))}
+          />
+          <Input
+            id="copy-default-location"
+            type="text"
+            label="Localização física padrão"
+            placeholder="Usa a primeira preenchida"
+            value={defaultLocation}
+            onChange={(event) => setDefaultLocation(event.target.value)}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleGenerateCopySuggestions}
+            leftIcon={<Sparkles size={14} aria-hidden="true" />}
+          >
+            Gerar exemplares
+          </Button>
+        </div>
+        <p className="type-caption mt-2 text-muted">
+          Os tombos serão sugeridos em sequência e continuarão editáveis.
+        </p>
+        {generationError && (
+          <p className="type-caption mt-2 text-danger" role="alert">
+            {generationError}
+          </p>
+        )}
       </div>
 
       {errors.copies?.root?.message && (
-        <p className="text-xs text-danger" role="alert">
+        <p className="type-caption text-danger" role="alert">
           {errors.copies.root.message}
         </p>
       )}
@@ -41,68 +135,63 @@ export function BookCopiesFields() {
           className="relative flex flex-col gap-3 rounded-lg border border-line bg-surface-warm p-3"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-fg">
+            <span className="type-caption font-semibold text-fg">
               Exemplar {index + 1}
             </span>
-            <button
+            <IconButton
               type="button"
-              onClick={() => remove(index)}
-              aria-label={`Remover exemplar ${index + 1}`}
-              className="text-danger hover:text-danger"
-            >
-              <Trash2 size={14} />
-            </button>
+              label={
+                typeof field.copyId === 'number'
+                  ? 'Excluir exemplar'
+                  : `Remover exemplar ${index + 1}`
+              }
+              icon={<Trash2 size={14} aria-hidden="true" />}
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (typeof field.copyId === 'number') {
+                  onRemoveExistingCopy?.(field.copyId);
+                } else {
+                  remove(index);
+                }
+              }}
+              title={
+                typeof field.copyId === 'number' &&
+                lockedCopyIds.includes(field.copyId)
+                  ? 'Exemplares com empréstimo ativo não podem ser excluídos.'
+                  : undefined
+              }
+              disabled={
+                (typeof field.copyId === 'number' &&
+                  lockedCopyIds.includes(field.copyId)) ||
+                (typeof field.copyId === 'number' &&
+                  removingCopyId === field.copyId)
+              }
+              className="text-fg hover:text-danger"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label
-                htmlFor={`copy-${index}-accession`}
-                className="mb-1 block text-xs font-semibold text-fg"
-              >
-                Tombo (Nº de Registro) *
-              </label>
-              <input
+              <Input
                 id={`copy-${index}-accession`}
                 {...register(`copies.${index}.accessionNumber`)}
                 type="text"
+                label={`Tombo do exemplar ${index + 1} *`}
                 placeholder="ex: 0090"
-                className={`w-full rounded-lg border bg-surface px-3 py-2 text-sm text-fg focus:outline-none ${
-                  errors.copies?.[index]?.accessionNumber
-                    ? 'border-danger bg-danger-bg'
-                    : 'border-line focus:border-primary'
-                }`}
+                readOnly={typeof field.copyId === 'number'}
+                error={errors.copies?.[index]?.accessionNumber?.message}
               />
-              {errors.copies?.[index]?.accessionNumber && (
-                <span className="mt-1.5 block text-xs font-medium text-danger">
-                  {errors.copies[index]?.accessionNumber?.message}
-                </span>
-              )}
             </div>
-
             <div>
-              <label
-                htmlFor={`copy-${index}-location`}
-                className="mb-1 block text-xs font-semibold text-fg"
-              >
-                Localização Física *
-              </label>
-              <input
+              <Input
                 id={`copy-${index}-location`}
                 {...register(`copies.${index}.physicalLocation`)}
                 type="text"
+                label={`Localização Física do exemplar ${index + 1} *`}
                 placeholder="ex: Estante A-01"
-                className={`w-full rounded-lg border bg-surface px-3 py-2 text-sm text-fg focus:outline-none ${
-                  errors.copies?.[index]?.physicalLocation
-                    ? 'border-danger bg-danger-bg'
-                    : 'border-line focus:border-primary'
-                }`}
+                error={errors.copies?.[index]?.physicalLocation?.message}
               />
-              {errors.copies?.[index]?.physicalLocation && (
-                <span className="mt-1.5 block text-xs font-medium text-danger">
-                  {errors.copies[index]?.physicalLocation?.message}
-                </span>
-              )}
             </div>
           </div>
         </div>

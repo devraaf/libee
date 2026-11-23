@@ -47,6 +47,24 @@ export interface RegisterBookRequest {
   }>;
 }
 
+export interface UpdateCopyRequest {
+  id: number;
+  physicalLocation: string;
+}
+
+export interface UpdateBookRequest extends Omit<RegisterBookRequest, 'copies'> {
+  copies: UpdateCopyRequest[];
+}
+
+export interface RegisterCopyRequest {
+  accessionNumber: string;
+  physicalLocation: string;
+}
+
+export interface AddCopiesRequest {
+  copies: RegisterCopyRequest[];
+}
+
 export interface RegisteredBookDto {
   id: number;
   title: string;

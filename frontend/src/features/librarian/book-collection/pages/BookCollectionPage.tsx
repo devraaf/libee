@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { EmptyState } from '@/shared/components/ui/EmptyState';
-import { Loader } from '@/shared/components/ui/loader/Loader';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
 import SearchFilterBar from '@/shared/components/ui/SearchFilterBar';
+import { Select } from '@/shared/components/ui/Select';
 import { ApiError } from '@/shared/api/api-error';
 import { listCategories } from '@/shared/services/categories.service';
 import {
@@ -25,29 +25,26 @@ import {
 import DeleteBookModal from '../components/DeleteBookModal';
 import EditBookModal from '../components/EditBookModal';
 import RegisterBookModal from '../components/RegisterBookModal';
+import { LoadingState } from '../../shared/components/LoadingState';
+import { SuccessToast } from '../../shared/components/SuccessToast';
+import {
+  usePaginatedManagementList,
+  type ManagementListParams,
+} from '../../shared/hooks/usePaginatedManagementList';
+import { useTransientMessage } from '../../shared/hooks/useTransientMessage';
+import { getErrorMessage } from '../../shared/utils/error-message';
 
 const PAGE_SIZE = 10;
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : 'Não foi possível carregar os dados do acervo.';
-}
 
 export default function BookCollectionPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [books, setBooks] = useState<BookCollectionItem[]>([]);
   const [categories, setCategories] = useState<
     Array<{ id: number; name: string }>
   >([]);
   const [summary, setSummary] = useState<BookManagementSummaryDto | null>(null);
-  const [isLoadingBooks, setIsLoadingBooks] = useState(true);
-  const [booksError, setBooksError] = useState<string | null>(null);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [categoriesRetry, setCategoriesRetry] = useState(0);
@@ -63,7 +60,8 @@ export default function BookCollectionPage() {
   const [blockedAccessionNumbers, setBlockedAccessionNumbers] = useState<
     string[]
   >([]);
-  const [successToast, setSuccessToast] = useState<string | null>(null);
+  const { message: successToast, setMessage: setSuccessToast } =
+    useTransientMessage();
 
   useEffect(() => {
     let active = true;
@@ -75,7 +73,14 @@ export default function BookCollectionPage() {
         }
       })
       .catch((error: unknown) => {
-        if (active) setCategoriesError(getErrorMessage(error));
+        if (active) {
+          setCategoriesError(
+            getErrorMessage(
+              error,
+              'Não foi possível carregar os dados do acervo.',
+            ),
+          );
+        }
       })
       .finally(() => {
         if (active) setCategoriesLoading(false);
@@ -86,52 +91,45 @@ export default function BookCollectionPage() {
     };
   }, [categoriesRetry]);
 
-  useEffect(() => {
-    let active = true;
-    const timeoutId = window.setTimeout(() => {
-      async function loadBooks() {
-        setIsLoadingBooks(true);
-        setBooksError(null);
-        try {
-          const category = categories.find(
-            ({ name }) => name === categoryFilter,
-          );
-          const result = await listManagedBooks({
-            page,
-            size: PAGE_SIZE,
-            search,
-            categoryId: category?.id,
-          });
-          if (!active) return;
-          setBooks(
-            result.content.map((book) => ({
-              id: book.id,
-              title: book.title,
-              authors: book.authors.join(', '),
-              isbn: book.isbn,
-              category: book.category,
-              copies: book.totalCopies,
-              availableCopies: book.availableCopies,
-              coverImageUrl: book.coverImageUrl,
-            })),
-          );
-          setTotalItems(result.totalElements);
-          setTotalPages(Math.max(result.totalPages, 1));
-        } catch (error) {
-          if (active) setBooksError(getErrorMessage(error));
-        } finally {
-          if (active) setIsLoadingBooks(false);
-        }
-      }
-
-      void loadBooks();
-    }, 250);
-
-    return () => {
-      active = false;
-      window.clearTimeout(timeoutId);
-    };
-  }, [categories, categoryFilter, page, refresh, search]);
+  const loadBooks = useCallback(
+    async ({ page, size, search }: ManagementListParams) => {
+      const category = categories.find(({ name }) => name === categoryFilter);
+      const result = await listManagedBooks({
+        page,
+        size,
+        search,
+        categoryId: category?.id,
+      });
+      return {
+        ...result,
+        content: result.content.map((book) => ({
+          id: book.id,
+          title: book.title,
+          authors: book.authors.join(', '),
+          isbn: book.isbn,
+          category: book.category,
+          copies: book.totalCopies,
+          availableCopies: book.availableCopies,
+          coverImageUrl: book.coverImageUrl,
+        })),
+      };
+    },
+    [categories, categoryFilter],
+  );
+  const {
+    items: books,
+    totalItems,
+    totalPages,
+    isLoading: isLoadingBooks,
+    error: booksError,
+  } = usePaginatedManagementList({
+    page,
+    size: PAGE_SIZE,
+    search,
+    refreshKey: refresh,
+    loadPage: loadBooks,
+    errorFallback: 'Não foi possível carregar os dados do acervo.',
+  });
 
   useEffect(() => {
     let active = true;
@@ -143,7 +141,14 @@ export default function BookCollectionPage() {
         }
       })
       .catch((error: unknown) => {
-        if (active) setSummaryError(getErrorMessage(error));
+        if (active) {
+          setSummaryError(
+            getErrorMessage(
+              error,
+              'Não foi possível carregar os dados do acervo.',
+            ),
+          );
+        }
       });
 
     return () => {
@@ -156,19 +161,13 @@ export default function BookCollectionPage() {
     setRefresh((current) => current + 1);
   }
 
-  useEffect(() => {
-    if (!successToast) return;
-    const timeoutId = window.setTimeout(() => setSuccessToast(null), 4000);
-    return () => window.clearTimeout(timeoutId);
-  }, [successToast]);
-
   function handleBookRegisteredSuccess(newBook: RegisteredBookDto) {
     setIsRegisterModalOpen(false);
     setSearch('');
     setCategoryFilter('');
     setPage(1);
     refreshCollection();
-    setSuccessToast(`Livro "${newBook.title}" cadastrado com sucesso!`);
+    setSuccessToast(`Livro "${newBook.title}" cadastrado com sucesso.`);
   }
 
   async function handleDeleteBook() {
@@ -181,7 +180,9 @@ export default function BookCollectionPage() {
       refreshCollection();
       setSuccessToast(`Livro "${bookToDelete.title}" excluído com sucesso.`);
     } catch (error) {
-      setDeleteBookError(getErrorMessage(error));
+      setDeleteBookError(
+        getErrorMessage(error, 'Não foi possível carregar os dados do acervo.'),
+      );
       if (error instanceof ApiError) {
         setBlockedAccessionNumbers(error.accessionNumbers);
       }
@@ -199,14 +200,7 @@ export default function BookCollectionPage() {
 
   return (
     <section className="relative mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-8">
-      {successToast && (
-        <div
-          role="status"
-          className="fixed bottom-5 right-5 z-50 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg transition-all"
-        >
-          {successToast}
-        </div>
-      )}
+      <SuccessToast message={successToast} />
 
       <PageHeader
         title="Acervo"
@@ -242,24 +236,21 @@ export default function BookCollectionPage() {
           setPage(1);
         }}
         filterContent={
-          <label className="flex flex-col gap-2 text-sm text-fg">
-            Categoria
-            <select
-              value={categoryFilter}
-              onChange={(event) => {
-                setCategoryFilter(event.target.value);
-                setPage(1);
-              }}
-              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
-            >
-              <option value="">Todas as categorias</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.name}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Select
+            density="compact"
+            label="Categoria"
+            value={categoryFilter}
+            onChange={(event) => {
+              setCategoryFilter(event.target.value);
+              setPage(1);
+            }}
+            placeholder="Todas as categorias"
+            placeholderDisabled={false}
+            options={categories.map((category) => ({
+              value: category.name,
+              label: category.name,
+            }))}
+          />
         }
       />
       {categoriesError && (
@@ -269,13 +260,7 @@ export default function BookCollectionPage() {
       )}
 
       {isLoadingBooks ? (
-        <div
-          className="flex min-h-48 items-center justify-center"
-          role="status"
-          aria-label="Carregando acervo"
-        >
-          <Loader />
-        </div>
+        <LoadingState label="Carregando acervo" />
       ) : booksError ? (
         <EmptyState
           title="Não foi possível carregar o acervo."
@@ -327,6 +312,19 @@ export default function BookCollectionPage() {
         open={editingBookId !== null}
         bookId={editingBookId}
         categories={categories}
+        categoriesLoading={categoriesLoading}
+        categoriesError={categoriesError}
+        onRetryCategories={() => {
+          setCategoriesLoading(true);
+          setCategoriesRetry((current) => current + 1);
+        }}
+        onCategoryCreated={(category) =>
+          setCategories((current) =>
+            current.some(({ id }) => id === category.id)
+              ? current
+              : [...current, category],
+          )
+        }
         onClose={() => setEditingBookId(null)}
         onCopyDeleted={refreshCollection}
       />

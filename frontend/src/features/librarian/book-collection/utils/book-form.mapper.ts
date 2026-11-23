@@ -1,13 +1,15 @@
 import type { FieldPath } from 'react-hook-form';
 import type {
+  BookFormData,
   RegisterBookFormData,
   RegisterBookFormInput,
 } from '../schemas/book.schema';
-import type { RegisterBookRequest } from '../types/book-management';
+import type {
+  RegisterBookRequest,
+  UpdateBookRequest,
+} from '../types/book-management';
 
-export function toRegisterBookRequest(
-  data: RegisterBookFormData,
-): RegisterBookRequest {
+export function toUpdateBookRequest(data: BookFormData): UpdateBookRequest {
   return {
     title: data.title,
     authors: data.authors,
@@ -17,11 +19,27 @@ export function toRegisterBookRequest(
     publisher: data.publisher,
     place: data.publicationPlace,
     edition: data.edition,
-    publicationYear: data.publicationDate
-      ? Number(data.publicationDate.split('/')[2])
-      : null,
+    publicationYear: data.publicationDate,
     pageCount: data.pageCount,
     description: data.summary,
+    copies: data.copies.flatMap((copy) =>
+      copy.copyId === undefined
+        ? []
+        : [
+            {
+              id: copy.copyId,
+              physicalLocation: copy.physicalLocation.trim(),
+            },
+          ],
+    ),
+  };
+}
+
+export function toRegisterBookRequest(
+  data: RegisterBookFormData,
+): RegisterBookRequest {
+  return {
+    ...toUpdateBookRequest(data),
     copies: data.copies.map((copy) => ({
       accessionNumber: copy.accessionNumber.trim(),
       physicalLocation: copy.physicalLocation,

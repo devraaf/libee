@@ -1,21 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { get, post, deleteRequest } = vi.hoisted(() => ({
+const { get, post, put, deleteRequest } = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
+  put: vi.fn(),
   deleteRequest: vi.fn(),
 }));
 
 vi.mock('@/shared/api/http-client', () => ({
-  httpClient: { get, post, delete: deleteRequest },
+  httpClient: { get, post, put, delete: deleteRequest },
 }));
 
 import {
+  addManagedCopy,
   deleteManagedCopy,
   deleteManagedBook,
   getBookManagementSummary,
   listManagedBooks,
   registerManagedBook,
+  updateManagedBook,
 } from './book-management.service';
 
 describe('book management API service', () => {
@@ -84,6 +87,40 @@ describe('book management API service', () => {
     await registerManagedBook(request);
 
     expect(post).toHaveBeenCalledWith('/books', request);
+  });
+
+  it('updates book data using the book resource endpoint', async () => {
+    const request = {
+      title: 'Clean Code - revised',
+      authors: ['Robert C. Martin'],
+      categoryId: 3,
+      isbn: '9780132350884',
+      coverUrl: null,
+      publisher: null,
+      place: null,
+      edition: null,
+      publicationYear: 2008,
+      pageCount: 464,
+      description: null,
+      copies: [{ id: 24, physicalLocation: 'A-02' }],
+    };
+
+    await updateManagedBook(8, request);
+
+    expect(put).toHaveBeenCalledWith('/books/8', request);
+  });
+
+  it('posts a new copy to the book copies endpoint', async () => {
+    const request = {
+      accessionNumber: 'T-002',
+      physicalLocation: 'A-02',
+    };
+
+    await addManagedCopy(8, request);
+
+    expect(post).toHaveBeenCalledWith('/books/8/copies', {
+      copies: [request],
+    });
   });
 
   it('deletes a book using the backend resource path', async () => {

@@ -2,11 +2,14 @@ import { httpClient } from '@/shared/api/http-client';
 import { toApiPageParams } from '@/shared/api/request-params';
 import type { PageResponse } from '@/shared/types/library';
 import type {
+  AddCopiesRequest,
   BookLookupDto,
   BookManagementDto,
   BookManagementSummaryDto,
+  RegisterCopyRequest,
   RegisterBookRequest,
   RegisteredBookDto,
+  UpdateBookRequest,
 } from '../types/book-management';
 
 export async function listManagedBooks({
@@ -53,6 +56,21 @@ export async function registerManagedBook(
 ): Promise<RegisteredBookDto> {
   const { data } = await httpClient.post<RegisteredBookDto>('/books', request);
   return data;
+}
+
+export async function updateManagedBook(
+  bookId: number,
+  request: UpdateBookRequest,
+): Promise<void> {
+  await httpClient.put(`/books/${bookId}`, request);
+}
+
+export async function addManagedCopy(
+  bookId: number,
+  request: RegisterCopyRequest,
+): Promise<void> {
+  const body: AddCopiesRequest = { copies: [request] };
+  await httpClient.post(`/books/${bookId}/copies`, body);
 }
 
 export async function deleteManagedBook(bookId: number): Promise<void> {
